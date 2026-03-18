@@ -10,6 +10,8 @@ struct ScriptEditorView: View {
     @State private var title: String = ""
     @State private var content: String = ""
     @State private var showingDiscardAlert = false
+    @State private var isOptimizing = false
+    @State private var optimizeError: String?
     @FocusState private var contentFocused: Bool
 
     private var isNew: Bool { script == nil }
@@ -84,6 +86,14 @@ struct ScriptEditorView: View {
                 Button("Discard", role: .destructive) { dismiss() }
                 Button("Keep Editing", role: .cancel) {}
             }
+            .alert("Optimization Failed", isPresented: .init(
+                get: { optimizeError != nil },
+                set: { if !$0 { optimizeError = nil } }
+            )) {
+                Button("OK") { optimizeError = nil }
+            } message: {
+                Text(optimizeError ?? "")
+            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -103,6 +113,17 @@ struct ScriptEditorView: View {
             Label("\(wordCount) words", systemImage: "text.word.spacing")
             Label(estimatedReadTime, systemImage: "clock")
             Spacer()
+            Button {
+                optimizeForReading()
+            } label: {
+                if isOptimizing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Label("Optimize", systemImage: "wand.and.stars")
+                }
+            }
+            .disabled(isOptimizing || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -124,6 +145,20 @@ struct ScriptEditorView: View {
             modelContext.insert(newScript)
         }
         dismiss()
+    }
+
+    private func optimizeForReading() {
+        isOptimizing = true
+        Task {
+            do {
+                let aiResult = try await AnthropicService.optimizeForReading(content)
+                let cleaned = ScriptFormatter.cleanUp(aiResult)
+                content = cleaned
+            } catch {
+                optimizeError = "Could not format script. Check connection."
+            }
+            isOptimizing = false
+        }
     }
 
     private func pasteFromClipboard() {

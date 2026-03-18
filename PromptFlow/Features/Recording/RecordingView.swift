@@ -1,6 +1,25 @@
 import SwiftUI
 import AVFoundation
 
+// MARK: - Text width presets
+
+enum TextWidthPreset: String, CaseIterable, Identifiable {
+    case narrow = "Narrow"
+    case medium = "Medium"
+    case wide = "Wide"
+
+    var id: String { rawValue }
+
+    /// Fraction of screen width the container occupies
+    var fraction: CGFloat {
+        switch self {
+        case .narrow: return 0.50
+        case .medium: return 0.65
+        case .wide:   return 0.80
+        }
+    }
+}
+
 struct RecordingView: View {
     let script: Script
 
@@ -13,9 +32,20 @@ struct RecordingView: View {
     @State private var currentChunkIndex = 0
     @State private var wbwResetToken = UUID()
 
-    // Display settings — font is hardcoded large for maximum readability / eye contact
-    private let fontSize: CGFloat = 42
+    // Display settings
+    private let fontSize: CGFloat = 32
     @State private var readingSpeed: WordChunkEngine.ReadingSpeed = .medium
+
+    // Container positioning — persisted
+    @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
+    @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
+    private var textWidth: TextWidthPreset {
+        TextWidthPreset(rawValue: textWidthRaw) ?? .medium
+    }
+
+    // Drag state
+    @State private var dragOffsetX: CGFloat = 0
+    @State private var isDragging = false
 
     // Recording countdown
     @State private var countdownValue: Int = 0
@@ -26,9 +56,9 @@ struct RecordingView: View {
     // UI
     @State private var showControls = true
     @State private var controlsHideTask: Task<Void, Never>?
-    /// Controls container expand/collapse — stays true on pause, false only on reset
+    /// Container expand state — expands on appear, only collapses when leaving screen
     @State private var isExpanded = false
-    /// Delayed flag — text fades in after the container expand animation finishes
+    /// Text fades in after the container expand animation finishes
     @State private var showTextContent = false
     /// Smooth progress value animated continuously within each chunk
     @State private var smoothProgress: Double = 0
@@ -42,20 +72,24 @@ struct RecordingView: View {
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
 
-            // 2. Black container expanding from Dynamic Island
+            // 2. Black container expanding from Dynamic Island — narrower & draggable
             // Hardcoded DI dimensions: top=11pt, width=126pt, height=37.33pt, radius≈19pt
-            // Container shares the same top edge (y:11) and corner radius as the DI,
-            // so when both are black it looks like the island stretches downward.
             GeometryReader { geo in
                 let diTop: CGFloat = 11
                 let diHeight: CGFloat = 37.33
                 let cornerRadius: CGFloat = 28
                 let diWidth: CGFloat = 126
 
-                // Text + bottom padding
-                let contentHeight: CGFloat = fontSize + 12
-                let expandedContentHeight = diHeight + 6 + contentHeight
-                let expandedWidth = geo.size.width - 32
+                let contentHeight: CGFloat = fontSize + 4 + 10
+                let expandedContentHeight = diHeight + contentHeight
+                let expandedWidth = geo.size.width * textWidth.fraction
+
+                // Clamp: container must always cover the Dynamic Island AND stay 16pt from edges
+                let diCoverLimit = (expandedWidth - diWidth) / 2 - 16
+                let edgeLimit = (geo.size.width - expandedWidth) / 2 - 16
+                let maxOffset = max(0, min(diCoverLimit, edgeLimit))
+                let currentX = CGFloat(savedOffsetX) + dragOffsetX
+                let clampedX = min(max(currentX, -maxOffset), maxOffset)
 
                 VStack(spacing: 0) {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -64,19 +98,43 @@ struct RecordingView: View {
                             width: isExpanded ? expandedWidth : diWidth,
                             height: isExpanded ? expandedContentHeight : diHeight
                         )
-                        .overlay(alignment: .bottom) {
+                        .overlay(alignment: .top) {
                             if showTextContent {
                                 wordDisplay
-                                    .frame(width: expandedWidth)
-                                    .padding(.bottom, 10)
+                                    .frame(width: expandedWidth - 32)
+                                    .padding(.top, diHeight)
                                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
                             }
                         }
+                        .scaleEffect(isDragging ? 1.02 : 1.0)
+                        .offset(x: isExpanded ? clampedX : 0)
+                        .gesture(
+                            isExpanded ?
+                            DragGesture(minimumDistance: 5)
+                                .onChanged { value in
+                                    isDragging = true
+                                    // Clamp live so it hard-stops at limits
+                                    let proposed = CGFloat(savedOffsetX) + value.translation.width
+                                    let clamped = min(max(proposed, -maxOffset), maxOffset)
+                                    dragOffsetX = clamped - CGFloat(savedOffsetX)
+                                }
+                                .onEnded { value in
+                                    let newOffset = CGFloat(savedOffsetX) + value.translation.width
+                                    let clamped = min(max(newOffset, -maxOffset), maxOffset)
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                        savedOffsetX = Double(clamped)
+                                        dragOffsetX = 0
+                                        isDragging = false
+                                    }
+                                }
+                            : nil
+                        )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, diTop)
                 .ignoresSafeArea(edges: .top)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
+                .animation(.interactiveSpring(), value: isDragging)
             }
 
             // 3. Controls pinned to bottom
@@ -102,6 +160,15 @@ struct RecordingView: View {
             chunks = WordChunkEngine.chunks(from: script.content)
             cameraManager.configure(position: .front)
             scheduleControlsHide()
+            // Auto-expand container after a short delay so user sees text position
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isExpanded = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    withAnimation(.easeIn(duration: 0.15)) {
+                        showTextContent = true
+                    }
+                }
+            }
         }
         .onChange(of: currentChunkIndex) { _, newIndex in
             guard newIndex < chunks.count, isPlaying else { return }
@@ -138,16 +205,25 @@ struct RecordingView: View {
 
     // MARK: - Word display area
 
+    /// Shows placeholder loop before playback, real script during playback
+    @State private var hasStartedPlayback = false
+
     private var wordDisplay: some View {
-        WordByWordView(
-            chunks: chunks,
-            fontSize: fontSize,
-            speed: readingSpeed,
-            isPlaying: $isPlaying,
-            resetToken: $wbwResetToken,
-            onFinished: { isPlaying = false },
-            currentIndex: $currentChunkIndex
-        )
+        Group {
+            if hasStartedPlayback {
+                WordByWordView(
+                    chunks: chunks,
+                    fontSize: fontSize,
+                    speed: readingSpeed,
+                    isPlaying: $isPlaying,
+                    resetToken: $wbwResetToken,
+                    onFinished: { isPlaying = false },
+                    currentIndex: $currentChunkIndex
+                )
+            } else {
+                PlaceholderLoopView(fontSize: fontSize)
+            }
+        }
     }
 
     // MARK: - Scrubable progress bar
@@ -229,12 +305,13 @@ struct RecordingView: View {
 
                 Spacer()
 
-                Button { cameraManager.switchCamera() } label: {
-                    Image(systemName: "camera.rotate.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .shadow(radius: 4)
-                }
+                // DISABLED: front camera only for now
+                // Button { cameraManager.switchCamera() } label: {
+                //     Image(systemName: "camera.rotate.fill")
+                //         .font(.title2)
+                //         .foregroundStyle(.white)
+                //         .shadow(radius: 4)
+                // }
             }
             .padding(.horizontal, 20)
 
@@ -259,6 +336,7 @@ struct RecordingView: View {
                         .frame(width: 56, height: 56)
                         .background(.ultraThinMaterial, in: Circle())
                 }
+                .disabled(chunks.isEmpty)
 
                 // Record button
                 Button { toggleRecording() } label: {
@@ -337,32 +415,20 @@ struct RecordingView: View {
     // MARK: - Teleprompter control
 
     private func togglePlay() {
-        if isPlaying {
-            // Pause — stop scheduling but keep container expanded with text visible
-            isPlaying = false
-        } else if isExpanded {
-            // Resume — container already open, just restart scheduling
-            isPlaying = true
-        } else {
-            // Play from collapsed — expand first, then reveal text after 300ms
-            isExpanded = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                guard isExpanded else { return }
-                withAnimation(.easeIn(duration: 0.15)) {
-                    showTextContent = true
-                }
-                isPlaying = true
-            }
+        guard !chunks.isEmpty else { return }
+        if !hasStartedPlayback {
+            hasStartedPlayback = true
         }
+        isPlaying.toggle()
     }
 
     private func resetDisplay() {
         isPlaying = false
-        showTextContent = false
-        isExpanded = false
+        hasStartedPlayback = false
         currentChunkIndex = 0
         smoothProgress = 0
         wbwResetToken = UUID()
+        // Container stays open — only collapses when leaving the screen
     }
 
     // MARK: - Recording control
@@ -387,14 +453,8 @@ struct RecordingView: View {
                 countdownTimer = nil
                 isCountingDown = false
                 cameraManager.startRecording()
-                isExpanded = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    guard isExpanded else { return }
-                    withAnimation(.easeIn(duration: 0.15)) {
-                        showTextContent = true
-                    }
-                    isPlaying = true
-                }
+                hasStartedPlayback = true
+                isPlaying = true
             }
         }
     }

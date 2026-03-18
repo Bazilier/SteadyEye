@@ -1,5 +1,61 @@
 import SwiftUI
 
+// MARK: - Placeholder demo loop
+
+/// Cycles through sample words to demonstrate word-by-word display before playback starts.
+struct PlaceholderLoopView: View {
+    let fontSize: CGFloat
+
+    private let words = ["Your", "script", "will", "appear", "here", "word", "by", "word"]
+    @State private var currentIndex = 0
+    @State private var opacity: Double = 1
+    @State private var loopTask: Task<Void, Never>?
+
+    var body: some View {
+        Text(words[currentIndex])
+            .font(.system(size: fontSize, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.5))
+            .opacity(opacity)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 16)
+            .onAppear { startLoop() }
+            .onDisappear { loopTask?.cancel() }
+    }
+
+    private func startLoop() {
+        loopTask?.cancel()
+        currentIndex = 0
+        opacity = 1
+        loopTask = Task {
+            while !Task.isCancelled {
+                // Display current word
+                try? await Task.sleep(nanoseconds: 1_100_000_000) // 1.1s display
+                guard !Task.isCancelled else { return }
+
+                // Fade out
+                await MainActor.run { withAnimation(.easeOut(duration: 0.1)) { opacity = 0 } }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                guard !Task.isCancelled else { return }
+
+                // Advance index
+                let isLast = currentIndex == words.count - 1
+                await MainActor.run { currentIndex = isLast ? 0 : currentIndex + 1 }
+
+                // Fade in
+                await MainActor.run { withAnimation(.easeIn(duration: 0.1)) { opacity = 1 } }
+
+                // Extra pause after the last word before looping
+                if isLast {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    guard !Task.isCancelled else { return }
+                }
+            }
+        }
+    }
+}
+
 /// Pure content view — shows one word chunk at a time.
 /// Has NO positioning or safe-area logic; the parent handles layout.
 /// Scheduling state is isolated from recording state.

@@ -4,6 +4,8 @@ import SwiftData
 struct SettingsView: View {
     @Query private var settingsArray: [AppSettings]
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
+    @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
 
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
@@ -30,19 +32,33 @@ struct SettingsView: View {
                         .accentColor(.orange)
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Default Font Size")
-                            Spacer()
-                            Text("\(Int(settings.fontSize)) pt")
-                                .foregroundStyle(.secondary)
+                    // DISABLED: font size is hardcoded in RecordingView for now
+                    // VStack(alignment: .leading, spacing: 4) {
+                    //     HStack {
+                    //         Text("Default Font Size")
+                    //         Spacer()
+                    //         Text("\(Int(settings.fontSize)) pt")
+                    //             .foregroundStyle(.secondary)
+                    //     }
+                    //     Slider(value: Binding(
+                    //         get: { settings.fontSize },
+                    //         set: { settings.fontSize = $0 }
+                    //     ), in: 18...52, step: 2)
+                    //     .accentColor(.orange)
+                    // }
+                }
+
+                Section("Text Container") {
+                    Picker("Text Width", selection: $textWidthRaw) {
+                        ForEach(TextWidthPreset.allCases) { preset in
+                            Text(preset.rawValue).tag(preset.rawValue)
                         }
-                        Slider(value: Binding(
-                            get: { settings.fontSize },
-                            set: { settings.fontSize = $0 }
-                        ), in: 18...52, step: 2)
-                        .accentColor(.orange)
                     }
+
+                    Button("Reset Position to Default") {
+                        savedOffsetX = 20
+                    }
+                    .foregroundStyle(.orange)
                 }
 
                 Section("Recording") {
@@ -56,13 +72,14 @@ struct SettingsView: View {
                         Text("10 sec").tag(10)
                     }
 
-                    Picker("Default Camera", selection: Binding(
-                        get: { settings.cameraPosition },
-                        set: { settings.cameraPosition = $0 }
-                    )) {
-                        Text("Front").tag(CameraPositionPreference.front)
-                        Text("Back").tag(CameraPositionPreference.back)
-                    }
+                    // DISABLED: front camera only for now
+                    // Picker("Default Camera", selection: Binding(
+                    //     get: { settings.cameraPosition },
+                    //     set: { settings.cameraPosition = $0 }
+                    // )) {
+                    //     Text("Front").tag(CameraPositionPreference.front)
+                    //     Text("Back").tag(CameraPositionPreference.back)
+                    // }
                 }
 
                 Section("About") {

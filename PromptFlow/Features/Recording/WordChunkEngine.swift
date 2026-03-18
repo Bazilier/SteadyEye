@@ -80,9 +80,9 @@ enum WordChunkEngine {
         /// Milliseconds per character
         var msPerChar: Double {
             switch self {
-            case .slow:   return 100
-            case .medium: return 80
-            case .fast:   return 50
+            case .slow:   return 80
+            case .medium: return 50
+            case .fast:   return 30
             }
         }
     }
