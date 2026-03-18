@@ -1,13 +1,33 @@
 import SwiftUI
 import SwiftData
 
+/// Identifiable wrapper for the editor sheet — guarantees the correct value
+/// is passed into .sheet(item:), avoiding the stale-state capture bug.
+enum EditorMode: Identifiable {
+    case new
+    case edit(Script)
+
+    var id: String {
+        switch self {
+        case .new: return "new"
+        case .edit(let s): return s.id.uuidString
+        }
+    }
+
+    var script: Script? {
+        switch self {
+        case .new: return nil
+        case .edit(let s): return s
+        }
+    }
+}
+
 struct ScriptListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Script.updatedAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
-    @State private var showingEditor = false
-    @State private var selectedScript: Script?
+    @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
 
     private var filteredScripts: [Script] {
@@ -32,15 +52,14 @@ struct ScriptListView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        selectedScript = nil
-                        showingEditor = true
+                        editorMode = .new
                     } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
-            .sheet(isPresented: $showingEditor) {
-                ScriptEditorView(script: selectedScript)
+            .sheet(item: $editorMode) { mode in
+                ScriptEditorView(script: mode.script)
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script)
@@ -64,8 +83,7 @@ struct ScriptListView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Button {
-                selectedScript = nil
-                showingEditor = true
+                editorMode = .new
             } label: {
                 Label("New Script", systemImage: "plus")
                     .padding(.horizontal, 24)
@@ -79,26 +97,24 @@ struct ScriptListView: View {
     private var scriptsList: some View {
         List {
             ForEach(filteredScripts) { script in
-                Button {
-                    selectedScript = script
-                    showingEditor = true
-                } label: {
-                    HStack {
-                        ScriptRowView(script: script)
-                        Spacer()
-                        Button {
-                            scriptToRecord = script
-                        } label: {
-                            Image(systemName: "video.fill")
-                                .font(.body)
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(.orange, in: Circle())
-                        }
-                        .buttonStyle(.plain)
+                HStack {
+                    ScriptRowView(script: script)
+                    Spacer()
+                    Button {
+                        scriptToRecord = script
+                    } label: {
+                        Image(systemName: "video.fill")
+                            .font(.body)
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.orange, in: Circle())
                     }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    editorMode = .edit(script)
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         deleteScript(script)
