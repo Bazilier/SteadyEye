@@ -1,6 +1,13 @@
 import SwiftUI
 import AVFoundation
 
+// MARK: - Identifiable URL wrapper for fullScreenCover
+
+struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 // MARK: - Text width presets
 
 enum TextWidthPreset: String, CaseIterable, Identifiable {
@@ -27,6 +34,7 @@ struct RecordingView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var cameraManager = CameraManager()
     @State private var showSavedToast = false
+    @State private var previewVideo: IdentifiableURL?
 
     // Word-by-word teleprompter state
     @State private var chunks: [String] = []
@@ -213,7 +221,8 @@ struct RecordingView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background || newPhase == .inactive else { return }
             if cameraManager.isRecording {
-                // Save recording and clean up
+                // Background while recording: save directly to Photos (no preview)
+                cameraManager.saveDirectlyOnStop = true
                 cameraManager.stopRecording()
                 isPlaying = false
                 hasStartedPlayback = false
@@ -232,6 +241,25 @@ struct RecordingView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        .onChange(of: cameraManager.lastRecordedURL) { _, url in
+            guard let url else { return }
+            cameraManager.lastRecordedURL = nil
+            previewVideo = IdentifiableURL(url: url)
+        }
+        .fullScreenCover(item: $previewVideo) { item in
+            VideoPreviewView(
+                videoURL: item.url,
+                onRetake: {
+                    previewVideo = nil
+                    resetDisplay()
+                },
+                onSaved: {
+                    previewVideo = nil
+                    resetDisplay()
+                    showSavedToast = true
+                }
+            )
+        }
         .alert("Camera Error", isPresented: .constant(cameraManager.errorMessage != nil)) {
             Button("OK") { cameraManager.errorMessage = nil }
         } message: {
@@ -472,12 +500,8 @@ struct RecordingView: View {
     private func toggleRecording() {
         if cameraManager.isRecording {
             cameraManager.stopRecording()
-            // Reset to placeholder, ready for next take
             isPlaying = false
-            hasStartedPlayback = false
-            currentChunkIndex = 0
-            smoothProgress = 0
-            wbwResetToken = UUID()
+            // Preview will be shown when lastRecordedURL is set (via onChange)
         } else {
             startCountdown()
         }

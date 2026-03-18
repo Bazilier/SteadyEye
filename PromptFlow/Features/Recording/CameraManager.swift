@@ -9,6 +9,10 @@ final class CameraManager: NSObject {
     var recordingDuration: TimeInterval = 0
     var errorMessage: String?
     var cameraPosition: AVCaptureDevice.Position = .front
+    /// URL of the last recorded video (temp file). Set after recording finishes writing.
+    var lastRecordedURL: URL?
+    /// When true, save directly to Photos instead of showing preview (used for background saves).
+    var saveDirectlyOnStop = false
 
     // MARK: - Private
     let session = AVCaptureSession()
@@ -154,6 +158,13 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
             }
             return
         }
-        UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
+        if saveDirectlyOnStop {
+            saveDirectlyOnStop = false
+            UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.lastRecordedURL = outputFileURL
+            }
+        }
     }
 }

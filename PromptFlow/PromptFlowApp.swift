@@ -16,10 +16,25 @@ struct PromptFlowApp: App {
         }
     }()
 
+    init() {
+        cleanUpTempRecordings()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    /// Remove leftover .mov files from tmp directory (e.g. force-quit during preview)
+    private func cleanUpTempRecordings() {
+        let tmpDir = FileManager.default.temporaryDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmpDir, includingPropertiesForKeys: nil
+        ) else { return }
+        for file in files where file.pathExtension == "mov" {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 }
