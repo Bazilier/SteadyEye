@@ -6,3 +6,6 @@ DerivedData/
 
 # Secrets
 Secrets.plist
+
+# Project docs (not part of the app)
+docs/
