@@ -10,9 +10,22 @@
 		1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PromptFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1195F1682F5AE4F0003B4DD2 /* Exceptions for "PromptFlow" folder in "PromptFlow" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1195F13D2F5ADD78003B4DD2 /* PromptFlow */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1195F1402F5ADD78003B4DD2 /* PromptFlow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1195F1682F5AE4F0003B4DD2 /* Exceptions for "PromptFlow" folder in "PromptFlow" target */,
+			);
 			path = PromptFlow;
 			sourceTree = "<group>";
 		};
@@ -256,6 +269,9 @@
 				DEVELOPMENT_TEAM = KT4DXU7VF6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "PromptFlow uses the camera so you can record yourself while reading your script.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "PromptFlow uses the microphone to record audio while you film your video.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +304,9 @@
 				DEVELOPMENT_TEAM = KT4DXU7VF6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "PromptFlow uses the camera so you can record yourself while reading your script.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "PromptFlow uses the microphone to record audio while you film your video.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

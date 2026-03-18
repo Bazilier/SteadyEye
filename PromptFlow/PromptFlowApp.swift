@@ -1,10 +1,3 @@
-//
-//  PromptFlowApp.swift
-//  PromptFlow
-//
-//  Created by Cyril Vasilyev on 6.03.2026.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,10 +5,10 @@ import SwiftData
 struct PromptFlowApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Script.self,
+            AppSettings.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
