@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>PromptFlow uses the camera so you can record yourself while reading your script.</string>
+	<string>SteadyEye uses the camera so you can record yourself while reading your script.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>PromptFlow uses the microphone to record audio while you film your video.</string>
+	<string>SteadyEye uses the microphone to record audio while you film your video.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>PromptFlow saves your recorded videos to your Photo Library.</string>
+	<string>SteadyEye saves your recorded videos to your Photo Library.</string>
 </dict>
 </plist>

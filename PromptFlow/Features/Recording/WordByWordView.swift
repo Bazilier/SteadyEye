@@ -64,7 +64,7 @@ struct WordByWordView: View {
     // MARK: - Inputs
     let chunks: [String]
     let fontSize: CGFloat
-    let speed: WordChunkEngine.ReadingSpeed
+    let sliderValue: Double
     @Binding var isPlaying: Bool
     @Binding var resetToken: UUID
     var onFinished: () -> Void = {}
@@ -125,7 +125,7 @@ struct WordByWordView: View {
 
         let displayDuration = WordChunkEngine.duration(
             for: chunks[index],
-            speed: speed
+            sliderValue: sliderValue
         )
 
         scheduledTask = Task {
@@ -134,7 +134,7 @@ struct WordByWordView: View {
 
             await MainActor.run { displayedText = "" }
 
-            let gap = WordChunkEngine.gapDuration(speed: speed)
+            let gap = WordChunkEngine.gapDuration(sliderValue: sliderValue)
             try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
             guard !Task.isCancelled else { return }
 

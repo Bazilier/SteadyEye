@@ -44,7 +44,7 @@ struct RecordingView: View {
 
     // Display settings
     private let fontSize: CGFloat = 32
-    @State private var readingSpeed: WordChunkEngine.ReadingSpeed = .medium
+    @AppStorage("speedSliderValue") private var speedSlider: Double = 0.5
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
@@ -187,6 +187,7 @@ struct RecordingView: View {
             }
         }
         .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
             chunks = WordChunkEngine.chunks(from: script.content)
             cameraManager.configure(position: .front)
             scheduleControlsHide()
@@ -212,6 +213,7 @@ struct RecordingView: View {
             }
         }
         .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
             cameraManager.stopRecording()
             cameraManager.stopSession()
             isPlaying = false
@@ -278,7 +280,7 @@ struct RecordingView: View {
                 WordByWordView(
                     chunks: chunks,
                     fontSize: fontSize,
-                    speed: readingSpeed,
+                    sliderValue: speedSlider,
                     isPlaying: $isPlaying,
                     resetToken: $wbwResetToken,
                     onFinished: { isPlaying = false },
@@ -347,7 +349,7 @@ struct RecordingView: View {
         let target = Double(index + 1) / Double(chunks.count)
         let duration = WordChunkEngine.duration(
             for: chunks[index],
-            speed: readingSpeed
+            sliderValue: speedSlider
         )
         withAnimation(.linear(duration: duration)) {
             smoothProgress = target
@@ -379,14 +381,10 @@ struct RecordingView: View {
             }
             .padding(.horizontal, 20)
 
-            // Speed picker
-            Picker("Speed", selection: $readingSpeed) {
-                ForEach(WordChunkEngine.ReadingSpeed.allCases) { speed in
-                    Text(speed.rawValue).tag(speed)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 24)
+            // Speed slider
+            Slider(value: $speedSlider, in: 0...1)
+                .tint(.orange)
+                .padding(.horizontal, 24)
 
             // Scrubable progress bar
             scrubBar

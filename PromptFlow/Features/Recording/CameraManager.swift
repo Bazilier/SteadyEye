@@ -17,7 +17,7 @@ final class CameraManager: NSObject {
     // MARK: - Private
     let session = AVCaptureSession()
     /// Dedicated serial queue for all AVCaptureSession calls — required by AVFoundation.
-    private let sessionQueue = DispatchQueue(label: "com.promptflow.sessionQueue")
+    private let sessionQueue = DispatchQueue(label: "com.steadyeye.sessionQueue")
     private var movieOutput = AVCaptureMovieFileOutput()
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
@@ -144,25 +144,23 @@ final class CameraManager: NSObject {
 // MARK: - AVCaptureFileOutputRecordingDelegate
 
 extension CameraManager: AVCaptureFileOutputRecordingDelegate {
-    func fileOutput(
+    nonisolated func fileOutput(
         _ output: AVCaptureFileOutput,
         didFinishRecordingTo outputFileURL: URL,
         from connections: [AVCaptureConnection],
         error: Error?
     ) {
-        defer { endBackgroundTask() }
+        Task { @MainActor [weak self] in
+            defer { self?.endBackgroundTask() }
 
-        if let error {
-            DispatchQueue.main.async { [weak self] in
+            if let error {
                 self?.errorMessage = "Recording error: \(error.localizedDescription)"
+                return
             }
-            return
-        }
-        if saveDirectlyOnStop {
-            saveDirectlyOnStop = false
-            UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
-        } else {
-            DispatchQueue.main.async { [weak self] in
+            if self?.saveDirectlyOnStop == true {
+                self?.saveDirectlyOnStop = false
+                UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
+            } else {
                 self?.lastRecordedURL = outputFileURL
             }
         }

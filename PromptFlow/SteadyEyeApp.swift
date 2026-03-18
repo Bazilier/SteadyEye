@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct PromptFlowApp: App {
+struct SteadyEyeApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Script.self,
@@ -16,13 +16,29 @@ struct PromptFlowApp: App {
         }
     }()
 
+    @State private var isReady = false
+
     init() {
         cleanUpTempRecordings()
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ZStack {
+                if isReady {
+                    ContentView()
+                        .transition(.opacity)
+                } else {
+                    SplashView()
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: isReady)
+            .task {
+                // Model container is already initialized above;
+                // mark ready once the main view can appear.
+                isReady = true
+            }
         }
         .modelContainer(sharedModelContainer)
     }

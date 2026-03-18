@@ -68,39 +68,28 @@ enum WordChunkEngine {
         return result
     }
 
-    // MARK: - Reading speed
+    // MARK: - Continuous speed
 
-    enum ReadingSpeed: String, CaseIterable, Identifiable {
-        case slow = "Slow"
-        case medium = "Medium"
-        case fast = "Fast"
-
-        var id: String { rawValue }
-
-        /// Milliseconds per character
-        var msPerChar: Double {
-            switch self {
-            case .slow:   return 50
-            case .medium: return 30
-            case .fast:   return 18
-            }
-        }
+    /// Converts a 0…1 slider value to milliseconds per character.
+    /// 0.0 = slowest (80ms), 1.0 = fastest (12ms).
+    /// Exponential mapping gives more resolution in the fast range.
+    static func msPerChar(forSlider value: Double) -> Double {
+        80.0 * pow(0.15, value)
     }
 
     // MARK: - Display duration
 
-    static func duration(for chunk: String, speed: ReadingSpeed) -> TimeInterval {
-        let baseMs = speed.msPerChar * Double(chunk.count)
-        let clampedMs = max(400.0, min(1500.0, baseMs))
+    /// Duration a chunk should be displayed, given a slider value (0…1).
+    static func duration(for chunk: String, sliderValue: Double) -> TimeInterval {
+        let ms = msPerChar(forSlider: sliderValue) * Double(chunk.count)
+        let clampedMs = max(250.0, min(2000.0, ms))
         return clampedMs / 1000.0
     }
 
     /// Duration of the blank gap shown between chunks (seconds).
-    static func gapDuration(speed: ReadingSpeed) -> TimeInterval {
-        switch speed {
-        case .slow:   return 0.12
-        case .medium: return 0.08
-        case .fast:   return 0.05
-        }
+    static func gapDuration(sliderValue: Double) -> TimeInterval {
+        // Slower → longer gap, faster → shorter gap
+        let gap = 0.12 - 0.08 * sliderValue
+        return max(0.03, gap)
     }
 }
