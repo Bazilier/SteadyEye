@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 import SwiftUI
 
 @Observable
@@ -16,6 +17,7 @@ final class CameraManager: NSObject {
     private var movieOutput = AVCaptureMovieFileOutput()
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     // MARK: - Setup
 
@@ -107,6 +109,10 @@ final class CameraManager: NSObject {
 
     func stopRecording() {
         guard isRecording else { return }
+        // Register background task so the video file finishes writing even if app is backgrounded
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask { [weak self] in
+            self?.endBackgroundTask()
+        }
         sessionQueue.async { [weak self] in
             self?.movieOutput.stopRecording()
         }
@@ -115,6 +121,12 @@ final class CameraManager: NSObject {
         isRecording = false
         recordingDuration = 0
         recordingStartTime = nil
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
     }
 
     func stopSession() {
@@ -134,6 +146,8 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
         from connections: [AVCaptureConnection],
         error: Error?
     ) {
+        defer { endBackgroundTask() }
+
         if let error {
             DispatchQueue.main.async { [weak self] in
                 self?.errorMessage = "Recording error: \(error.localizedDescription)"

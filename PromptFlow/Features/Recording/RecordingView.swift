@@ -24,7 +24,9 @@ struct RecordingView: View {
     let script: Script
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var cameraManager = CameraManager()
+    @State private var showSavedToast = false
 
     // Word-by-word teleprompter state
     @State private var chunks: [String] = []
@@ -155,6 +157,26 @@ struct RecordingView: View {
             if cameraManager.isRecording {
                 recordingIndicator
             }
+
+            // 5. "Recording saved" toast
+            if showSavedToast {
+                VStack {
+                    Text("Recording saved")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.black.opacity(0.7), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 80)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation { showSavedToast = false }
+                    }
+                }
+            }
         }
         .onAppear {
             chunks = WordChunkEngine.chunks(from: script.content)
@@ -187,6 +209,20 @@ struct RecordingView: View {
             isPlaying = false
             showTextContent = false
             isExpanded = false
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .background || newPhase == .inactive else { return }
+            if cameraManager.isRecording {
+                // Save recording and clean up
+                cameraManager.stopRecording()
+                isPlaying = false
+                hasStartedPlayback = false
+                currentChunkIndex = 0
+                smoothProgress = 0
+                showSavedToast = true
+            }
+            cameraManager.stopSession()
+            dismiss()
         }
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -436,6 +472,12 @@ struct RecordingView: View {
     private func toggleRecording() {
         if cameraManager.isRecording {
             cameraManager.stopRecording()
+            // Reset to placeholder, ready for next take
+            isPlaying = false
+            hasStartedPlayback = false
+            currentChunkIndex = 0
+            smoothProgress = 0
+            wbwResetToken = UUID()
         } else {
             startCountdown()
         }
@@ -452,6 +494,10 @@ struct RecordingView: View {
                 timer.invalidate()
                 countdownTimer = nil
                 isCountingDown = false
+                // Reset text to beginning before starting recording
+                currentChunkIndex = 0
+                smoothProgress = 0
+                wbwResetToken = UUID()
                 cameraManager.startRecording()
                 hasStartedPlayback = true
                 isPlaying = true

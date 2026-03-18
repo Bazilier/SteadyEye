@@ -159,10 +159,16 @@ struct WordByWordView: View {
 
     /// Resyncs to the current parent-owned currentIndex.
     /// Used for both full reset (parent sets index=0) and scrub seeks.
+    /// If playback is active, restarts scheduling from the new position.
     private func reset() {
         cancelScheduled()
         finished = false
         let idx = min(currentIndex, chunks.count - 1)
         displayedText = (idx >= 0 && !chunks.isEmpty) ? chunks[idx] : ""
+        // Restart scheduling if still playing — onChange(of: isPlaying)
+        // won't fire when isPlaying was already true before the reset.
+        if isPlaying && !chunks.isEmpty {
+            scheduleNext(at: max(0, idx))
+        }
     }
 }
