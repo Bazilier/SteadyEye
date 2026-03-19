@@ -72,6 +72,7 @@ struct WordByWordView: View {
 
     // MARK: - Private scheduling state
     @State private var displayedText: String = ""
+    @State private var textOpacity: Double = 1
     @State private var finished = false
     @State private var lastResetToken: UUID = UUID()
     @State private var scheduledTask: Task<Void, Never>?
@@ -80,6 +81,7 @@ struct WordByWordView: View {
         Text(displayedText)
             .font(.system(size: fontSize, weight: .semibold))
             .foregroundStyle(.white)
+            .opacity(textOpacity)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             .multilineTextAlignment(.center)
@@ -115,6 +117,7 @@ struct WordByWordView: View {
     private func showChunk(at index: Int) {
         guard index < chunks.count else { return }
         displayedText = chunks[index]
+        textOpacity = 1
     }
 
     private func scheduleNext(at index: Int) {
@@ -132,18 +135,23 @@ struct WordByWordView: View {
             try? await Task.sleep(nanoseconds: UInt64(displayDuration * 1_000_000_000))
             guard !Task.isCancelled else { return }
 
-            await MainActor.run { displayedText = "" }
-
-            let gap = WordChunkEngine.gapDuration(sliderValue: sliderValue)
-            try? await Task.sleep(nanoseconds: UInt64(gap * 1_000_000_000))
+            // Crossfade: fade out old chunk
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 0 }
+            }
+            try? await Task.sleep(nanoseconds: 80_000_000)
             guard !Task.isCancelled else { return }
 
+            // Swap text and fade in
             await MainActor.run {
                 let next = index + 1
                 if next < chunks.count {
+                    displayedText = chunks[next]
+                    withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 1 }
                     scheduleNext(at: next)
                 } else {
                     displayedText = "✓"
+                    withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 1 }
                     finished = true
                     isPlaying = false
                     onFinished()
@@ -165,6 +173,7 @@ struct WordByWordView: View {
         finished = false
         let idx = min(currentIndex, chunks.count - 1)
         displayedText = (idx >= 0 && !chunks.isEmpty) ? chunks[idx] : ""
+        textOpacity = 1
         // Restart scheduling if still playing — onChange(of: isPlaying)
         // won't fire when isPlaying was already true before the reset.
         if isPlaying && !chunks.isEmpty {
