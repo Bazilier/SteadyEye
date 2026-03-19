@@ -29,6 +29,8 @@ struct ScriptListView: View {
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
+    @State private var showBulkImport = false
+    @State private var importToastCount = 0
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -64,6 +66,9 @@ struct ScriptListView: View {
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script)
             }
+            .sheet(isPresented: $showBulkImport) {
+                BulkImportView()
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -91,6 +96,16 @@ struct ScriptListView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.orange)
+
+            Button {
+                showBulkImport = true
+            } label: {
+                Label("Import Multiple Scripts", systemImage: "doc.on.doc")
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.bordered)
+            .tint(.secondary)
         }
     }
 
@@ -122,6 +137,14 @@ struct ScriptListView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+            }
+
+            Button {
+                showBulkImport = true
+            } label: {
+                Label("Import Multiple Scripts", systemImage: "doc.on.doc")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
         .listStyle(.insetGrouped)

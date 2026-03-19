@@ -1,5 +1,10 @@
 import Foundation
 
+struct ImportedScript: Decodable {
+    let title: String
+    let content: String
+}
+
 enum AnthropicService {
 
     enum ServiceError: LocalizedError {
@@ -110,5 +115,110 @@ Input language may be English or Russian. Detect and apply rules accordingly.
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw ServiceError.emptyResponse }
         return trimmed
+    }
+
+    // MARK: - Bulk script splitting
+
+    private static let splitSystemPrompt = """
+You are a script splitter. The user will paste a document containing \
+multiple video scripts or text sections. Your job is to split them \
+into individual scripts.
+
+For each script found, output a JSON array:
+[
+  {"title": "Short title for this script", "content": "The spoken text only"},
+  {"title": "...", "content": "..."}
+]
+
+Rules:
+- Extract ONLY the spoken/script text for each entry
+- Remove all metadata: hooks, visual directions, CTA instructions, \
+production notes, section headers like "Script (20 sec):"
+- Remove stage directions, timecodes, visual cues
+- The title should be concise (3-7 words), taken from any heading \
+or generated from the content
+- If the document has numbered sections or clear separators (---), \
+use those as split points
+- Ignore any sections that are purely instructional (like \
+"Production Notes" or "General guidelines")
+- Return ONLY valid JSON, no markdown, no backticks, no explanation
+"""
+
+    static func splitScripts(_ text: String) async throws -> [ImportedScript] {
+        guard let apiKey = SecretsManager.anthropicAPIKey() else {
+            throw ServiceError.missingAPIKey
+        }
+
+        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+
+        let body: [String: Any] = [
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 8192,
+            "system": splitSystemPrompt,
+            "messages": [["role": "user", "content": text]]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw ServiceError.networkError(error)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ServiceError.decodingError
+        }
+        guard http.statusCode == 200 else {
+            throw ServiceError.httpError(http.statusCode)
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]],
+              let first = content.first,
+              let responseText = first["text"] as? String
+        else {
+            throw ServiceError.decodingError
+        }
+
+        return parseScriptsJSON(responseText)
+    }
+
+    /// Parses JSON array from the API response, handling markdown fences and edge cases.
+    private static func parseScriptsJSON(_ text: String) -> [ImportedScript] {
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip markdown code fences if present
+        if cleaned.hasPrefix("```") {
+            if let firstNewline = cleaned.firstIndex(of: "\n") {
+                cleaned = String(cleaned[cleaned.index(after: firstNewline)...])
+            }
+            if cleaned.hasSuffix("```") {
+                cleaned = String(cleaned.dropLast(3))
+            }
+            cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Try to find JSON array boundaries
+        if let start = cleaned.firstIndex(of: "["),
+           let end = cleaned.lastIndex(of: "]") {
+            cleaned = String(cleaned[start...end])
+        }
+
+        guard let data = cleaned.data(using: .utf8),
+              let scripts = try? JSONDecoder().decode([ImportedScript].self, from: data),
+              !scripts.isEmpty
+        else {
+            return []
+        }
+
+        return scripts.filter { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }

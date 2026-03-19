@@ -12,7 +12,10 @@ struct ScriptEditorView: View {
     @State private var showingDiscardAlert = false
     @State private var isOptimizing = false
     @State private var optimizeError: String?
+    @State private var showRateLimitAlert = false
     @FocusState private var contentFocused: Bool
+
+    private let maxChars = 5000
 
     private var isNew: Bool { script == nil }
 
@@ -94,6 +97,11 @@ struct ScriptEditorView: View {
             } message: {
                 Text(optimizeError ?? "")
             }
+            .alert("Daily limit reached", isPresented: $showRateLimitAlert) {
+                Button("OK") {}
+            } message: {
+                Text("Try again tomorrow.")
+            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -108,10 +116,17 @@ struct ScriptEditorView: View {
 
     // MARK: - Stats bar
 
+    private var charCountColor: Color {
+        if content.count >= maxChars { return .red }
+        if content.count >= 4000 { return .orange }
+        return .secondary
+    }
+
     private var statsBar: some View {
         HStack(spacing: 20) {
             Label("\(wordCount) words", systemImage: "text.word.spacing")
-            Label(estimatedReadTime, systemImage: "clock")
+            Text("\(content.count.formatted()) / \(maxChars.formatted())")
+                .foregroundStyle(charCountColor)
             Spacer()
             Button {
                 optimizeForReading()
@@ -123,7 +138,7 @@ struct ScriptEditorView: View {
                     Label("Optimize", systemImage: "wand.and.stars")
                 }
             }
-            .disabled(isOptimizing || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
+            .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -148,6 +163,10 @@ struct ScriptEditorView: View {
     }
 
     private func optimizeForReading() {
+        guard RateLimiter.canMakeAPICall() else {
+            showRateLimitAlert = true
+            return
+        }
         isOptimizing = true
         Task {
             do {

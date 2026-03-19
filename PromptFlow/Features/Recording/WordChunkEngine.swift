@@ -22,8 +22,14 @@ enum WordChunkEngine {
     /// Maximum characters (including spaces) allowed in a single chunk.
     static let maxChunkLength = 10
 
+    /// Returns true if a word ends with sentence-ending punctuation (. ! ? ...).
+    private static func endsSentence(_ word: String) -> Bool {
+        word.hasSuffix(".") || word.hasSuffix("!") || word.hasSuffix("?")
+    }
+
     /// Splits text into word groups. Glue words attach to following words
     /// only if the combined chunk stays within `maxChunkLength`.
+    /// Sentence-ending punctuation always closes the current chunk.
     static func chunks(from text: String) -> [String] {
         let words = text
             .components(separatedBy: .whitespacesAndNewlines)
@@ -35,6 +41,12 @@ enum WordChunkEngine {
         while i < words.count {
             var group = words[i]
             i += 1
+
+            // If word ends a sentence, close chunk immediately
+            if endsSentence(group) {
+                result.append(group)
+                continue
+            }
 
             // Only try to attach more words if the current word is a glue word
             let bare = group.lowercased().trimmingCharacters(in: .punctuationCharacters)
@@ -51,10 +63,11 @@ enum WordChunkEngine {
                 guard candidate.count <= maxChunkLength else { break }
                 group = candidate
                 i += 1
+                if endsSentence(words[i - 1]) { break }
             }
 
-            // Try to attach exactly one non-glue word
-            if i < words.count {
+            // Try to attach exactly one non-glue word (unless chunk already ends a sentence)
+            if !endsSentence(group), i < words.count {
                 let candidate = group + " " + words[i]
                 if candidate.count <= maxChunkLength {
                     group = candidate
