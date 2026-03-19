@@ -17,7 +17,6 @@ enum TextWidthPreset: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Fraction of screen width the container occupies
     var fraction: CGFloat {
         switch self {
         case .narrow: return 0.50
@@ -33,18 +32,15 @@ struct RecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var cameraManager = CameraManager()
+    @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
     @State private var previewVideo: IdentifiableURL?
-
-    // Word-by-word teleprompter state
-    @State private var chunks: [String] = []
-    @State private var isPlaying = false
-    @State private var currentChunkIndex = 0
-    @State private var wbwResetToken = UUID()
 
     // Display settings
     private let fontSize: CGFloat = 32
     @AppStorage("speedSliderValue") private var speedSlider: Double = 0.5
+    @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    private var isClassicMode: Bool { displayMode == "classic" }
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
@@ -66,41 +62,37 @@ struct RecordingView: View {
     // UI
     @State private var showControls = true
     @State private var controlsHideTask: Task<Void, Never>?
-    /// Container expand state — expands on appear, only collapses when leaving screen
     @State private var isExpanded = false
-    /// Text fades in after the container expand animation finishes
     @State private var showTextContent = false
-    /// Smooth progress value animated continuously within each chunk
     @State private var smoothProgress: Double = 0
-    /// Scrubbing state
     @State private var isScrubbing = false
     @State private var wasPlayingBeforeScrub = false
+    @State private var hasStartedPlayback = false
 
     var body: some View {
         ZStack {
-            // 1. Camera preview — full screen
+            // 1. Camera preview
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
 
-            // 2. Black container expanding from Dynamic Island — narrower & draggable
-            // Hardcoded DI dimensions: top=11pt, width=126pt, height=37.33pt, radius≈19pt
+            // 2. Black container expanding from Dynamic Island
             GeometryReader { geo in
                 let diTop: CGFloat = 11
                 let diHeight: CGFloat = 37.33
                 let cornerRadius: CGFloat = 28
                 let diWidth: CGFloat = 126
 
-                let contentHeight: CGFloat = fontSize + 4 + 10
+                let wbwContentHeight: CGFloat = fontSize + 4 + 10
+                let classicContentHeight: CGFloat = 28 * 3 + 10
+                let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
                 let expandedContentHeight = diHeight + contentHeight
                 let expandedWidth = geo.size.width * textWidth.fraction
 
-                // Drag limits: center (0) to right (maxOffset covering DI + edge)
                 let minOffset: CGFloat = 0
                 let diCoverLimit = (expandedWidth - diWidth) / 2 - 16
                 let edgeLimit = (geo.size.width - expandedWidth) / 2 - 16
                 let maxOffset = max(0, min(diCoverLimit, edgeLimit))
 
-                // Rubber band: past limits, move at 30% rate
                 let rawX = CGFloat(savedOffsetX) + dragOffsetX
                 let displayX: CGFloat = {
                     if rawX < minOffset {
@@ -111,7 +103,7 @@ struct RecordingView: View {
                     return rawX
                 }()
 
-                VStack(spacing: 0) {
+                VStack(spacing: 8) {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(Color.black)
                         .frame(
@@ -124,6 +116,20 @@ struct RecordingView: View {
                                     .frame(width: expandedWidth - 32)
                                     .padding(.top, diHeight)
                                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
+                            }
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            if isExpanded {
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        displayMode = isClassicMode ? "wbw" : "classic"
+                                    }
+                                } label: {
+                                    Image(systemName: isClassicMode ? "chevron.up" : "chevron.down")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                        .frame(width: 44, height: 44)
+                                }
                             }
                         }
                         .scaleEffect(isDragging ? 1.02 : 1.0)
@@ -146,15 +152,32 @@ struct RecordingView: View {
                                 }
                             : nil
                         )
+
+                    // Recording timer — follows the container horizontally
+                    if cameraManager.isRecording {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 10, height: 10)
+                            Text(durationString(cameraManager.recordingDuration))
+                                .font(.caption.monospacedDigit().bold())
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.5), in: Capsule())
+                        .offset(x: isExpanded ? displayX : 0)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, diTop)
                 .ignoresSafeArea(edges: .top)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
                 .animation(.interactiveSpring(), value: isDragging)
             }
 
-            // 3. Controls pinned to bottom
+            // 3. Controls
             if showControls {
                 VStack {
                     Spacer()
@@ -163,17 +186,12 @@ struct RecordingView: View {
                 .transition(.opacity)
             }
 
-            // 3. Countdown overlay
+            // 4. Countdown
             if isCountingDown {
                 countdownOverlay
             }
 
-            // 4. Recording indicator
-            if cameraManager.isRecording {
-                recordingIndicator
-            }
-
-            // 5. "Recording saved" toast
+            // 5. Toast
             if showSavedToast {
                 VStack {
                     Text("Recording saved")
@@ -195,10 +213,10 @@ struct RecordingView: View {
         }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
-            chunks = WordChunkEngine.chunks(from: script.content)
+            player.loadScript(script.content)
+            player.sliderValue = speedSlider
             cameraManager.configure(position: .front)
             scheduleControlsHide()
-            // Auto-expand container after a short delay so user sees text position
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -208,34 +226,33 @@ struct RecordingView: View {
                 }
             }
         }
-        .onChange(of: currentChunkIndex) { _, newIndex in
-            guard newIndex < chunks.count, isPlaying else { return }
+        .onChange(of: player.currentChunkIndex) { _, newIndex in
+            guard newIndex < player.chunks.count, player.isPlaying else { return }
             animateProgressForChunk(at: newIndex)
         }
-        .onChange(of: isPlaying) { _, playing in
-            if playing && currentChunkIndex < chunks.count {
-                // Kick off smooth progress for current chunk (handles first chunk
-                // and resume, since onChange(of: currentChunkIndex) won't fire)
-                animateProgressForChunk(at: currentChunkIndex)
+        .onChange(of: player.isPlaying) { _, playing in
+            if playing && player.currentChunkIndex < player.chunks.count {
+                animateProgressForChunk(at: player.currentChunkIndex)
             }
+        }
+        .onChange(of: speedSlider) { _, newVal in
+            player.sliderValue = newVal
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            player.pause()
             cameraManager.stopRecording()
             cameraManager.stopSession()
-            isPlaying = false
             showTextContent = false
             isExpanded = false
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background || newPhase == .inactive else { return }
             if cameraManager.isRecording {
-                // Background while recording: save directly to Photos (no preview)
                 cameraManager.saveDirectlyOnStop = true
                 cameraManager.stopRecording()
-                isPlaying = false
+                player.pause()
                 hasStartedPlayback = false
-                currentChunkIndex = 0
                 smoothProgress = 0
                 showSavedToast = true
             }
@@ -278,23 +295,16 @@ struct RecordingView: View {
 
     // MARK: - Word display area
 
-    /// Shows placeholder loop before playback, real script during playback
-    @State private var hasStartedPlayback = false
-
     private var wordDisplay: some View {
         Group {
             if hasStartedPlayback {
-                WordByWordView(
-                    chunks: chunks,
-                    fontSize: fontSize,
-                    sliderValue: speedSlider,
-                    isPlaying: $isPlaying,
-                    resetToken: $wbwResetToken,
-                    onFinished: { isPlaying = false },
-                    currentIndex: $currentChunkIndex
-                )
+                if isClassicMode {
+                    ClassicThreeLineView(player: player)
+                } else {
+                    WordByWordView(player: player, fontSize: fontSize)
+                }
             } else {
-                PlaceholderLoopView(fontSize: fontSize)
+                PlaceholderLoopView(fontSize: fontSize, isClassicMode: isClassicMode)
             }
         }
     }
@@ -304,11 +314,9 @@ struct RecordingView: View {
     private var scrubBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                // Track
                 Capsule()
                     .fill(Color.white.opacity(0.2))
                     .frame(height: 4)
-                // Fill
                 Capsule()
                     .fill(Color.orange)
                     .frame(width: max(0, geo.size.width * smoothProgress), height: 4)
@@ -320,42 +328,39 @@ struct RecordingView: View {
                     .onChanged { value in
                         if !isScrubbing {
                             isScrubbing = true
-                            wasPlayingBeforeScrub = isPlaying
-                            isPlaying = false
+                            wasPlayingBeforeScrub = player.isPlaying
+                            player.pause()
                         }
                         let fraction = max(0, min(1, value.location.x / geo.size.width))
-                        let index = min(chunks.count - 1, Int(fraction * Double(chunks.count)))
+                        let index = min(player.chunks.count - 1, Int(fraction * Double(player.chunks.count)))
                         guard index >= 0 else { return }
-                        currentChunkIndex = index
-                        // Snap progress to chunk position (no animation while scrubbing)
+                        player.seekTo(index: index)
                         withAnimation(.none) {
-                            smoothProgress = Double(index) / Double(max(1, chunks.count))
+                            smoothProgress = Double(index) / Double(max(1, player.chunks.count))
                         }
                     }
                     .onEnded { value in
                         let fraction = max(0, min(1, value.location.x / geo.size.width))
-                        let index = min(chunks.count - 1, Int(fraction * Double(chunks.count)))
+                        let index = min(player.chunks.count - 1, Int(fraction * Double(player.chunks.count)))
                         guard index >= 0 else { return }
-                        currentChunkIndex = index
-                        smoothProgress = Double(index) / Double(max(1, chunks.count))
-                        wbwResetToken = UUID()
+                        player.seekTo(index: index)
+                        smoothProgress = Double(index) / Double(max(1, player.chunks.count))
                         isScrubbing = false
                         if wasPlayingBeforeScrub {
-                            isPlaying = true
+                            player.play()
                         }
                     }
             )
         }
-        .frame(height: 44) // Accessibility hit area
+        .frame(height: 44)
         .padding(.horizontal, 24)
     }
 
-    /// Animate progress bar smoothly across the current chunk's duration
     private func animateProgressForChunk(at index: Int) {
-        guard !chunks.isEmpty, !isScrubbing else { return }
-        let target = Double(index + 1) / Double(chunks.count)
+        guard !player.chunks.isEmpty, !isScrubbing else { return }
+        let target = Double(index + 1) / Double(player.chunks.count)
         let duration = WordChunkEngine.duration(
-            for: chunks[index],
+            for: player.chunks[index],
             sliderValue: speedSlider
         )
         withAnimation(.linear(duration: duration)) {
@@ -367,7 +372,6 @@ struct RecordingView: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 16) {
-            // Top row: close + progress + camera switch
             HStack {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -375,20 +379,10 @@ struct RecordingView: View {
                         .foregroundStyle(.white)
                         .shadow(radius: 4)
                 }
-
                 Spacer()
-
-                // DISABLED: front camera only for now
-                // Button { cameraManager.switchCamera() } label: {
-                //     Image(systemName: "camera.rotate.fill")
-                //         .font(.title2)
-                //         .foregroundStyle(.white)
-                //         .shadow(radius: 4)
-                // }
             }
             .padding(.horizontal, 20)
 
-            // Speed slider
             HStack(spacing: 10) {
                 Image(systemName: "tortoise.fill")
                     .font(.system(size: 16))
@@ -401,21 +395,18 @@ struct RecordingView: View {
             }
             .padding(.horizontal, 24)
 
-            // Scrubable progress bar
             scrubBar
 
-            // Play/Pause — Record — Reset
             HStack(spacing: 48) {
                 Button { togglePlay() } label: {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 28))
                         .foregroundStyle(.white)
                         .frame(width: 56, height: 56)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                .disabled(chunks.isEmpty)
+                .disabled(player.chunks.isEmpty)
 
-                // Record button
                 Button { toggleRecording() } label: {
                     ZStack {
                         Circle()
@@ -452,30 +443,6 @@ struct RecordingView: View {
         )
     }
 
-    // MARK: - Recording indicator
-
-    private var recordingIndicator: some View {
-        VStack {
-            HStack {
-                Spacer()
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 10, height: 10)
-                    Text(durationString(cameraManager.recordingDuration))
-                        .font(.caption.monospacedDigit().bold())
-                        .foregroundStyle(.white)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.black.opacity(0.5), in: Capsule())
-                .padding(.trailing, 20)
-            }
-            .padding(.top, 64)
-            Spacer()
-        }
-    }
-
     // MARK: - Countdown overlay
 
     private var countdownOverlay: some View {
@@ -492,20 +459,19 @@ struct RecordingView: View {
     // MARK: - Teleprompter control
 
     private func togglePlay() {
-        guard !chunks.isEmpty else { return }
-        if !hasStartedPlayback {
-            hasStartedPlayback = true
+        guard !player.chunks.isEmpty else { return }
+        if !hasStartedPlayback { hasStartedPlayback = true }
+        if player.isPlaying {
+            player.pause()
+        } else {
+            player.play()
         }
-        isPlaying.toggle()
     }
 
     private func resetDisplay() {
-        isPlaying = false
+        player.reset()
         hasStartedPlayback = false
-        currentChunkIndex = 0
         smoothProgress = 0
-        wbwResetToken = UUID()
-        // Container stays open — only collapses when leaving the screen
     }
 
     // MARK: - Recording control
@@ -513,14 +479,20 @@ struct RecordingView: View {
     private func toggleRecording() {
         if cameraManager.isRecording {
             cameraManager.stopRecording()
-            isPlaying = false
-            // Preview will be shown when lastRecordedURL is set (via onChange)
+            player.pause()
+            // Stay on current chunk — do not reset
         } else {
             startCountdown()
         }
     }
 
     private func startCountdown() {
+        // Show real chunks statically during countdown (no advancement)
+        player.reset()
+        smoothProgress = 0
+        hasStartedPlayback = true
+        // Player stays paused — chunks visible but frozen
+
         countdownValue = countdownSeconds
         isCountingDown = true
 
@@ -531,13 +503,8 @@ struct RecordingView: View {
                 timer.invalidate()
                 countdownTimer = nil
                 isCountingDown = false
-                // Reset text to beginning before starting recording
-                currentChunkIndex = 0
-                smoothProgress = 0
-                wbwResetToken = UUID()
                 cameraManager.startRecording()
-                hasStartedPlayback = true
-                isPlaying = true
+                player.play()
             }
         }
     }
