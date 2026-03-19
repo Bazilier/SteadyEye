@@ -94,12 +94,22 @@ struct RecordingView: View {
                 let expandedContentHeight = diHeight + contentHeight
                 let expandedWidth = geo.size.width * textWidth.fraction
 
-                // Clamp: container must always cover the Dynamic Island AND stay 16pt from edges
+                // Drag limits: center (0) to right (maxOffset covering DI + edge)
+                let minOffset: CGFloat = 0
                 let diCoverLimit = (expandedWidth - diWidth) / 2 - 16
                 let edgeLimit = (geo.size.width - expandedWidth) / 2 - 16
                 let maxOffset = max(0, min(diCoverLimit, edgeLimit))
-                let currentX = CGFloat(savedOffsetX) + dragOffsetX
-                let clampedX = min(max(currentX, -maxOffset), maxOffset)
+
+                // Rubber band: past limits, move at 30% rate
+                let rawX = CGFloat(savedOffsetX) + dragOffsetX
+                let displayX: CGFloat = {
+                    if rawX < minOffset {
+                        return minOffset + (rawX - minOffset) * 0.05
+                    } else if rawX > maxOffset {
+                        return maxOffset + (rawX - maxOffset) * 0.05
+                    }
+                    return rawX
+                }()
 
                 VStack(spacing: 0) {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -117,21 +127,18 @@ struct RecordingView: View {
                             }
                         }
                         .scaleEffect(isDragging ? 1.02 : 1.0)
-                        .offset(x: isExpanded ? clampedX : 0)
+                        .offset(x: isExpanded ? displayX : 0)
                         .gesture(
                             isExpanded ?
                             DragGesture(minimumDistance: 5)
                                 .onChanged { value in
                                     isDragging = true
-                                    // Clamp live so it hard-stops at limits
-                                    let proposed = CGFloat(savedOffsetX) + value.translation.width
-                                    let clamped = min(max(proposed, -maxOffset), maxOffset)
-                                    dragOffsetX = clamped - CGFloat(savedOffsetX)
+                                    dragOffsetX = value.translation.width
                                 }
                                 .onEnded { value in
-                                    let newOffset = CGFloat(savedOffsetX) + value.translation.width
-                                    let clamped = min(max(newOffset, -maxOffset), maxOffset)
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    let raw = CGFloat(savedOffsetX) + value.translation.width
+                                    let clamped = min(max(raw, minOffset), maxOffset)
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         savedOffsetX = Double(clamped)
                                         dragOffsetX = 0
                                         isDragging = false
@@ -382,9 +389,17 @@ struct RecordingView: View {
             .padding(.horizontal, 20)
 
             // Speed slider
-            Slider(value: $speedSlider, in: 0...1)
-                .tint(.orange)
-                .padding(.horizontal, 24)
+            HStack(spacing: 10) {
+                Image(systemName: "tortoise.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.5))
+                Slider(value: $speedSlider, in: 0...1)
+                    .tint(.orange)
+                Image(systemName: "hare.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.horizontal, 24)
 
             // Scrubable progress bar
             scrubBar

@@ -31,7 +31,7 @@ struct PlaceholderLoopView: View {
         loopTask = Task {
             while !Task.isCancelled {
                 // Display current word
-                try? await Task.sleep(nanoseconds: 1_100_000_000) // 1.1s display
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s display
                 guard !Task.isCancelled else { return }
 
                 // Fade out
@@ -48,7 +48,7 @@ struct PlaceholderLoopView: View {
 
                 // Extra pause after the last word before looping
                 if isLast {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    try? await Task.sleep(nanoseconds: 750_000_000)
                     guard !Task.isCancelled else { return }
                 }
             }
