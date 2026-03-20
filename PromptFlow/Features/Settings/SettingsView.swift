@@ -4,10 +4,9 @@ import SwiftData
 struct SettingsView: View {
     @Query private var settingsArray: [AppSettings]
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
-    @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
+    @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
 
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
@@ -19,50 +18,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Teleprompter") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Default Speed")
-                            Spacer()
-                            Text("\(Int(settings.scrollSpeed)) WPM")
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: Binding(
-                            get: { settings.scrollSpeed },
-                            set: { settings.scrollSpeed = $0 }
-                        ), in: 60...300, step: 10)
-                        .accentColor(.orange)
-                    }
-
-                    // DISABLED: font size is hardcoded in RecordingView for now
-                    // VStack(alignment: .leading, spacing: 4) {
-                    //     HStack {
-                    //         Text("Default Font Size")
-                    //         Spacer()
-                    //         Text("\(Int(settings.fontSize)) pt")
-                    //             .foregroundStyle(.secondary)
-                    //     }
-                    //     Slider(value: Binding(
-                    //         get: { settings.fontSize },
-                    //         set: { settings.fontSize = $0 }
-                    //     ), in: 18...52, step: 2)
-                    //     .accentColor(.orange)
-                    // }
-                }
-
-                Section("Text Container") {
-                    Picker("Text Width", selection: $textWidthRaw) {
-                        ForEach(TextWidthPreset.allCases) { preset in
-                            Text(preset.rawValue).tag(preset.rawValue)
-                        }
-                    }
-
-                    Button("Reset Position to Default") {
-                        savedOffsetX = 20
-                    }
-                    .foregroundStyle(.orange)
-                }
-
                 Section {
                     Picker("Resolution", selection: $videoResolution) {
                         Text("1080p").tag("1080p")
@@ -91,14 +46,7 @@ struct SettingsView: View {
                         Text("10 sec").tag(10)
                     }
 
-                    // DISABLED: front camera only for now
-                    // Picker("Default Camera", selection: Binding(
-                    //     get: { settings.cameraPosition },
-                    //     set: { settings.cameraPosition = $0 }
-                    // )) {
-                    //     Text("Front").tag(CameraPositionPreference.front)
-                    //     Text("Back").tag(CameraPositionPreference.back)
-                    // }
+                    Toggle("Dim Screen While Recording", isOn: $dimDuringRecording)
                 }
 
                 Section("About") {

@@ -8,24 +8,6 @@ struct IdentifiableURL: Identifiable {
     let url: URL
 }
 
-// MARK: - Text width presets
-
-enum TextWidthPreset: String, CaseIterable, Identifiable {
-    case narrow = "Narrow"
-    case medium = "Medium"
-    case wide = "Wide"
-
-    var id: String { rawValue }
-
-    var fraction: CGFloat {
-        switch self {
-        case .narrow: return 0.50
-        case .medium: return 0.65
-        case .wide:   return 0.80
-        }
-    }
-}
-
 struct RecordingView: View {
     let script: Script
 
@@ -45,10 +27,7 @@ struct RecordingView: View {
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
     @AppStorage("textVerticalOffset") private var textVerticalOffset: Double = 0
-    @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
-    private var textWidth: TextWidthPreset {
-        TextWidthPreset(rawValue: textWidthRaw) ?? .medium
-    }
+    @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
 
     // Drag state
     @State private var dragOffsetX: CGFloat = 0
@@ -78,6 +57,15 @@ struct RecordingView: View {
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
 
+            // 1b. Dim overlay during recording
+            if dimDuringRecording {
+                Color.black
+                    .opacity(cameraManager.isRecording ? 0.4 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
+            }
+
             // 2. Black container expanding from top cutout area
             GeometryReader { geo in
                 let cfg = CutoutLayoutConfig.current(
@@ -92,7 +80,7 @@ struct RecordingView: View {
                 let classicContentHeight: CGFloat = 28 * 3 + 10
                 let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
                 let expandedContentHeight = collapsedHeight + contentHeight
-                let expandedWidth = geo.size.width * textWidth.fraction
+                let expandedWidth = geo.size.width * 0.65
 
                 let minOffset: CGFloat = 0
                 let diCoverLimit = (expandedWidth - cfg.collapsedWidth) / 2 - 16
