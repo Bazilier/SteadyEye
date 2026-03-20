@@ -63,6 +63,32 @@ final class ChunkPlayerEngine: ObservableObject {
         chunk.trimmingCharacters(in: .whitespaces) == pauseMarker
     }
 
+    // MARK: - Duration calculation
+
+    /// Returns display duration for a chunk, handling pauses, abbreviations, and sentence ends.
+    func chunkDuration(_ chunk: String) -> TimeInterval {
+        if Self.isPause(chunk) { return 0.5 }
+
+        let trimmed = chunk.trimmingCharacters(in: .punctuationCharacters)
+        let endsSentence = chunk.hasSuffix(".") || chunk.hasSuffix("!") || chunk.hasSuffix("?")
+
+        // Abbreviation: all uppercase letters (optionally with dots), 2-6 chars
+        if trimmed.count >= 2 && trimmed.count <= 6
+            && trimmed == trimmed.uppercased()
+            && trimmed.allSatisfy({ $0.isLetter || $0 == "." }) {
+            let letterCount = trimmed.filter { $0.isLetter }.count
+            let effectiveCharCount = letterCount * 3
+            var d = WordChunkEngine.duration(for: String(repeating: "x", count: effectiveCharCount), sliderValue: sliderValue)
+            if endsSentence { d += 0.3 }
+            return d
+        }
+
+        // Normal chunk
+        var d = WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
+        if endsSentence { d += 0.3 }
+        return d
+    }
+
     // MARK: - Internal scheduling
 
     private func scheduleAdvance() {
@@ -70,15 +96,7 @@ final class ChunkPlayerEngine: ObservableObject {
         guard currentChunkIndex < chunks.count, isPlaying else { return }
 
         let chunk = chunks[currentChunkIndex]
-        let duration: TimeInterval = {
-            if Self.isPause(chunk) { return 0.5 }
-            var d = WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
-            let trimmed = chunk.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasSuffix(".") || trimmed.hasSuffix("!") || trimmed.hasSuffix("?") {
-                d += 0.3
-            }
-            return d
-        }()
+        let duration = chunkDuration(chunk)
 
         advanceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))

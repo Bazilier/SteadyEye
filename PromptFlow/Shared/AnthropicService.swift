@@ -48,8 +48,9 @@ Step 1 — Extract spoken text only:
 Step 2 — Format for reading aloud:
 - Convert ALL numbers to words: "5" to "five", "15%" to "fifteen percent", 
   "$39.99" to "thirty nine dollars ninety nine cents"
-- Expand ALL abbreviations: "CTA" to "call to action", "AI" to "A I", 
-  "U.S." to "U S", "CEO" to "C E O"
+- Keep abbreviations that people naturally say as letters: \
+"AI", "CEO", "U.S.", "SaaS", "SEO", "CPC", "PDF" stay as-is
+- Do NOT split abbreviations into individual letters with spaces
 - Remove dashes used as punctuation. Replace with a period or remove
 - Remove parentheses and brackets. Integrate the content or remove
 - Remove special characters: bullet points, emojis, asterisks, hashtags

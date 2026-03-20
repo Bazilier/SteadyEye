@@ -369,16 +369,7 @@ struct RecordingView: View {
     private func animateProgressForChunk(at index: Int) {
         guard !player.chunks.isEmpty, !isScrubbing else { return }
         let target = Double(index + 1) / Double(player.chunks.count)
-        let chunk = player.chunks[index]
-        let duration: TimeInterval = {
-            if ChunkPlayerEngine.isPause(chunk) { return 0.5 }
-            var d = WordChunkEngine.duration(for: chunk, sliderValue: speedSlider)
-            let trimmed = chunk.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasSuffix(".") || trimmed.hasSuffix("!") || trimmed.hasSuffix("?") {
-                d += 0.3
-            }
-            return d
-        }()
+        let duration = player.chunkDuration(player.chunks[index])
         withAnimation(.linear(duration: duration)) {
             smoothProgress = target
         }
