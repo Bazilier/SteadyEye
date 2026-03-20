@@ -235,6 +235,7 @@ struct RecordingView: View {
                         .background(.black.opacity(0.5), in: Capsule())
                         .offset(x: isExpanded ? displayX : 0)
                     }
+
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, cfg.topPadding)
@@ -259,7 +260,27 @@ struct RecordingView: View {
                 countdownOverlay
             }
 
-            // 5. Toast
+            // 5. Audio route change toast
+            if let audioToast = cameraManager.audioRouteToast {
+                VStack {
+                    Text(audioToast)
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.7), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 80)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation { cameraManager.audioRouteToast = nil }
+                    }
+                }
+            }
+
+            // 6. Toast
             if showSavedToast {
                 VStack {
                     Text("Recording saved")
@@ -447,6 +468,15 @@ struct RecordingView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
+
+            // Audio source indicator
+            HStack(spacing: 4) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 10))
+                Text(cameraManager.audioSourceName)
+                    .font(.caption2)
+            }
+            .foregroundStyle(.white.opacity(0.5))
 
             HStack(spacing: 10) {
                 Image(systemName: "tortoise.fill")

@@ -9,19 +9,21 @@ final class CameraManager: NSObject {
     var recordingDuration: TimeInterval = 0
     var errorMessage: String?
     var cameraPosition: AVCaptureDevice.Position = .front
-    /// URL of the last recorded video (temp file). Set after recording finishes writing.
     var lastRecordedURL: URL?
-    /// When true, save directly to Photos instead of showing preview (used for background saves).
     var saveDirectlyOnStop = false
+    /// Current audio input source name (e.g. "iPhone Microphone", "AirPods", "DJI Mic")
+    var audioSourceName: String = "iPhone Microphone"
+    /// Brief message shown when audio route changes (set to nil to dismiss)
+    var audioRouteToast: String?
 
     // MARK: - Private
     let session = AVCaptureSession()
-    /// Dedicated serial queue for all AVCaptureSession calls — required by AVFoundation.
     private let sessionQueue = DispatchQueue(label: "com.steadyeye.sessionQueue")
     private var movieOutput = AVCaptureMovieFileOutput()
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private var routeChangeObserver: NSObjectProtocol?
 
     // MARK: - Setup
 
@@ -34,13 +36,75 @@ final class CameraManager: NSObject {
 
     private func setupSession(position: AVCaptureDevice.Position) {
         // Must be called on sessionQueue
+
+        // 1. Tell AVCaptureSession to NOT manage AVAudioSession — we do it ourselves.
+        //    This is the key fix for Bluetooth/external mic support.
+        session.automaticallyConfiguresApplicationAudioSession = false
+
+        // 2. Register route change observer before configuring audio session
+        if routeChangeObserver == nil {
+            routeChangeObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self else { return }
+                self.updateAudioSourceName()
+
+                guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                      let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+                if self.isRecording {
+                    switch reason {
+                    case .oldDeviceUnavailable:
+                        self.audioRouteToast = "Switched to iPhone microphone"
+                    case .newDeviceAvailable:
+                        self.audioRouteToast = "New mic detected. Will use on next recording."
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+
+        // 3. Configure AVAudioSession with Bluetooth options BEFORE adding audio input
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .videoRecording,
+                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+            )
+            try audioSession.setActive(true)
+
+            print("[Audio] Category: \(audioSession.category.rawValue)")
+            print("[Audio] Route inputs: \(audioSession.currentRoute.inputs.map { "\($0.portName) (\($0.portType.rawValue))" })")
+            print("[Audio] Available: \(audioSession.availableInputs?.map { "\($0.portName) (\($0.portType.rawValue))" } ?? [])")
+
+            // Prefer Bluetooth input if available
+            if let btInput = audioSession.availableInputs?.first(where: {
+                $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
+            }) {
+                try audioSession.setPreferredInput(btInput)
+                print("[Audio] Preferred: \(btInput.portName)")
+            }
+        } catch {
+            print("[Audio] Config failed: \(error)")
+        }
+
+        // Read source name after route settles
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.updateAudioSourceName()
+        }
+
+        // 4. Configure capture session
         let resolution = UserDefaults.standard.string(forKey: "videoResolution") ?? "1080p"
         let fps = UserDefaults.standard.integer(forKey: "videoFPS")
         let targetFPS = fps > 0 ? fps : 30
 
         session.beginConfiguration()
 
-        // Set resolution preset
         let want4K = resolution == "4k"
         if want4K && session.canSetSessionPreset(.hd4K3840x2160) {
             session.sessionPreset = .hd4K3840x2160
@@ -166,10 +230,19 @@ final class CameraManager: NSObject {
     }
 
     func stopSession() {
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            routeChangeObserver = nil
+        }
         sessionQueue.async { [weak self] in
             guard let self, self.session.isRunning else { return }
             self.session.stopRunning()
         }
+    }
+
+    private func updateAudioSourceName() {
+        let input = AVAudioSession.sharedInstance().currentRoute.inputs.first
+        audioSourceName = input?.portName ?? "iPhone Microphone"
     }
 }
 
