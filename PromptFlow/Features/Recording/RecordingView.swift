@@ -75,26 +75,30 @@ struct RecordingView: View {
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
 
-            // 2. Black container expanding from Dynamic Island
+            // 2. Black container expanding from top cutout area
             GeometryReader { geo in
-                let diTop: CGFloat = 11
-                let diHeight: CGFloat = 37.33
-                let cornerRadius: CGFloat = 28
-                let diWidth: CGFloat = 126
+                let cfg = CutoutLayoutConfig.current(
+                    for: DeviceDetectionService.shared.cutoutType,
+                    screenWidth: geo.size.width,
+                    safeAreaTop: geo.safeAreaInsets.top
+                )
 
+                let safeTop = geo.safeAreaInsets.top
+                let collapsedHeight = max(1, safeTop - cfg.topPadding)
                 let wbwContentHeight: CGFloat = fontSize + 4 + 10
                 let classicContentHeight: CGFloat = 28 * 3 + 10
                 let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
-                let expandedContentHeight = diHeight + contentHeight
+                let expandedContentHeight = collapsedHeight + contentHeight
                 let expandedWidth = geo.size.width * textWidth.fraction
 
                 let minOffset: CGFloat = 0
-                let diCoverLimit = (expandedWidth - diWidth) / 2 - 16
+                let diCoverLimit = (expandedWidth - cfg.collapsedWidth) / 2 - 16
                 let edgeLimit = (geo.size.width - expandedWidth) / 2 - 16
                 let maxOffset = max(0, min(diCoverLimit, edgeLimit))
 
-                let rawX = CGFloat(savedOffsetX) + dragOffsetX
                 let displayX: CGFloat = {
+                    guard cfg.dragEnabled else { return 0 }
+                    let rawX = CGFloat(savedOffsetX) + dragOffsetX
                     if rawX < minOffset {
                         return minOffset + (rawX - minOffset) * 0.05
                     } else if rawX > maxOffset {
@@ -104,17 +108,23 @@ struct RecordingView: View {
                 }()
 
                 VStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: cfg.topCornerRadius,
+                        bottomLeadingRadius: cfg.bottomCornerRadius,
+                        bottomTrailingRadius: cfg.bottomCornerRadius,
+                        topTrailingRadius: cfg.topCornerRadius,
+                        style: .continuous
+                    )
                         .fill(Color.black)
                         .frame(
-                            width: isExpanded ? expandedWidth : diWidth,
-                            height: isExpanded ? expandedContentHeight : diHeight
+                            width: isExpanded ? expandedWidth : cfg.collapsedWidth,
+                            height: isExpanded ? expandedContentHeight : collapsedHeight
                         )
                         .overlay(alignment: .top) {
                             if showTextContent {
                                 wordDisplay
                                     .frame(width: expandedWidth - 32)
-                                    .padding(.top, diHeight)
+                                    .padding(.top, cfg.textTopOffset)
                                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
                             }
                         }
@@ -135,7 +145,7 @@ struct RecordingView: View {
                         .scaleEffect(isDragging ? 1.02 : 1.0)
                         .offset(x: isExpanded ? displayX : 0)
                         .gesture(
-                            isExpanded ?
+                            isExpanded && cfg.dragEnabled ?
                             DragGesture(minimumDistance: 5)
                                 .onChanged { value in
                                     isDragging = true
@@ -170,7 +180,7 @@ struct RecordingView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, diTop)
+                .padding(.top, cfg.topPadding)
                 .ignoresSafeArea(edges: .top)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
@@ -359,10 +369,10 @@ struct RecordingView: View {
     private func animateProgressForChunk(at index: Int) {
         guard !player.chunks.isEmpty, !isScrubbing else { return }
         let target = Double(index + 1) / Double(player.chunks.count)
-        let duration = WordChunkEngine.duration(
-            for: player.chunks[index],
-            sliderValue: speedSlider
-        )
+        let chunk = player.chunks[index]
+        let duration: TimeInterval = ChunkPlayerEngine.isPause(chunk)
+            ? 0.5
+            : WordChunkEngine.duration(for: chunk, sliderValue: speedSlider)
         withAnimation(.linear(duration: duration)) {
             smoothProgress = target
         }

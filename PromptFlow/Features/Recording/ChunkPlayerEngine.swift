@@ -56,6 +56,13 @@ final class ChunkPlayerEngine: ObservableObject {
         }
     }
 
+    /// Pause chunk marker — displayed as empty/subtle, fixed 1.5s duration.
+    static let pauseMarker = "//"
+
+    static func isPause(_ chunk: String) -> Bool {
+        chunk.trimmingCharacters(in: .whitespaces) == pauseMarker
+    }
+
     // MARK: - Internal scheduling
 
     private func scheduleAdvance() {
@@ -63,7 +70,7 @@ final class ChunkPlayerEngine: ObservableObject {
         guard currentChunkIndex < chunks.count, isPlaying else { return }
 
         let chunk = chunks[currentChunkIndex]
-        let duration = WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
+        let duration: TimeInterval = Self.isPause(chunk) ? 0.5 : WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
 
         advanceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))

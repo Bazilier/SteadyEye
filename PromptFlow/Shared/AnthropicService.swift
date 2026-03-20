@@ -59,7 +59,13 @@ Step 2 — Format for reading aloud:
 - Keep the meaning and tone identical. Do NOT rewrite or add content
 - Do NOT add any commentary, explanation, or markdown formatting
 
-Step 3 — Visual formatting:
+Step 3 — Pause markers:
+- Insert a pause marker // on a separate line between logical sections, \
+topic changes, numbered steps, or any place where the speaker would \
+naturally take a breath or pause for emphasis
+- Do not overuse — roughly one pause marker per 3-5 sentences maximum
+
+Step 4 — Visual formatting:
 - Each sentence must start on a new line
 - Add one empty line between sentences (double newline)
 

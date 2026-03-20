@@ -43,6 +43,7 @@ struct PlaceholderLoopView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             .multilineTextAlignment(.center)
+            .padding(.top, -4)
             .padding(.horizontal, 16)
     }
 
@@ -142,6 +143,7 @@ struct WordByWordView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.5)
             .multilineTextAlignment(.center)
+            .padding(.top, -4)
             .padding(.horizontal, 16)
             .onAppear { syncToPlayer() }
             .onChange(of: player.currentChunkIndex) { _, _ in
@@ -149,12 +151,21 @@ struct WordByWordView: View {
             }
     }
 
+    private func displayText(for chunk: String) -> String {
+        ChunkPlayerEngine.isPause(chunk) ? "..." : chunk
+    }
+
+    private func displayOpacity(for chunk: String) -> Double {
+        ChunkPlayerEngine.isPause(chunk) ? 0.2 : 1
+    }
+
     private func syncToPlayer() {
         let idx = player.currentChunkIndex
         if idx >= 0, idx < player.chunks.count {
-            displayedText = player.chunks[idx]
+            let chunk = player.chunks[idx]
+            displayedText = displayText(for: chunk)
+            textOpacity = displayOpacity(for: chunk)
         }
-        textOpacity = 1
         lastIndex = idx
     }
 
@@ -169,10 +180,11 @@ struct WordByWordView: View {
             return
         }
 
+        let chunk = player.chunks[idx]
         withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            displayedText = player.chunks[idx]
-            withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 1 }
+            displayedText = displayText(for: chunk)
+            withAnimation(.easeInOut(duration: 0.08)) { textOpacity = displayOpacity(for: chunk) }
         }
     }
 }
@@ -190,7 +202,8 @@ struct ClassicThreeLineView: View {
 
     private func chunkText(at i: Int) -> String {
         guard i >= 0, i < player.chunks.count else { return "" }
-        return player.chunks[i]
+        let chunk = player.chunks[i]
+        return ChunkPlayerEngine.isPause(chunk) ? "" : chunk
     }
 
     private func lineOpacity(_ slot: Int) -> Double {
