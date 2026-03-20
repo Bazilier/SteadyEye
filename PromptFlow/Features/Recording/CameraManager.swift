@@ -34,8 +34,19 @@ final class CameraManager: NSObject {
 
     private func setupSession(position: AVCaptureDevice.Position) {
         // Must be called on sessionQueue
+        let resolution = UserDefaults.standard.string(forKey: "videoResolution") ?? "1080p"
+        let fps = UserDefaults.standard.integer(forKey: "videoFPS")
+        let targetFPS = fps > 0 ? fps : 30
+
         session.beginConfiguration()
-        session.sessionPreset = .hd1920x1080
+
+        // Set resolution preset
+        let want4K = resolution == "4k"
+        if want4K && session.canSetSessionPreset(.hd4K3840x2160) {
+            session.sessionPreset = .hd4K3840x2160
+        } else {
+            session.sessionPreset = .hd1920x1080
+        }
 
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
@@ -62,6 +73,27 @@ final class CameraManager: NSObject {
                 self?.errorMessage = "Failed to access camera: \(error.localizedDescription)"
             }
             return
+        }
+
+        // Configure frame rate
+        do {
+            try videoDevice.lockForConfiguration()
+            let desiredFPS = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
+            let supported = videoDevice.activeFormat.videoSupportedFrameRateRanges.contains {
+                Int($0.maxFrameRate) >= targetFPS
+            }
+            if supported {
+                videoDevice.activeVideoMinFrameDuration = desiredFPS
+                videoDevice.activeVideoMaxFrameDuration = desiredFPS
+            } else {
+                // Fall back to 30fps
+                let fallback = CMTime(value: 1, timescale: 30)
+                videoDevice.activeVideoMinFrameDuration = fallback
+                videoDevice.activeVideoMaxFrameDuration = fallback
+            }
+            videoDevice.unlockForConfiguration()
+        } catch {
+            // Frame rate configuration failed — continue with defaults
         }
 
         // Audio input (non-fatal if unavailable)

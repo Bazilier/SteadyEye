@@ -70,7 +70,15 @@ final class ChunkPlayerEngine: ObservableObject {
         guard currentChunkIndex < chunks.count, isPlaying else { return }
 
         let chunk = chunks[currentChunkIndex]
-        let duration: TimeInterval = Self.isPause(chunk) ? 0.5 : WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
+        let duration: TimeInterval = {
+            if Self.isPause(chunk) { return 0.5 }
+            var d = WordChunkEngine.duration(for: chunk, sliderValue: sliderValue)
+            let trimmed = chunk.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasSuffix(".") || trimmed.hasSuffix("!") || trimmed.hasSuffix("?") {
+                d += 0.3
+            }
+            return d
+        }()
 
         advanceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))

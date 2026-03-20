@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
+    @AppStorage("videoResolution") private var videoResolution: String = "1080p"
+    @AppStorage("videoFPS") private var videoFPS: Int = 30
 
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
@@ -59,6 +61,23 @@ struct SettingsView: View {
                         savedOffsetX = 20
                     }
                     .foregroundStyle(.orange)
+                }
+
+                Section {
+                    Picker("Resolution", selection: $videoResolution) {
+                        Text("1080p").tag("1080p")
+                        Text("4K").tag("4k")
+                    }
+
+                    Picker("Frame Rate", selection: $videoFPS) {
+                        Text("24 fps").tag(24)
+                        Text("30 fps").tag(30)
+                        Text("60 fps").tag(60)
+                    }
+                } header: {
+                    Text("Video Quality")
+                } footer: {
+                    Text("Higher quality uses more storage")
                 }
 
                 Section("Recording") {

@@ -3,20 +3,7 @@ import SwiftData
 
 @main
 struct SteadyEyeApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Script.self,
-            AppSettings.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
-    @State private var isReady = false
+    @State private var container: ModelContainer?
 
     init() {
         cleanUpTempRecordings()
@@ -25,22 +12,26 @@ struct SteadyEyeApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if isReady {
+                if let container {
                     ContentView()
+                        .modelContainer(container)
                         .transition(.opacity)
                 } else {
                     SplashView()
                         .transition(.opacity)
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: isReady)
+            .animation(.easeInOut(duration: 0.3), value: container != nil)
             .task {
-                // Model container is already initialized above;
-                // mark ready once the main view can appear.
-                isReady = true
+                let schema = Schema([Script.self, AppSettings.self])
+                let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+                do {
+                    container = try ModelContainer(for: schema, configurations: [config])
+                } catch {
+                    fatalError("Could not create ModelContainer: \(error)")
+                }
             }
         }
-        .modelContainer(sharedModelContainer)
     }
 
     /// Remove leftover .mov files from tmp directory (e.g. force-quit during preview)
