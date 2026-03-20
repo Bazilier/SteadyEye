@@ -44,6 +44,7 @@ struct RecordingView: View {
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
+    @AppStorage("textVerticalOffset") private var textVerticalOffset: Double = 0
     @AppStorage("textWidthPreset") private var textWidthRaw: String = TextWidthPreset.medium.rawValue
     private var textWidth: TextWidthPreset {
         TextWidthPreset(rawValue: textWidthRaw) ?? .medium
@@ -52,6 +53,8 @@ struct RecordingView: View {
     // Drag state
     @State private var dragOffsetX: CGFloat = 0
     @State private var isDragging = false
+    @State private var isTextEditMode = false
+    @State private var textDragY: CGFloat = 0
 
     // Recording countdown
     @State private var countdownValue: Int = 0
@@ -107,6 +110,15 @@ struct RecordingView: View {
                     return rawX
                 }()
 
+                let textDisplayY: CGFloat = {
+                    let rawY = CGFloat(textVerticalOffset) + textDragY
+                    let minY: CGFloat = -15
+                    let maxY: CGFloat = 20
+                    if rawY < minY { return minY + (rawY - minY) * 0.05 }
+                    if rawY > maxY { return maxY + (rawY - maxY) * 0.05 }
+                    return rawY
+                }()
+
                 VStack(spacing: 8) {
                     UnevenRoundedRectangle(
                         topLeadingRadius: cfg.topCornerRadius,
@@ -125,9 +137,11 @@ struct RecordingView: View {
                                 wordDisplay
                                     .frame(width: expandedWidth - 32)
                                     .padding(.top, cfg.textTopOffset)
+                                    .offset(y: textDisplayY)
                                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
                             }
                         }
+                        .clipped()
                         .overlay(alignment: .topTrailing) {
                             if isExpanded {
                                 Button {
@@ -142,7 +156,17 @@ struct RecordingView: View {
                                 }
                             }
                         }
-                        .scaleEffect(isDragging ? 1.02 : 1.0)
+                        .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
+                        .overlay(
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: cfg.topCornerRadius,
+                                bottomLeadingRadius: cfg.bottomCornerRadius,
+                                bottomTrailingRadius: cfg.bottomCornerRadius,
+                                topTrailingRadius: cfg.topCornerRadius,
+                                style: .continuous
+                            )
+                            .strokeBorder(.white.opacity(isTextEditMode ? 0.2 : 0), lineWidth: 1)
+                        )
                         .offset(x: isExpanded ? displayX : 0)
                         .gesture(
                             isExpanded && cfg.dragEnabled ?
@@ -158,6 +182,51 @@ struct RecordingView: View {
                                         savedOffsetX = Double(clamped)
                                         dragOffsetX = 0
                                         isDragging = false
+                                    }
+                                }
+                            : nil
+                        )
+                        // Long press + vertical drag = text offset inside container
+                        .simultaneousGesture(
+                            isExpanded ?
+                            LongPressGesture(minimumDuration: 0.5)
+                                .sequenced(before: DragGesture())
+                                .onChanged { value in
+                                    switch value {
+                                    case .second(true, let drag):
+                                        if !isTextEditMode {
+                                            isTextEditMode = true
+                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        }
+                                        if let drag {
+                                            textDragY = drag.translation.height
+                                        }
+                                    default:
+                                        break
+                                    }
+                                }
+                                .onEnded { _ in
+                                    let rawY = CGFloat(textVerticalOffset) + textDragY
+                                    let clampedY = min(max(rawY, -15), 20)
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        textVerticalOffset = Double(clampedY)
+                                        textDragY = 0
+                                        isTextEditMode = false
+                                    }
+                                }
+                            : nil
+                        )
+                        // Double tap = reset text and container position
+                        .simultaneousGesture(
+                            isExpanded ?
+                            TapGesture(count: 2)
+                                .onEnded {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        savedOffsetX = cfg.defaultOffset
+                                        textVerticalOffset = 0
+                                        textDragY = 0
+                                        dragOffsetX = 0
                                     }
                                 }
                             : nil
@@ -185,6 +254,7 @@ struct RecordingView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
                 .animation(.interactiveSpring(), value: isDragging)
+                .animation(.interactiveSpring(), value: isTextEditMode)
             }
 
             // 3. Controls
