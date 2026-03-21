@@ -10,60 +10,125 @@ struct VideoPreviewView: View {
     @State private var player: AVPlayer?
     @State private var isSaving = false
     @State private var showSavedCheck = false
+    @State private var currentTime: Double = 0
+    @State private var duration: Double = 1
+    @State private var isScrubbing = false
+    @State private var timeObserver: Any?
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Video player
             if let player {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
             }
 
-            // Top controls
+            // Bottom controls
             VStack {
-                HStack {
+                Spacer()
+
+                // Retake / Save buttons
+                HStack(spacing: 60) {
                     Button {
                         player?.pause()
                         discardAndRetake()
                     } label: {
-                        Text("Retake")
-                            .font(.body.bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial, in: Capsule())
+                        VStack(spacing: 8) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 60, height: 60)
+                                .background(.white.opacity(0.15), in: Circle())
+                            Text("Retake")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
                     }
-
-                    Spacer()
 
                     Button {
                         saveToPhotos()
                     } label: {
-                        if isSaving {
-                            ProgressView()
-                                .tint(.white)
-                                .frame(width: 44, height: 44)
-                        } else {
-                            Image(systemName: showSavedCheck ? "checkmark.circle.fill" : "square.and.arrow.down")
-                                .font(.title2.bold())
-                                .foregroundStyle(showSavedCheck ? .green : .white)
-                                .frame(width: 44, height: 44)
-                                .background(.ultraThinMaterial, in: Circle())
+                        VStack(spacing: 8) {
+                            if isSaving {
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 60, height: 60)
+                            } else {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 60, height: 60)
+                                    .background(
+                                        showSavedCheck
+                                            ? Color.green.opacity(0.5)
+                                            : Color(red: 0.2, green: 0.78, blue: 0.35),
+                                        in: Circle()
+                                    )
+                            }
+                            Text("Save")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
                         }
                     }
                     .disabled(isSaving || showSavedCheck)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 60)
+                .padding(.bottom, 20)
 
-                Spacer()
+                // Scrubber with timestamps
+                VStack(spacing: 6) {
+                    Slider(
+                        value: $currentTime,
+                        in: 0...max(0.01, duration)
+                    ) { editing in
+                        isScrubbing = editing
+                        if editing {
+                            player?.pause()
+                        } else {
+                            player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
+                            player?.play()
+                        }
+                    }
+                    .tint(.white)
+
+                    HStack {
+                        Text(formatTime(currentTime))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.5))
+                        Spacer()
+                        Text(formatTime(duration))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
             }
         }
         .onAppear {
             let avPlayer = AVPlayer(url: videoURL)
             self.player = avPlayer
+
+            // Get duration
+            if let item = avPlayer.currentItem {
+                Task {
+                    if let dur = try? await item.asset.load(.duration) {
+                        await MainActor.run {
+                            duration = CMTimeGetSeconds(dur)
+                        }
+                    }
+                }
+            }
+
+            // Periodic time observer
+            timeObserver = avPlayer.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
+                queue: .main
+            ) { [self] time in
+                guard !isScrubbing else { return }
+                currentTime = CMTimeGetSeconds(time)
+            }
+
             // Loop playback
             NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
@@ -73,14 +138,29 @@ struct VideoPreviewView: View {
                 avPlayer.seek(to: .zero)
                 avPlayer.play()
             }
+
             avPlayer.play()
         }
+        .onChange(of: currentTime) { _, newTime in
+            if isScrubbing {
+                player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            }
+        }
         .onDisappear {
+            if let observer = timeObserver {
+                player?.removeTimeObserver(observer)
+            }
             player?.pause()
             player = nil
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
     }
 
     private func saveToPhotos() {
@@ -92,13 +172,11 @@ struct VideoPreviewView: View {
                 isSaving = false
                 if success {
                     showSavedCheck = true
-                    // Clean up temp file
                     try? FileManager.default.removeItem(at: videoURL)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         onSaved()
                     }
                 } else {
-                    // Fallback: try legacy save
                     UISaveVideoAtPathToSavedPhotosAlbum(videoURL.path, nil, nil, nil)
                     try? FileManager.default.removeItem(at: videoURL)
                     onSaved()
