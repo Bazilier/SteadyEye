@@ -45,7 +45,7 @@ final class CameraManager: NSObject {
         try? audioSession.setCategory(
             .playAndRecord,
             mode: .videoRecording,
-            options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+            options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
         )
         try? audioSession.setActive(true)
 

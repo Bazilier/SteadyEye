@@ -30,7 +30,7 @@ struct ScriptListView: View {
     @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
     @State private var showBulkImport = false
-    @State private var importToastCount = 0
+    @State private var showPaywall = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -68,6 +68,9 @@ struct ScriptListView: View {
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView()
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
             }
         }
         .preferredColorScheme(.dark)
@@ -116,7 +119,11 @@ struct ScriptListView: View {
                     ScriptRowView(script: script)
                     Spacer()
                     Button {
-                        scriptToRecord = script
+                        if SubscriptionManager.shared.canUseCamera {
+                            scriptToRecord = script
+                        } else {
+                            showPaywall = true
+                        }
                     } label: {
                         Image(systemName: "video.fill")
                             .font(.body)

@@ -13,6 +13,7 @@ struct ScriptEditorView: View {
     @State private var isOptimizing = false
     @State private var optimizeError: String?
     @State private var showRateLimitAlert = false
+    @State private var showPaywall = false
     @FocusState private var contentFocused: Bool
 
     private let maxChars = 5000
@@ -102,6 +103,9 @@ struct ScriptEditorView: View {
             } message: {
                 Text("Try again tomorrow.")
             }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -163,6 +167,10 @@ struct ScriptEditorView: View {
     }
 
     private func optimizeForReading() {
+        guard SubscriptionManager.shared.canOptimize else {
+            showPaywall = true
+            return
+        }
         guard RateLimiter.canMakeAPICall() else {
             showRateLimitAlert = true
             return

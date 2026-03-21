@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
+    @State private var showPaywall = false
 
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
@@ -49,6 +50,13 @@ struct SettingsView: View {
                     Toggle("Dim Screen While Recording", isOn: $dimDuringRecording)
                 }
 
+                // DEBUG — remove before release
+                Section {
+                    Button("Preview Paywall (debug)") {
+                        showPaywall = true
+                    }
+                }
+
                 Section("About") {
                     HStack {
                         Text("Version")
@@ -57,8 +65,16 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Section("Legal") {
+                    Link("Privacy Policy", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!)
+                    Link("Terms of Use", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!)
+                }
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+            }
         }
         .preferredColorScheme(.dark)
     }

@@ -5,9 +5,11 @@ import AVFoundation
 @main
 struct SteadyEyeApp: App {
     @State private var container: ModelContainer?
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     init() {
         cleanUpTempRecordings()
+        SubscriptionManager.shared.configure()
     }
 
     var body: some Scene {
@@ -16,6 +18,7 @@ struct SteadyEyeApp: App {
                 if let container {
                     ContentView()
                         .modelContainer(container)
+                        .environmentObject(subscriptionManager)
                         .transition(.opacity)
                 } else {
                     SplashView()

@@ -1,5 +1,7 @@
 import Foundation
 
+/// Reads API keys from Secrets.plist (gitignored).
+/// Expected keys: ANTHROPIC_API_KEY, REVENUECAT_API_KEY
 enum SecretsManager {
     static func anthropicAPIKey() -> String? {
         guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),

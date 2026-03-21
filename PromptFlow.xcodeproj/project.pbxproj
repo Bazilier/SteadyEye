@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		116FE5382F6EFA540094999F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 116FE5372F6EFA540094999F /* RevenueCat */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PromptFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				116FE5382F6EFA540094999F /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = PromptFlow;
 			packageProductDependencies = (
+				116FE5372F6EFA540094999F /* RevenueCat */,
 			);
 			productName = PromptFlow;
 			productReference = 1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = 1195F1352F5ADD78003B4DD2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1195F13F2F5ADD78003B4DD2 /* Products */;
 			projectDirPath = "";
@@ -359,6 +368,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 5.66.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		116FE5372F6EFA540094999F /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1195F1362F5ADD78003B4DD2 /* Project object */;
 }

@@ -55,6 +55,9 @@ struct BulkImportView: View {
         } message: {
             Text("Try again tomorrow.")
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+        }
     }
 
     // MARK: - Editor
@@ -134,7 +137,13 @@ struct BulkImportView: View {
 
     // MARK: - Import logic
 
+    @State private var showPaywall = false
+
     private func startImport() {
+        guard SubscriptionManager.shared.canBulkImport else {
+            showPaywall = true
+            return
+        }
         guard RateLimiter.canBulkImport() else {
             showRateLimitAlert = true
             return
