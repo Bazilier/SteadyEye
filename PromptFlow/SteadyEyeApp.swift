@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 @main
 struct SteadyEyeApp: App {
@@ -19,22 +20,40 @@ struct SteadyEyeApp: App {
                 } else {
                     SplashView()
                         .transition(.opacity)
+                        .task { await prepareApp() }
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: container != nil)
-            .task {
-                let schema = Schema([Script.self, AppSettings.self])
-                let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-                do {
-                    container = try ModelContainer(for: schema, configurations: [config])
-                } catch {
-                    fatalError("Could not create ModelContainer: \(error)")
-                }
-            }
         }
     }
 
-    /// Remove leftover .mov files from tmp directory (e.g. force-quit during preview)
+    private func prepareApp() async {
+        // 1. Request permissions (shows system dialogs over splash)
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            AVCaptureDevice.requestAccess(for: .video) { _ in cont.resume() }
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            AVCaptureDevice.requestAccess(for: .audio) { _ in cont.resume() }
+        }
+
+        // 2. ModelContainer (off main thread to avoid blocking UI)
+        let schema = Schema([Script.self, AppSettings.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let newContainer = await Task.detached {
+            try? ModelContainer(for: schema, configurations: [config])
+        }.value
+
+        // 3. Device detection (warm lazy property)
+        _ = DeviceDetectionService.shared.cutoutType
+
+        // 5. Show main UI
+        if let newContainer {
+            container = newContainer
+        } else {
+            fatalError("Could not create ModelContainer")
+        }
+    }
+
     private func cleanUpTempRecordings() {
         let tmpDir = FileManager.default.temporaryDirectory
         guard let files = try? FileManager.default.contentsOfDirectory(

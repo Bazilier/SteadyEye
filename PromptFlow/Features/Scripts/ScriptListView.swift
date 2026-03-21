@@ -122,7 +122,7 @@ struct ScriptListView: View {
                             .font(.body)
                             .foregroundStyle(.white)
                             .frame(width: 36, height: 36)
-                            .background(.orange, in: Circle())
+                            .background(.red, in: Circle())
                     }
                     .buttonStyle(.borderless)
                 }

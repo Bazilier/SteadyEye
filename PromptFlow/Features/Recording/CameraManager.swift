@@ -11,9 +11,9 @@ final class CameraManager: NSObject {
     var cameraPosition: AVCaptureDevice.Position = .front
     var lastRecordedURL: URL?
     var saveDirectlyOnStop = false
-    /// Current audio input source name (e.g. "iPhone Microphone", "AirPods", "DJI Mic")
+    /// True once the capture session is running and camera preview is available
+    var isSessionReady = false
     var audioSourceName: String = "iPhone Microphone"
-    /// Brief message shown when audio route changes (set to nil to dismiss)
     var audioRouteToast: String?
 
     // MARK: - Private
@@ -35,13 +35,28 @@ final class CameraManager: NSObject {
     }
 
     private func setupSession(position: AVCaptureDevice.Position) {
-        // Must be called on sessionQueue
+        // Must be called on sessionQueue — all steps run serially here
 
-        // 1. Tell AVCaptureSession to NOT manage AVAudioSession — we do it ourselves.
-        //    This is the key fix for Bluetooth/external mic support.
+        // a) Prevent capture session from touching audio session
         session.automaticallyConfiguresApplicationAudioSession = false
 
-        // 2. Register route change observer before configuring audio session
+        // b) Configure audio session (sole owner — no other code touches it)
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setCategory(
+            .playAndRecord,
+            mode: .videoRecording,
+            options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+        )
+        try? audioSession.setActive(true)
+
+        // Prefer Bluetooth input if available
+        if let btInput = audioSession.availableInputs?.first(where: {
+            $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
+        }) {
+            try? audioSession.setPreferredInput(btInput)
+        }
+
+        // Route change observer
         if routeChangeObserver == nil {
             routeChangeObserver = NotificationCenter.default.addObserver(
                 forName: AVAudioSession.routeChangeNotification,
@@ -67,38 +82,11 @@ final class CameraManager: NSObject {
             }
         }
 
-        // 3. Configure AVAudioSession with Bluetooth options BEFORE adding audio input
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-            try audioSession.setCategory(
-                .playAndRecord,
-                mode: .videoRecording,
-                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
-            )
-            try audioSession.setActive(true)
-
-            print("[Audio] Category: \(audioSession.category.rawValue)")
-            print("[Audio] Route inputs: \(audioSession.currentRoute.inputs.map { "\($0.portName) (\($0.portType.rawValue))" })")
-            print("[Audio] Available: \(audioSession.availableInputs?.map { "\($0.portName) (\($0.portType.rawValue))" } ?? [])")
-
-            // Prefer Bluetooth input if available
-            if let btInput = audioSession.availableInputs?.first(where: {
-                $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
-            }) {
-                try audioSession.setPreferredInput(btInput)
-                print("[Audio] Preferred: \(btInput.portName)")
-            }
-        } catch {
-            print("[Audio] Config failed: \(error)")
-        }
-
-        // Read source name after route settles
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        DispatchQueue.main.async { [weak self] in
             self?.updateAudioSourceName()
         }
 
-        // 4. Configure capture session
+        // c) Configure capture session
         let resolution = UserDefaults.standard.string(forKey: "videoResolution") ?? "1080p"
         let fps = UserDefaults.standard.integer(forKey: "videoFPS")
         let targetFPS = fps > 0 ? fps : 30
@@ -150,17 +138,16 @@ final class CameraManager: NSObject {
                 videoDevice.activeVideoMinFrameDuration = desiredFPS
                 videoDevice.activeVideoMaxFrameDuration = desiredFPS
             } else {
-                // Fall back to 30fps
                 let fallback = CMTime(value: 1, timescale: 30)
                 videoDevice.activeVideoMinFrameDuration = fallback
                 videoDevice.activeVideoMaxFrameDuration = fallback
             }
             videoDevice.unlockForConfiguration()
         } catch {
-            // Frame rate configuration failed — continue with defaults
+            // Continue with defaults
         }
 
-        // Audio input (non-fatal if unavailable)
+        // Audio input
         if let audioDevice = AVCaptureDevice.default(for: .audio),
            let aInput = try? AVCaptureDeviceInput(device: audioDevice),
            session.canAddInput(aInput) {
@@ -174,8 +161,12 @@ final class CameraManager: NSObject {
 
         session.commitConfiguration()
 
+        // 5. Start running — non-blocking for UI
         if !session.isRunning {
             session.startRunning()
+            DispatchQueue.main.async { [weak self] in
+                self?.isSessionReady = true
+            }
         }
     }
 
