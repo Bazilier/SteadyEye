@@ -72,7 +72,18 @@ Step 4 — Visual formatting:
 
 Return ONLY the reformatted spoken text, nothing else.
 
-Input language may be English or Russian. Detect and apply rules accordingly.
+Input language may be any language. Detect and apply rules accordingly.
+
+Language-specific rules:
+- Japanese: keep kanji and katakana as-is, convert Arabic numerals \
+to Japanese words (5 to 五, 100 to 百)
+- Chinese: keep characters as-is, convert Arabic numerals to \
+Chinese (5 to 五, 100 to 一百)
+- Korean: keep text as-is, convert Arabic numerals to Korean \
+(5 to 다섯, 100 to 백)
+- Arabic: convert numbers to Arabic words
+- All other rules (remove dashes, split long sentences, add // \
+pauses, remove special characters) apply to all languages
 """
 
     static func optimizeForReading(_ text: String) async throws -> String {
@@ -199,7 +210,7 @@ use those as split points
     }
 
     /// Parses JSON array from the API response, handling markdown fences and edge cases.
-    private static func parseScriptsJSON(_ text: String) -> [ImportedScript] {
+    static func parseScriptsJSON(_ text: String) -> [ImportedScript] {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Strip markdown code fences if present

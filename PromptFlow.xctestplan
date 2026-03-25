@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "E6BB26B1-447D-4C05-81A4-27A070B7F679",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:PromptFlow.xcodeproj",
+      "identifier" : "1195F13D2F5ADD78003B4DD2",
+      "name" : "PromptFlow"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:PromptFlow.xcodeproj",
+        "identifier" : "116FE5E42F73BDBB0094999F",
+        "name" : "PromptFlowTests"
+      }
+    }
+  ],
+  "version" : 1
+}

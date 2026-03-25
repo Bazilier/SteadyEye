@@ -11,6 +11,7 @@ final class DeviceDetectionService {
     static let shared = DeviceDetectionService()
 
     lazy var cutoutType: CutoutType = detectCutoutType()
+    lazy var modelIdentifier: String = getModelIdentifier()
 
     private init() {}
 

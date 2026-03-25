@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct SettingsView: View {
     @Query private var settingsArray: [AppSettings]
@@ -66,7 +67,10 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Legal") {
+                Section("Support & Legal") {
+                    Button("Send Feedback") {
+                        sendFeedback()
+                    }
                     Link("Privacy Policy", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!)
                     Link("Terms of Use", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!)
                 }
@@ -77,5 +81,23 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func sendFeedback() {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let iosVersion = UIDevice.current.systemVersion
+        let device = DeviceDetectionService.shared.modelIdentifier
+        let lang = Locale.current.language.languageCode?.identifier ?? "?"
+
+        let body = "\n\n\n---\nApp version: \(appVersion)\niOS version: \(iosVersion)\nDevice: \(device)\nLanguage: \(lang)"
+        let subject = "SteadyEye Feedback"
+        let to = "heybazilier@gmail.com"
+
+        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
+        let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? body
+
+        if let url = URL(string: "mailto:\(to)?subject=\(encodedSubject)&body=\(encodedBody)") {
+            UIApplication.shared.open(url)
+        }
     }
 }

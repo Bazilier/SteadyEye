@@ -151,8 +151,17 @@ struct WordByWordView: View {
             }
     }
 
+    /// CJK sentence-ending punctuation to strip from display (but keep for timing)
+    private static let cjkStripPunctuation: Set<Character> = ["。", "！", "？"]
+
     private func displayText(for chunk: String) -> String {
-        ChunkPlayerEngine.isPause(chunk) ? "..." : chunk
+        if ChunkPlayerEngine.isPause(chunk) { return "..." }
+        // Strip CJK sentence-ending punctuation from display
+        if CJKTokenizer.containsCJK(chunk) {
+            let stripped = String(chunk.filter { !Self.cjkStripPunctuation.contains($0) })
+            return stripped.isEmpty ? chunk : stripped
+        }
+        return chunk
     }
 
     private func displayOpacity(for chunk: String) -> Double {
@@ -200,10 +209,17 @@ struct ClassicThreeLineView: View {
     private let lineFontSize: CGFloat = 22
     private let lineHeight: CGFloat = 28
 
+    private static let cjkStripPunctuation: Set<Character> = ["。", "！", "？"]
+
     private func chunkText(at i: Int) -> String {
         guard i >= 0, i < player.chunks.count else { return "" }
         let chunk = player.chunks[i]
-        return ChunkPlayerEngine.isPause(chunk) ? "" : chunk
+        if ChunkPlayerEngine.isPause(chunk) { return "" }
+        if CJKTokenizer.containsCJK(chunk) {
+            let stripped = String(chunk.filter { !Self.cjkStripPunctuation.contains($0) })
+            return stripped.isEmpty ? chunk : stripped
+        }
+        return chunk
     }
 
     private func lineOpacity(_ slot: Int) -> Double {
