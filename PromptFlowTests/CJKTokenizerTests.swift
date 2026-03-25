@@ -126,4 +126,65 @@ final class CJKTokenizerTests: XCTestCase {
         let chunks = WordChunkEngine.chunks(from: "こんにちは世界")
         XCTAssertFalse(chunks.isEmpty)
     }
+
+    // MARK: - CJK Timing
+
+    func testCJKTimingReasonable() {
+        let strategy = CJKLanguageStrategy(language: "ja")
+        let text = "カメラの前で話すのは難しい"
+        let chunks = strategy.chunks(from: text)
+
+        print("=== CJK TIMING TEST ===")
+        for chunk in chunks {
+            let duration = strategy.duration(for: chunk, msPerChar: 30)
+            print("  '\(chunk)' → \(String(format: "%.2f", duration))s")
+
+            XCTAssertGreaterThanOrEqual(duration, 0.3,
+                "Chunk '\(chunk)' is too fast at \(duration)s")
+            XCTAssertLessThanOrEqual(duration, 3.0,
+                "Chunk '\(chunk)' is too slow at \(duration)s")
+        }
+        print("=== END ===")
+    }
+
+    func testCJKKanjiSlowerThanKana() {
+        let strategy = CJKLanguageStrategy(language: "ja")
+        let kanjiDuration = strategy.duration(for: "経済", msPerChar: 30)
+        let kanaDuration = strategy.duration(for: "けいざい", msPerChar: 30)
+
+        print("経済: \(String(format: "%.2f", kanjiDuration))s, けいざい: \(String(format: "%.2f", kanaDuration))s")
+
+        XCTAssertGreaterThanOrEqual(kanjiDuration, 0.3)
+        XCTAssertGreaterThanOrEqual(kanaDuration, 0.3)
+    }
+
+    func testCJKParticleTiming() {
+        let strategy = CJKLanguageStrategy(language: "ja")
+        let duration = strategy.duration(for: "で", msPerChar: 30)
+        print("Particle 'で' → \(String(format: "%.2f", duration))s")
+        XCTAssertGreaterThanOrEqual(duration, 0.3,
+            "Particle 'で' should get minimum duration, got \(duration)s")
+    }
+
+    func testCJKSentenceEndDetection() {
+        let strategy = CJKLanguageStrategy(language: "ja")
+        XCTAssertTrue(strategy.endsSentence("です。"))
+        XCTAssertTrue(strategy.endsSentence("ます！"))
+        XCTAssertTrue(strategy.endsSentence("か？"))
+        XCTAssertFalse(strategy.endsSentence("です"))
+        XCTAssertFalse(strategy.endsSentence(""))
+    }
+
+    func testCJKSentenceEndAddsDuration() {
+        let strategy = CJKLanguageStrategy(language: "ja")
+        let withEnd = ChunkPlayerEngine.calculateDuration(
+            for: "です。", sliderValue: 0.5, strategy: strategy)
+        let without = ChunkPlayerEngine.calculateDuration(
+            for: "です", sliderValue: 0.5, strategy: strategy)
+
+        print("です。: \(String(format: "%.2f", withEnd))s, です: \(String(format: "%.2f", without))s")
+
+        XCTAssertGreaterThan(withEnd, without,
+            "Sentence-ending chunk should be longer")
+    }
 }
