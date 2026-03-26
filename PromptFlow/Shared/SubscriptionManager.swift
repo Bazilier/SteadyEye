@@ -16,7 +16,7 @@ final class SubscriptionManager: ObservableObject {
         #endif
     }
 
-    @Published var isSubscribed: Bool = true
+    @Published var isSubscribed: Bool = false
     @Published var isTrialActive: Bool = false
 
     private init() {}
@@ -28,6 +28,7 @@ final class SubscriptionManager: ObservableObject {
             isSubscribed = true
             return
         }
+        // In production with no RevenueCat yet: isSubscribed stays false → paywall shows
 
         // TODO: Uncomment when RevenueCat SDK is added and API key is set
         // guard let apiKey = revenueCatAPIKey(), !apiKey.isEmpty else { return }
@@ -80,10 +81,29 @@ final class SubscriptionManager: ObservableObject {
         // await checkSubscriptionStatus()
     }
 
+    // MARK: - Free optimization tracking
+
+    @Published var freeOptimizationsUsed: Int = UserDefaults.standard.integer(forKey: "freeOptimizationsUsed")
+
+    static let freeOptimizationLimit = 3
+
+    var freeOptimizationsRemaining: Int {
+        max(0, Self.freeOptimizationLimit - freeOptimizationsUsed)
+    }
+
+    func recordOptimizationUse() {
+        guard !isSubscribed else { return }
+        freeOptimizationsUsed += 1
+        UserDefaults.standard.set(freeOptimizationsUsed, forKey: "freeOptimizationsUsed")
+    }
+
     // MARK: - Feature access
 
     var canUseCamera: Bool { Self.devMode || isSubscribed }
-    var canOptimize: Bool { Self.devMode || isSubscribed }
+    var canOptimize: Bool {
+        if Self.devMode || isSubscribed { return true }
+        return freeOptimizationsUsed < Self.freeOptimizationLimit
+    }
     var canBulkImport: Bool { Self.devMode || isSubscribed }
     var canRecord4K: Bool { Self.devMode || isSubscribed }
     var showWatermark: Bool { !Self.devMode && !isSubscribed }

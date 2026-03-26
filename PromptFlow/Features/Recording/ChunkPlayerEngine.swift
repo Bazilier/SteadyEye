@@ -2,6 +2,7 @@ import Foundation
 import Combine
 
 /// Owns chunk advancement scheduling, independent of display views.
+@MainActor
 final class ChunkPlayerEngine: ObservableObject {
     @Published var currentChunkIndex = 0
     @Published var isPlaying = false
@@ -27,16 +28,16 @@ final class ChunkPlayerEngine: ObservableObject {
         isReady = false
 
         let scriptText = text
-        loadTask = Task.detached { [weak self] in
-            let strat = LanguageDetector.detect(scriptText)
-            let newChunks = strat.chunks(from: scriptText)
-            await MainActor.run {
-                guard let self else { return }
-                self.strategy = strat
-                self.chunks = newChunks
-                self.currentChunkIndex = 0
-                self.isReady = true
-            }
+        loadTask = Task { [weak self] in
+            let (strat, newChunks) = await Task.detached {
+                let s = LanguageDetector.detect(scriptText)
+                return (s, s.chunks(from: scriptText))
+            }.value
+            guard let self else { return }
+            self.strategy = strat
+            self.chunks = newChunks
+            self.currentChunkIndex = 0
+            self.isReady = true
         }
     }
 
@@ -75,55 +76,10 @@ final class ChunkPlayerEngine: ObservableObject {
         }
     }
 
-    // MARK: - Pause marker (language-independent)
+    // MARK: - Duration
 
-    nonisolated(unsafe) static let pauseMarker = "//"
-
-    nonisolated static func isPause(_ chunk: String) -> Bool {
-        let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed == "//" || trimmed == "／／"  // halfwidth and fullwidth
-    }
-
-    // MARK: - Duration calculation
-
-    /// Pure static duration calculation using a strategy.
-    nonisolated static func calculateDuration(
-        for chunk: String,
-        sliderValue: Double,
-        strategy: (any LanguageStrategy)? = nil
-    ) -> TimeInterval {
-        // Pause marker — speed-aware
-        if isPause(chunk) {
-            return sliderValue > 0.85 ? 0.2 : 0.5
-        }
-
-        let strat = strategy ?? LanguageDetector.detect(chunk)
-        let msPerChar = WordChunkEngine.msPerChar(forSlider: sliderValue)
-        var d = strat.duration(for: chunk, msPerChar: msPerChar)
-
-        // Speed-aware minimum
-        let minDuration: TimeInterval
-        if sliderValue > 0.95 {
-            minDuration = 0.1
-        } else if sliderValue > 0.85 {
-            minDuration = 0.15
-        } else {
-            minDuration = strat.minimumDuration
-        }
-        d = max(minDuration, min(3.0, d))
-
-        // Sentence-end pause — scaled with speed
-        if strat.endsSentence(chunk) {
-            d += sliderValue > 0.85 ? 0.1 : strat.sentencePauseDuration
-        }
-
-
-        return d
-    }
-
-    /// Instance convenience — uses the script's detected strategy.
     func chunkDuration(_ chunk: String) -> TimeInterval {
-        Self.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
+        ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
     }
 
     // MARK: - Internal scheduling

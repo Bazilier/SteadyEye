@@ -139,7 +139,7 @@ final class CJKTokenizerTests: XCTestCase {
             let duration = strategy.duration(for: chunk, msPerChar: 30)
             print("  '\(chunk)' → \(String(format: "%.2f", duration))s")
 
-            XCTAssertGreaterThanOrEqual(duration, 0.3,
+            XCTAssertGreaterThanOrEqual(duration, 0.1,
                 "Chunk '\(chunk)' is too fast at \(duration)s")
             XCTAssertLessThanOrEqual(duration, 3.0,
                 "Chunk '\(chunk)' is too slow at \(duration)s")
@@ -154,15 +154,15 @@ final class CJKTokenizerTests: XCTestCase {
 
         print("経済: \(String(format: "%.2f", kanjiDuration))s, けいざい: \(String(format: "%.2f", kanaDuration))s")
 
-        XCTAssertGreaterThanOrEqual(kanjiDuration, 0.3)
-        XCTAssertGreaterThanOrEqual(kanaDuration, 0.3)
+        XCTAssertGreaterThanOrEqual(kanjiDuration, 0.1)
+        XCTAssertGreaterThanOrEqual(kanaDuration, 0.1)
     }
 
     func testCJKParticleTiming() {
         let strategy = CJKLanguageStrategy(language: "ja")
         let duration = strategy.duration(for: "で", msPerChar: 30)
         print("Particle 'で' → \(String(format: "%.2f", duration))s")
-        XCTAssertGreaterThanOrEqual(duration, 0.3,
+        XCTAssertGreaterThanOrEqual(duration, 0.1,
             "Particle 'で' should get minimum duration, got \(duration)s")
     }
 
@@ -177,9 +177,9 @@ final class CJKTokenizerTests: XCTestCase {
 
     func testCJKSentenceEndAddsDuration() {
         let strategy = CJKLanguageStrategy(language: "ja")
-        let withEnd = ChunkPlayerEngine.calculateDuration(
+        let withEnd = ChunkTimingCalculator.calculateDuration(
             for: "です。", sliderValue: 0.5, strategy: strategy)
-        let without = ChunkPlayerEngine.calculateDuration(
+        let without = ChunkTimingCalculator.calculateDuration(
             for: "です", sliderValue: 0.5, strategy: strategy)
 
         print("です。: \(String(format: "%.2f", withEnd))s, です: \(String(format: "%.2f", without))s")

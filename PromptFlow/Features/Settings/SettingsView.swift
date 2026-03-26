@@ -54,13 +54,24 @@ struct SettingsView: View {
                 #if DEV
                 Section("Debug") {
                     Button("Preview Paywall") { showPaywall = true }
-                    Button("Reset Onboarding") {
-                        UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
+                    Button("Reset Tips") {
+                        UserDefaults.standard.set(false, forKey: "hasSeenEditorTip")
+                        UserDefaults.standard.set(false, forKey: "hasSeenRecordingTip")
                     }
                     Button("Reset Rate Limits") {
                         UserDefaults.standard.removeObject(forKey: "apiCallsToday")
                         UserDefaults.standard.removeObject(forKey: "bulkImportsToday")
                         UserDefaults.standard.removeObject(forKey: "rateLimitDate")
+                    }
+                    Button("Reset Free Optimizations") {
+                        UserDefaults.standard.set(0, forKey: "freeOptimizationsUsed")
+                        SubscriptionManager.shared.freeOptimizationsUsed = 0
+                    }
+                    HStack {
+                        Text("Free optimizations used")
+                        Spacer()
+                        Text("\(SubscriptionManager.shared.freeOptimizationsUsed) / \(SubscriptionManager.freeOptimizationLimit)")
+                            .foregroundStyle(.secondary)
                     }
                     HStack {
                         Text("API calls today")

@@ -16,10 +16,10 @@ struct PaywallView: View {
                 VStack(spacing: 28) {
                     // Header
                     VStack(spacing: 8) {
-                        Text("SteadyEye Premium")
+                        Text("Unlock SteadyEye")
                             .font(.largeTitle.bold())
                             .foregroundStyle(.white)
-                        Text("Unlock everything")
+                        Text("Record with perfect eye contact")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.6))
                     }

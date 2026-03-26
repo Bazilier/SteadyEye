@@ -30,7 +30,7 @@ enum WordChunkEngine {
     }
 
     /// Base duration for a chunk given character count and slider value.
-    /// Minimum clamping is handled by ChunkPlayerEngine.calculateDuration().
+    /// Minimum clamping is handled by ChunkTimingCalculator.calculateDuration().
     static func duration(for chunk: String, sliderValue: Double) -> TimeInterval {
         let ms = msPerChar(forSlider: sliderValue) * Double(chunk.count)
         return min(3.0, ms / 1000.0)

@@ -3,7 +3,7 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var coachManager = CoachMarkManager.shared
+    @AppStorage("demoScriptCreated") private var demoScriptCreated = false
 
     var body: some View {
         TabView {
@@ -19,20 +19,16 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .tint(.orange)
-        .environmentObject(coachManager)
-        .onAppear {
-            createDemoScriptIfNeeded()
-            coachManager.startIfNeeded()
-        }
+        .onAppear { createDemoScriptIfNeeded() }
     }
 
     private func createDemoScriptIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") else { return }
+        guard !demoScriptCreated else { return }
         let descriptor = FetchDescriptor<Script>(
             predicate: #Predicate { $0.title == "Demo Script" }
         )
         let existing = (try? modelContext.fetch(descriptor)) ?? []
-        guard existing.isEmpty else { return }
+        guard existing.isEmpty else { demoScriptCreated = true; return }
 
         let demo = Script(
             title: "Demo Script",
@@ -40,5 +36,6 @@ struct ContentView: View {
         )
         modelContext.insert(demo)
         try? modelContext.save()
+        demoScriptCreated = true
     }
 }

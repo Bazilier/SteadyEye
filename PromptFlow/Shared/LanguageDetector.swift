@@ -3,7 +3,7 @@ import Foundation
 /// Detects the dominant language of text and returns the appropriate strategy.
 /// Only samples the first 200 characters for performance.
 enum LanguageDetector {
-    static func detect(_ text: String) -> LanguageStrategy {
+    static func detect(_ text: String) -> any LanguageStrategy {
         let sample = String(text.prefix(200))
 
         if CJKTokenizer.containsCJK(sample) {

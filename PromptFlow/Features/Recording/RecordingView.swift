@@ -13,7 +13,8 @@ struct RecordingView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @EnvironmentObject private var coachManager: CoachMarkManager
+    @State private var showRecordingTip = false
+    @AppStorage("hasSeenRecordingTip") private var hasSeenRecordingTip = false
     @ObservedObject private var cameraManager = CameraManager.shared
     @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
@@ -23,6 +24,8 @@ struct RecordingView: View {
     private let fontSize: CGFloat = 32
     @AppStorage("speedSliderValue") private var speedSlider: Double = 0.5
     @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    @AppStorage("videoResolution") private var videoResolution: String = "1080p"
+    @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { displayMode == "classic" }
 
     // Container positioning — persisted
@@ -43,8 +46,7 @@ struct RecordingView: View {
     private let countdownSeconds = 3
 
     // UI
-    @State private var showControls = true
-    @State private var controlsHideTask: Task<Void, Never>?
+
     @State private var isExpanded = false
     @State private var showTextContent = false
     @State private var smoothProgress: Double = 0
@@ -132,8 +134,6 @@ struct RecordingView: View {
                             }
                         }
                         .clipped()
-                        .coachSpotlight(step: 2, manager: coachManager)
-                        .coachSpotlight(step: 3, manager: coachManager)
                         .overlay(alignment: .topTrailing) {
                             if isExpanded {
                                 Button {
@@ -250,13 +250,10 @@ struct RecordingView: View {
                 .animation(.interactiveSpring(), value: isTextEditMode)
             }
 
-            // 3. Controls
-            if showControls {
-                VStack {
-                    Spacer()
-                    controlsOverlay
-                }
-                .transition(.opacity)
+            // 3. Controls — always visible
+            VStack {
+                Spacer()
+                controlsOverlay
             }
 
             // 4. Countdown
@@ -309,7 +306,6 @@ struct RecordingView: View {
             player.loadScript(script.content)
             player.sliderValue = speedSlider
             cameraManager.start(position: .front)
-            scheduleControlsHide()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -318,6 +314,16 @@ struct RecordingView: View {
                     }
                 }
             }
+            if !hasSeenRecordingTip {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    showRecordingTip = true
+                }
+            }
+        }
+        .alert("Tip", isPresented: $showRecordingTip) {
+            Button("Got it") { hasSeenRecordingTip = true }
+        } message: {
+            Text("Drag the text bar left or right to position it under your camera.\n\nLong press and drag up or down to adjust height.")
         }
         .onChange(of: player.currentChunkIndex) { _, newIndex in
             guard newIndex < player.chunks.count, player.isPlaying else { return }
@@ -345,22 +351,14 @@ struct RecordingView: View {
                 cameraManager.saveDirectlyOnStop = true
                 cameraManager.stopRecording()
                 player.pause()
-                hasStartedPlayback = false
                 smoothProgress = 0
                 showSavedToast = true
             }
             cameraManager.stop()
             dismiss()
         }
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showControls.toggle()
-            }
-            if showControls { scheduleControlsHide() }
-        }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
-        .overlay { CoachMarkOverlay(manager: coachManager, screen: .recording) }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
@@ -391,7 +389,7 @@ struct RecordingView: View {
 
     private var wordDisplay: some View {
         Group {
-            if hasStartedPlayback {
+            if hasStartedPlayback && player.isReady {
                 if isClassicMode {
                     ClassicThreeLineView(player: player)
                 } else {
@@ -463,22 +461,30 @@ struct RecordingView: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 16) {
-            HStack {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .shadow(radius: 4)
+            if !cameraManager.isRecording {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
 
-            // Audio source indicator
-            HStack(spacing: 4) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 10))
-                Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
+            // Audio source + video quality indicators
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 10))
+                    Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
+                        .font(.caption2)
+                }
+                Text("·")
+                    .font(.caption2)
+                Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
                     .font(.caption2)
             }
             .foregroundStyle(.white.opacity(0.5))
@@ -570,7 +576,6 @@ struct RecordingView: View {
 
     private func resetDisplay() {
         player.reset()
-        hasStartedPlayback = false
         smoothProgress = 0
     }
 
@@ -610,19 +615,6 @@ struct RecordingView: View {
     }
 
     // MARK: - Helpers
-
-    private func scheduleControlsHide() {
-        controlsHideTask?.cancel()
-        controlsHideTask = Task {
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showControls = false
-                }
-            }
-        }
-    }
 
     private func durationString(_ duration: TimeInterval) -> String {
         let minutes = Int(duration) / 60

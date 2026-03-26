@@ -80,6 +80,12 @@ struct PlaceholderLoopView: View {
 
     // MARK: - Loop
 
+    private func chunkDelay() -> UInt64 {
+        let speed = UserDefaults.standard.double(forKey: "speedSliderValue")
+        let duration = ChunkTimingCalculator.calculateDuration(for: words[currentIndex], sliderValue: speed)
+        return UInt64(duration * 1_000_000_000)
+    }
+
     private func startLoop() {
         loopTask?.cancel()
         currentIndex = 0
@@ -88,37 +94,25 @@ struct PlaceholderLoopView: View {
 
         loopTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 500_000_000)
+                try? await Task.sleep(nanoseconds: chunkDelay())
                 guard !Task.isCancelled else { return }
 
                 if isClassicMode {
-                    // Scroll up
                     await MainActor.run {
                         withAnimation(.easeInOut(duration: 0.3)) { scrollOffset = lineHeight }
                     }
                     try? await Task.sleep(nanoseconds: 300_000_000)
                     guard !Task.isCancelled else { return }
-                    let isLast = currentIndex == words.count - 1
                     await MainActor.run {
                         scrollOffset = 0
-                        currentIndex = isLast ? 0 : currentIndex + 1
-                    }
-                    if isLast {
-                        try? await Task.sleep(nanoseconds: 750_000_000)
-                        guard !Task.isCancelled else { return }
+                        currentIndex = (currentIndex + 1) % words.count
                     }
                 } else {
-                    // WbW crossfade
-                    await MainActor.run { withAnimation(.easeOut(duration: 0.1)) { opacity = 0 } }
-                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    await MainActor.run { withAnimation(.easeOut(duration: 0.08)) { opacity = 0 } }
+                    try? await Task.sleep(nanoseconds: 80_000_000)
                     guard !Task.isCancelled else { return }
-                    let isLast = currentIndex == words.count - 1
-                    await MainActor.run { currentIndex = isLast ? 0 : currentIndex + 1 }
-                    await MainActor.run { withAnimation(.easeIn(duration: 0.1)) { opacity = 1 } }
-                    if isLast {
-                        try? await Task.sleep(nanoseconds: 750_000_000)
-                        guard !Task.isCancelled else { return }
-                    }
+                    await MainActor.run { currentIndex = (currentIndex + 1) % words.count }
+                    await MainActor.run { withAnimation(.easeIn(duration: 0.08)) { opacity = 1 } }
                 }
             }
         }
@@ -155,7 +149,7 @@ struct WordByWordView: View {
     private static let cjkStripPunctuation: Set<Character> = ["。", "！", "？"]
 
     private func displayText(for chunk: String) -> String {
-        if ChunkPlayerEngine.isPause(chunk) { return "..." }
+        if ChunkTimingCalculator.isPause(chunk) { return "..." }
         // Strip CJK sentence-ending punctuation from display
         if CJKTokenizer.containsCJK(chunk) {
             let stripped = String(chunk.filter { !Self.cjkStripPunctuation.contains($0) })
@@ -165,7 +159,7 @@ struct WordByWordView: View {
     }
 
     private func displayOpacity(for chunk: String) -> Double {
-        ChunkPlayerEngine.isPause(chunk) ? 0.2 : 1
+        ChunkTimingCalculator.isPause(chunk) ? 0.2 : 1
     }
 
     private func syncToPlayer() {
@@ -214,7 +208,7 @@ struct ClassicThreeLineView: View {
     private func chunkText(at i: Int) -> String {
         guard i >= 0, i < player.chunks.count else { return "" }
         let chunk = player.chunks[i]
-        if ChunkPlayerEngine.isPause(chunk) { return "" }
+        if ChunkTimingCalculator.isPause(chunk) { return "" }
         if CJKTokenizer.containsCJK(chunk) {
             let stripped = String(chunk.filter { !Self.cjkStripPunctuation.contains($0) })
             return stripped.isEmpty ? chunk : stripped

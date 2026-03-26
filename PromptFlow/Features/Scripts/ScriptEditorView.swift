@@ -4,7 +4,6 @@ import SwiftData
 struct ScriptEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var coachManager: CoachMarkManager
 
     let script: Script?
 
@@ -15,6 +14,8 @@ struct ScriptEditorView: View {
     @State private var optimizeError: String?
     @State private var showRateLimitAlert = false
     @State private var showPaywall = false
+    @State private var showEditorTip = false
+    @AppStorage("hasSeenEditorTip") private var hasSeenEditorTip = false
     @FocusState private var contentFocused: Bool
 
     private let maxChars = 5000
@@ -108,7 +109,6 @@ struct ScriptEditorView: View {
                 PaywallView()
             }
         }
-        .overlay { CoachMarkOverlay(manager: coachManager, screen: .editor) }
         .preferredColorScheme(.dark)
         .onAppear {
             if let script {
@@ -117,6 +117,14 @@ struct ScriptEditorView: View {
             } else {
                 contentFocused = true
             }
+            if !hasSeenEditorTip {
+                showEditorTip = true
+            }
+        }
+        .alert("Tip", isPresented: $showEditorTip) {
+            Button("Got it") { hasSeenEditorTip = true }
+        } message: {
+            Text("Tap \"Optimize\" to let AI clean up your script for reading aloud.\n\nUse // to add a pause between sections.")
         }
     }
 
@@ -129,23 +137,36 @@ struct ScriptEditorView: View {
     }
 
     private var statsBar: some View {
-        HStack(spacing: 20) {
-            Label("\(wordCount) words", systemImage: "text.word.spacing")
-            Text("\(content.count.formatted()) / \(maxChars.formatted())")
-                .foregroundStyle(charCountColor)
-            Spacer()
-            Button {
-                optimizeForReading()
-            } label: {
-                if isOptimizing {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label("Optimize", systemImage: "wand.and.stars")
+        let sub = SubscriptionManager.shared
+        return VStack(spacing: 4) {
+            HStack(spacing: 20) {
+                Label("\(wordCount) words", systemImage: "text.word.spacing")
+                Text("\(content.count.formatted()) / \(maxChars.formatted())")
+                    .foregroundStyle(charCountColor)
+                Spacer()
+                Button {
+                    if sub.canOptimize {
+                        optimizeForReading()
+                    } else {
+                        showPaywall = true
+                    }
+                } label: {
+                    if isOptimizing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label("Optimize", systemImage: "wand.and.stars")
+                            .foregroundStyle(sub.canOptimize ? .orange : .gray)
+                    }
                 }
+                .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
             }
-            .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
-            .coachSpotlight(step: 1, manager: coachManager)
+            if !sub.isSubscribed && sub.canOptimize {
+                Text("\(sub.freeOptimizationsRemaining) free optimization\(sub.freeOptimizationsRemaining == 1 ? "" : "s") left")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -184,14 +205,11 @@ struct ScriptEditorView: View {
                 let aiResult = try await AnthropicService.optimizeForReading(content)
                 let cleaned = ScriptFormatter.cleanUp(aiResult)
                 content = cleaned
+                SubscriptionManager.shared.recordOptimizationUse()
             } catch {
                 optimizeError = "Could not format script. Check connection."
             }
             isOptimizing = false
-            // Auto-advance coach mark after optimization
-            if coachManager.isActive && coachManager.currentStep == 1 {
-                coachManager.advance()
-            }
         }
     }
 

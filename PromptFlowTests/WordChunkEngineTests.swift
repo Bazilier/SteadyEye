@@ -14,7 +14,9 @@ final class WordChunkEngineTests: XCTestCase {
     }
 
     func testSingleLongWord() {
-        XCTAssertEqual(WordChunkEngine.chunks(from: "Supercalifragilistic"), ["Supercalifragilistic"])
+        let chunks = WordChunkEngine.chunks(from: "Supercalifragilistic")
+        XCTAssertGreaterThan(chunks.count, 1, "Long word should be split")
+        XCTAssertTrue(chunks.first!.hasSuffix("..."))
     }
 
     func testWhitespaceOnly() {
@@ -45,7 +47,8 @@ final class WordChunkEngineTests: XCTestCase {
     func testGlueWordExceedsMaxLength() {
         let latin = LatinLanguageStrategy()
         let chunks = latin.chunks(from: "the extraordinary")
-        XCTAssertEqual(chunks, ["the", "extraordinary"])
+        XCTAssertTrue(chunks.contains("the"))
+        XCTAssertGreaterThan(chunks.count, 2, "'the' + split parts of 'extraordinary'")
     }
 
     // MARK: - Sentence endings (universal)
@@ -121,7 +124,7 @@ final class WordChunkEngineTests: XCTestCase {
     }
 
     func testMsPerCharExponential() {
-        XCTAssertEqual(WordChunkEngine.msPerChar(forSlider: 0.0), 80.0, accuracy: 0.01)
+        XCTAssertEqual(WordChunkEngine.msPerChar(forSlider: 0.0), 120.0, accuracy: 0.01)
         XCTAssertGreaterThan(WordChunkEngine.msPerChar(forSlider: 0.0),
                              WordChunkEngine.msPerChar(forSlider: 1.0))
     }
@@ -177,5 +180,64 @@ final class WordChunkEngineTests: XCTestCase {
     func testCJKNoAbbreviation() {
         let cjk = CJKLanguageStrategy(language: "ja")
         XCTAssertFalse(cjk.isAbbreviation("猫"))
+    }
+
+    // MARK: - Long word splitting
+
+    func testLongWordSplit() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "pseudohypoparathyroidism")
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.first!.hasSuffix("..."))
+        XCTAssertTrue(chunks.last!.hasPrefix("..."))
+        for chunk in chunks {
+            XCTAssertLessThanOrEqual(chunk.count, 14,
+                "Chunk '\(chunk)' too long")
+        }
+    }
+
+    func testShortWordNotSplit() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "Hello")
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(chunks.first, "Hello")
+    }
+
+    func testExactly12CharsNotSplit() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "abcdefghijkl")
+        XCTAssertEqual(chunks.count, 1)
+    }
+
+    func testThirteenCharsSplit() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "abcdefghijklm")
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.first!.hasSuffix("..."))
+    }
+
+    func testGermanLongWord() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "Geschwindigkeitsbegrenzung")
+        XCTAssertGreaterThan(chunks.count, 1)
+        for chunk in chunks {
+            XCTAssertLessThanOrEqual(chunk.count, 14)
+        }
+    }
+
+    func testLongWordInSentence() {
+        let latin = LatinLanguageStrategy()
+        let chunks = latin.chunks(from: "The pseudohypoparathyroidism is rare")
+        XCTAssertTrue(chunks.count >= 4, "Should have normal + split + normal chunks")
+        XCTAssertTrue(chunks.contains { $0.hasSuffix("...") })
+        XCTAssertTrue(chunks.contains { $0.hasPrefix("...") })
+    }
+
+    func testLongWordDurationStripsEllipsis() {
+        let latin = LatinLanguageStrategy()
+        let fullDuration = latin.duration(for: "...thyroidism", msPerChar: 30)
+        let cleanDuration = latin.duration(for: "thyroidism", msPerChar: 30)
+        XCTAssertEqual(fullDuration, cleanDuration, accuracy: 0.001,
+            "Ellipsis should not affect duration")
     }
 }

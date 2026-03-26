@@ -24,7 +24,6 @@ enum EditorMode: Identifiable {
 
 struct ScriptListView: View {
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var coachManager: CoachMarkManager
     @Query(sort: \Script.updatedAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
@@ -63,11 +62,9 @@ struct ScriptListView: View {
             }
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
-                    .environmentObject(coachManager)
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script)
-                    .environmentObject(coachManager)
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView()
@@ -104,7 +101,11 @@ struct ScriptListView: View {
             .tint(.orange)
 
             Button {
-                showBulkImport = true
+                if SubscriptionManager.shared.canBulkImport {
+                    showBulkImport = true
+                } else {
+                    showPaywall = true
+                }
             } label: {
                 Label("Import Multiple Scripts", systemImage: "doc.on.doc")
                     .padding(.horizontal, 24)
@@ -150,7 +151,11 @@ struct ScriptListView: View {
             }
 
             Button {
-                showBulkImport = true
+                if SubscriptionManager.shared.canBulkImport {
+                    showBulkImport = true
+                } else {
+                    showPaywall = true
+                }
             } label: {
                 Label("Import Multiple Scripts", systemImage: "doc.on.doc")
                     .font(.subheadline)

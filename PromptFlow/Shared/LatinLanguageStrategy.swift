@@ -29,12 +29,17 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
     }
 
     func duration(for chunk: String, msPerChar: Double) -> TimeInterval {
+        // Strip ellipsis from split words before counting
+        var cleaned = chunk
+        if cleaned.hasPrefix("...") { cleaned = String(cleaned.dropFirst(3)) }
+        if cleaned.hasSuffix("...") { cleaned = String(cleaned.dropLast(3)) }
+
         let effectiveChars: Double
-        if isAbbreviation(chunk) {
-            let trimmed = chunk.trimmingCharacters(in: .punctuationCharacters)
+        if isAbbreviation(cleaned) {
+            let trimmed = cleaned.trimmingCharacters(in: .punctuationCharacters)
             effectiveChars = Double(trimmed.filter { $0.isLetter }.count) * 3.0
         } else {
-            effectiveChars = Double(chunk.count)
+            effectiveChars = Double(cleaned.count)
         }
         return effectiveChars * msPerChar / 1000.0
     }
@@ -94,6 +99,40 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
             result.append(group)
         }
 
-        return result
+        // Post-process: split long single words
+        return result.flatMap { chunk -> [String] in
+            if chunk == "//" { return [chunk] }
+            if chunk.contains(" ") { return [chunk] }
+            return splitLongWord(chunk)
+        }
+    }
+
+    // MARK: - Long word splitting
+
+    private func splitLongWord(_ word: String, maxChars: Int = 8) -> [String] {
+        guard word.count > 12 else { return [word] }
+
+        var parts: [String] = []
+        var remaining = word
+
+        while remaining.count > maxChars {
+            let splitIndex = remaining.index(remaining.startIndex, offsetBy: maxChars)
+            let part = String(remaining[..<splitIndex])
+            remaining = String(remaining[splitIndex...])
+
+            if parts.isEmpty {
+                parts.append(part + "...")
+            } else {
+                parts.append("..." + part + "...")
+            }
+        }
+
+        if parts.isEmpty {
+            parts.append(remaining)
+        } else {
+            parts.append("..." + remaining)
+        }
+
+        return parts
     }
 }
