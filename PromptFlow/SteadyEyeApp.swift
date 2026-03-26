@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import RevenueCat
 
 @main
 struct SteadyEyeApp: App {
@@ -9,6 +10,16 @@ struct SteadyEyeApp: App {
 
     init() {
         cleanUpTempRecordings()
+
+        #if !DEV
+        if let apiKey = SecretsManager.revenueCatAPIKey(), !apiKey.isEmpty {
+            #if DEV
+            Purchases.logLevel = .debug
+            #endif
+            Purchases.configure(withAPIKey: apiKey)
+        }
+        #endif
+
         SubscriptionManager.shared.configure()
     }
 

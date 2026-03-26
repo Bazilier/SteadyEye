@@ -601,15 +601,17 @@ struct RecordingView: View {
         countdownValue = countdownSeconds
         isCountingDown = true
 
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            if countdownValue > 1 {
-                withAnimation { countdownValue -= 1 }
-            } else {
-                timer.invalidate()
-                countdownTimer = nil
-                isCountingDown = false
-                cameraManager.startRecording()
-                player.play()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [self] timer in
+            Task { @MainActor in
+                if countdownValue > 1 {
+                    withAnimation { countdownValue -= 1 }
+                } else {
+                    timer.invalidate()
+                    countdownTimer = nil
+                    isCountingDown = false
+                    cameraManager.startRecording()
+                    player.play()
+                }
             }
         }
     }

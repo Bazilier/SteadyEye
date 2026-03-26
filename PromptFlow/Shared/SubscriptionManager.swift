@@ -1,13 +1,12 @@
 import Foundation
 import Combine
+import RevenueCat
 
-/// Manages subscription state and paywall logic.
-/// Uses RevenueCat SDK when devMode is false.
-/// During development, all features are unlocked.
+/// Manages subscription state via RevenueCat.
+/// In DEV builds, all features are unlocked without RC calls.
 final class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
-    /// Compile-time: true in Debug (DEV flag), false in Release (App Store)
     static var devMode: Bool {
         #if DEV
         return true
@@ -18,68 +17,8 @@ final class SubscriptionManager: ObservableObject {
 
     @Published var isSubscribed: Bool = false
     @Published var isTrialActive: Bool = false
-
-    private init() {}
-
-    // MARK: - Configuration
-
-    func configure() {
-        if Self.devMode {
-            isSubscribed = true
-            return
-        }
-        // In production with no RevenueCat yet: isSubscribed stays false → paywall shows
-
-        // TODO: Uncomment when RevenueCat SDK is added and API key is set
-        // guard let apiKey = revenueCatAPIKey(), !apiKey.isEmpty else { return }
-        // Purchases.configure(withAPIKey: apiKey)
-        // Task { await checkSubscriptionStatus() }
-    }
-
-    // MARK: - Subscription status
-
-    func checkSubscriptionStatus() async {
-        if Self.devMode {
-            isSubscribed = true
-            return
-        }
-
-        // TODO: Uncomment when RevenueCat SDK is added
-        // do {
-        //     let customerInfo = try await Purchases.shared.customerInfo()
-        //     let premium = customerInfo.entitlements["premium"]
-        //     await MainActor.run {
-        //         isSubscribed = premium?.isActive == true
-        //         isTrialActive = premium?.periodType == .trial
-        //     }
-        // } catch {
-        //     // Keep current state on error
-        // }
-    }
-
-    // MARK: - Purchases
-
-    func purchaseMonthly() async throws {
-        // TODO: Implement with RevenueCat
-        // let offerings = try await Purchases.shared.offerings()
-        // guard let package = offerings.current?.monthly else { return }
-        // let (_, customerInfo, _) = try await Purchases.shared.purchase(package: package)
-        // await checkSubscriptionStatus()
-    }
-
-    func purchaseAnnual() async throws {
-        // TODO: Implement with RevenueCat
-    }
-
-    func purchaseLifetime() async throws {
-        // TODO: Implement with RevenueCat
-    }
-
-    func restorePurchases() async throws {
-        // TODO: Implement with RevenueCat
-        // let customerInfo = try await Purchases.shared.restorePurchases()
-        // await checkSubscriptionStatus()
-    }
+    @Published var offerings: Offerings?
+    @Published var isLoading: Bool = false
 
     // MARK: - Free optimization tracking
 
@@ -108,6 +47,81 @@ final class SubscriptionManager: ObservableObject {
     var canRecord4K: Bool { Self.devMode || isSubscribed }
     var showWatermark: Bool { !Self.devMode && !isSubscribed }
 
+    private init() {}
+
+    // MARK: - Configuration
+
+    func configure() {
+        #if DEV
+        isSubscribed = true
+        return
+        #else
+        Task {
+            await checkAccess()
+            await loadOfferings()
+        }
+        #endif
+    }
+
+    // MARK: - RevenueCat calls
+
+    @MainActor
+    func checkAccess() async {
+        #if DEV
+        isSubscribed = true
+        #else
+        do {
+            let info = try await Purchases.shared.customerInfo()
+            let entitlement = info.entitlements[Self.entitlementID]
+            isSubscribed = entitlement?.isActive == true
+            isTrialActive = entitlement?.periodType == .trial
+        } catch {
+            // Keep current state on error
+        }
+        #endif
+    }
+
+    @MainActor
+    func loadOfferings() async {
+        #if DEV
+        return
+        #else
+        do {
+            offerings = try await Purchases.shared.offerings()
+        } catch {
+            // Offerings failed — paywall will show fallback prices
+        }
+        #endif
+    }
+
+    @MainActor
+    func purchase(_ package: Package) async -> Bool {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let result = try await Purchases.shared.purchase(package: package)
+            let entitlement = result.customerInfo.entitlements[Self.entitlementID]
+            isSubscribed = entitlement?.isActive == true
+            return isSubscribed
+        } catch {
+            return false
+        }
+    }
+
+    @MainActor
+    func restorePurchases() async -> Bool {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let info = try await Purchases.shared.restorePurchases()
+            let entitlement = info.entitlements[Self.entitlementID]
+            isSubscribed = entitlement?.isActive == true
+            return isSubscribed
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - API Key
 
     private func revenueCatAPIKey() -> String? {
@@ -121,13 +135,13 @@ final class SubscriptionManager: ObservableObject {
     }
 }
 
-// MARK: - Product IDs (for App Store Connect)
+// MARK: - Product IDs
 extension SubscriptionManager {
     enum ProductID {
-        static let monthly = "steadyeye_monthly"    // $6.99/mo
-        static let annual = "steadyeye_annual"       // $49.99/yr, 7-day trial
-        static let lifetime = "steadyeye_lifetime"   // $99.99
+        static let monthly = "steadyeye_monthly"
+        static let annual = "steadyeye_annual"
+        static let lifetime = "steadyeye_lifetime"
     }
 
-    static let entitlementID = "premium"
+    static let entitlementID = "access"
 }

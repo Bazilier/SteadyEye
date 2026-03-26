@@ -29,12 +29,14 @@ final class ChunkPlayerEngine: ObservableObject {
 
         let scriptText = text
         loadTask = Task { [weak self] in
-            let (strat, newChunks) = await Task.detached {
-                let s = LanguageDetector.detect(scriptText)
-                return (s, s.chunks(from: scriptText))
+            // Detect + chunk on background, only return Sendable results
+            let newChunks = await Task.detached {
+                let strat = LanguageDetector.detect(scriptText)
+                return strat.chunks(from: scriptText)
             }.value
             guard let self else { return }
-            self.strategy = strat
+            // Strategy is cheap to recreate on MainActor
+            self.strategy = LanguageDetector.detect(scriptText)
             self.chunks = newChunks
             self.currentChunkIndex = 0
             self.isReady = true
