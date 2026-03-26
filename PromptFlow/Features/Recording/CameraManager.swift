@@ -1,92 +1,78 @@
 import AVFoundation
 import UIKit
 import SwiftUI
+import Combine
 
-@Observable
-final class CameraManager: NSObject {
-    // MARK: - Public state (main-thread readable)
-    var isRecording = false
-    var recordingDuration: TimeInterval = 0
-    var errorMessage: String?
-    var cameraPosition: AVCaptureDevice.Position = .front
-    var lastRecordedURL: URL?
-    var saveDirectlyOnStop = false
-    /// True once the capture session is running and camera preview is available
-    var isSessionReady = false
-    var audioSourceName: String = "iPhone Microphone"
-    var audioRouteToast: String?
+final class CameraManager: NSObject, ObservableObject {
+    static let shared = CameraManager()
+
+    // MARK: - Public state
+    @Published var isRecording = false
+    @Published var recordingDuration: TimeInterval = 0
+    @Published var errorMessage: String?
+    @Published var cameraPosition: AVCaptureDevice.Position = .front
+    @Published var lastRecordedURL: URL?
+    @Published var saveDirectlyOnStop = false
+    @Published var isSessionReady = false
+    @Published var isAudioReady = false
+    @Published var audioSourceName: String = "iPhone Microphone"
+    @Published var audioRouteToast: String?
 
     // MARK: - Private
+    private static let cameraQueue = DispatchQueue(label: "com.steadyeye.camera", qos: .userInitiated)
     let session = AVCaptureSession()
-    private let sessionQueue = DispatchQueue(label: "com.steadyeye.sessionQueue")
     private var movieOutput = AVCaptureMovieFileOutput()
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var routeChangeObserver: NSObjectProtocol?
 
-    // MARK: - Setup
+    private override init() {
+        super.init()
+    }
 
-    func configure(position: AVCaptureDevice.Position = .front) {
+    // MARK: - Start / Stop
+
+    func start(position: AVCaptureDevice.Position = .front) {
         cameraPosition = position
-        sessionQueue.async { [weak self] in
-            self?.setupSession(position: position)
+        Self.cameraQueue.async { [weak self] in
+            guard let self else { return }
+            if self.session.isRunning {
+                DispatchQueue.main.async { self.isSessionReady = true }
+                return
+            }
+            self.setupSession(position: position)
         }
     }
 
-    private func setupSession(position: AVCaptureDevice.Position) {
-        // Must be called on sessionQueue — all steps run serially here
-
-        // a) Prevent capture session from touching audio session
-        session.automaticallyConfiguresApplicationAudioSession = false
-
-        // b) Configure audio session (sole owner — no other code touches it)
-        let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(
-            .playAndRecord,
-            mode: .videoRecording,
-            options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
-        )
-        try? audioSession.setActive(true)
-
-        // Prefer Bluetooth input if available
-        if let btInput = audioSession.availableInputs?.first(where: {
-            $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
-        }) {
-            try? audioSession.setPreferredInput(btInput)
+    func stop() {
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            routeChangeObserver = nil
         }
-
-        // Route change observer
-        if routeChangeObserver == nil {
-            routeChangeObserver = NotificationCenter.default.addObserver(
-                forName: AVAudioSession.routeChangeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] notification in
-                guard let self else { return }
-                self.updateAudioSourceName()
-
-                guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
-                      let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
-
-                if self.isRecording {
-                    switch reason {
-                    case .oldDeviceUnavailable:
-                        self.audioRouteToast = "Switched to iPhone microphone"
-                    case .newDeviceAvailable:
-                        self.audioRouteToast = "New mic detected. Will use on next recording."
-                    default:
-                        break
-                    }
-                }
+        Self.cameraQueue.async { [weak self] in
+            guard let self else { return }
+            if self.session.isRunning {
+                self.session.stopRunning()
+            }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            DispatchQueue.main.async {
+                self.isSessionReady = false
+                self.isAudioReady = false
             }
         }
+    }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.updateAudioSourceName()
-        }
+    // MARK: - Phase 1: Video + audio with built-in mic (instant)
 
-        // c) Configure capture session
+    private func setupSession(position: AVCaptureDevice.Position) {
+        session.automaticallyConfiguresApplicationAudioSession = false
+
+        // Audio session with built-in mic only (no Bluetooth yet — instant)
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker])
+        try? audioSession.setActive(true)
+
         let resolution = UserDefaults.standard.string(forKey: "videoResolution") ?? "1080p"
         let fps = UserDefaults.standard.integer(forKey: "videoFPS")
         let targetFPS = fps > 0 ? fps : 30
@@ -105,14 +91,10 @@ final class CameraManager: NSObject {
 
         // Video input
         guard let videoDevice = AVCaptureDevice.default(
-            .builtInWideAngleCamera,
-            for: .video,
-            position: position
+            .builtInWideAngleCamera, for: .video, position: position
         ) else {
             session.commitConfiguration()
-            DispatchQueue.main.async { [weak self] in
-                self?.errorMessage = "Camera not available."
-            }
+            DispatchQueue.main.async { [weak self] in self?.errorMessage = "Camera not available." }
             return
         }
 
@@ -127,7 +109,7 @@ final class CameraManager: NSObject {
             return
         }
 
-        // Configure frame rate
+        // Frame rate
         do {
             try videoDevice.lockForConfiguration()
             let desiredFPS = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
@@ -143,11 +125,9 @@ final class CameraManager: NSObject {
                 videoDevice.activeVideoMaxFrameDuration = fallback
             }
             videoDevice.unlockForConfiguration()
-        } catch {
-            // Continue with defaults
-        }
+        } catch {}
 
-        // Audio input
+        // Audio input (built-in mic — instant, no BT negotiation)
         if let audioDevice = AVCaptureDevice.default(for: .audio),
            let aInput = try? AVCaptureDeviceInput(device: audioDevice),
            session.canAddInput(aInput) {
@@ -160,13 +140,62 @@ final class CameraManager: NSObject {
         }
 
         session.commitConfiguration()
+        session.startRunning()
 
-        // 5. Start running — non-blocking for UI
-        if !session.isRunning {
-            session.startRunning()
-            DispatchQueue.main.async { [weak self] in
-                self?.isSessionReady = true
+        DispatchQueue.main.async { [weak self] in
+            self?.isSessionReady = true
+        }
+        // Phase 2: enable Bluetooth audio routing (non-blocking, no session reconfig)
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.enableBluetoothAudio()
+        }
+    }
+
+    // MARK: - Phase 2: Bluetooth audio routing (no capture session changes)
+
+    private func enableBluetoothAudio() {
+        // Reconfigure audio session WITH Bluetooth options
+        // iOS automatically routes the existing audio input to AirPods — no capture session reconfig needed
+        let audioSession = AVAudioSession.sharedInstance()
+        try? audioSession.setCategory(
+            .playAndRecord,
+            mode: .videoRecording,
+            options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
+        )
+
+        // Prefer Bluetooth if available
+        if let btInput = audioSession.availableInputs?.first(where: {
+            $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
+        }) {
+            try? audioSession.setPreferredInput(btInput)
+        }
+
+        // Route change observer
+        if routeChangeObserver == nil {
+            routeChangeObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self else { return }
+                self.updateAudioSourceName()
+                guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                      let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+                if self.isRecording {
+                    switch reason {
+                    case .oldDeviceUnavailable:
+                        self.audioRouteToast = "Switched to iPhone microphone"
+                    case .newDeviceAvailable:
+                        self.audioRouteToast = "New mic detected. Will use on next recording."
+                    default: break
+                    }
+                }
             }
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.isAudioReady = true
+            self?.updateAudioSourceName()
         }
     }
 
@@ -174,7 +203,11 @@ final class CameraManager: NSObject {
 
     func switchCamera() {
         let newPosition: AVCaptureDevice.Position = (cameraPosition == .front) ? .back : .front
-        configure(position: newPosition)
+        cameraPosition = newPosition
+        Self.cameraQueue.async { [weak self] in
+            guard let self else { return }
+            self.setupSession(position: newPosition)
+        }
     }
 
     // MARK: - Recording
@@ -186,7 +219,7 @@ final class CameraManager: NSObject {
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("mov")
 
-        sessionQueue.async { [weak self] in
+        Self.cameraQueue.async { [weak self] in
             self?.movieOutput.startRecording(to: outputURL, recordingDelegate: self!)
         }
 
@@ -204,7 +237,7 @@ final class CameraManager: NSObject {
         backgroundTaskID = UIApplication.shared.beginBackgroundTask { [weak self] in
             self?.endBackgroundTask()
         }
-        sessionQueue.async { [weak self] in
+        Self.cameraQueue.async { [weak self] in
             self?.movieOutput.stopRecording()
         }
         durationTimer?.invalidate()
@@ -220,16 +253,7 @@ final class CameraManager: NSObject {
         backgroundTaskID = .invalid
     }
 
-    func stopSession() {
-        if let observer = routeChangeObserver {
-            NotificationCenter.default.removeObserver(observer)
-            routeChangeObserver = nil
-        }
-        sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
-            self.session.stopRunning()
-        }
-    }
+    // stopSession removed — use stop() instead
 
     private func updateAudioSourceName() {
         let input = AVAudioSession.sharedInstance().currentRoute.inputs.first

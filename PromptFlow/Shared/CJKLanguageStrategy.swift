@@ -81,8 +81,7 @@ struct CJKLanguageStrategy: LanguageStrategy, Sendable {
         let syllableDuration = Double(syllables) * 0.25
         let kanjiBonus = Double(kanji) * 0.15
         let speedFactor = msPerChar / 30.0  // normalize: 30ms = 1.0× speed
-        let d = (syllableDuration + kanjiBonus) * speedFactor
-        return max(minimumDuration, min(2.5, d))
+        return (syllableDuration + kanjiBonus) * speedFactor
     }
 
     // MARK: - Chunking

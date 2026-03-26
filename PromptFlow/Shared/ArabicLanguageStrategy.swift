@@ -17,8 +17,7 @@ struct ArabicLanguageStrategy: LanguageStrategy, Sendable {
     }
 
     func duration(for chunk: String, msPerChar: Double) -> TimeInterval {
-        let ms = msPerChar * Double(chunk.count)
-        return max(0.25, min(2.0, ms / 1000.0))
+        return Double(chunk.count) * msPerChar / 1000.0
     }
 
     func chunks(from text: String) -> [String] {

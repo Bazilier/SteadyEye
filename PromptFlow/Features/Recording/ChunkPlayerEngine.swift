@@ -7,24 +7,41 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published var isPlaying = false
     @Published private(set) var chunks: [String] = []
     @Published var progress: Double = 0
+    @Published var isReady = false
 
     var sliderValue: Double = 0.5
-    private var strategy: LanguageStrategy = LatinLanguageStrategy()
+    private var strategy: any LanguageStrategy = LatinLanguageStrategy()
     private var advanceTask: Task<Void, Never>?
+    private var loadTask: Task<Void, Never>?
 
     // MARK: - Public API
 
     func loadScript(_ text: String) {
         advanceTask?.cancel()
-        strategy = LanguageDetector.detect(text)
-        chunks = strategy.chunks(from: text)
+        loadTask?.cancel()
+
+        chunks = ["..."]
         currentChunkIndex = 0
         progress = 0
         isPlaying = false
+        isReady = false
+
+        let scriptText = text
+        loadTask = Task.detached { [weak self] in
+            let strat = LanguageDetector.detect(scriptText)
+            let newChunks = strat.chunks(from: scriptText)
+            await MainActor.run {
+                guard let self else { return }
+                self.strategy = strat
+                self.chunks = newChunks
+                self.currentChunkIndex = 0
+                self.isReady = true
+            }
+        }
     }
 
     func play() {
-        guard !chunks.isEmpty else { return }
+        guard isReady, !chunks.isEmpty, !isPlaying else { return }
         if currentChunkIndex >= chunks.count {
             currentChunkIndex = 0
             progress = 0
@@ -34,13 +51,15 @@ final class ChunkPlayerEngine: ObservableObject {
     }
 
     func pause() {
-        isPlaying = false
         advanceTask?.cancel()
         advanceTask = nil
+        isPlaying = false
     }
 
     func reset() {
-        pause()
+        advanceTask?.cancel()
+        advanceTask = nil
+        isPlaying = false
         currentChunkIndex = 0
         progress = 0
     }
@@ -73,16 +92,31 @@ final class ChunkPlayerEngine: ObservableObject {
         sliderValue: Double,
         strategy: (any LanguageStrategy)? = nil
     ) -> TimeInterval {
-        if isPause(chunk) { return 0.5 }
+        // Pause marker — speed-aware
+        if isPause(chunk) {
+            return sliderValue > 0.85 ? 0.2 : 0.5
+        }
 
         let strat = strategy ?? LanguageDetector.detect(chunk)
         let msPerChar = WordChunkEngine.msPerChar(forSlider: sliderValue)
         var d = strat.duration(for: chunk, msPerChar: msPerChar)
-        d = max(strat.minimumDuration, d)
 
-        if strat.endsSentence(chunk) {
-            d += strat.sentencePauseDuration
+        // Speed-aware minimum
+        let minDuration: TimeInterval
+        if sliderValue > 0.95 {
+            minDuration = 0.1
+        } else if sliderValue > 0.85 {
+            minDuration = 0.15
+        } else {
+            minDuration = strat.minimumDuration
         }
+        d = max(minDuration, min(3.0, d))
+
+        // Sentence-end pause — scaled with speed
+        if strat.endsSentence(chunk) {
+            d += sliderValue > 0.85 ? 0.1 : strat.sentencePauseDuration
+        }
+
 
         return d
     }

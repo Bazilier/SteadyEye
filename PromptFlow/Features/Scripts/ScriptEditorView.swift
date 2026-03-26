@@ -4,6 +4,7 @@ import SwiftData
 struct ScriptEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var coachManager: CoachMarkManager
 
     let script: Script?
 
@@ -107,6 +108,7 @@ struct ScriptEditorView: View {
                 PaywallView()
             }
         }
+        .overlay { CoachMarkOverlay(manager: coachManager, screen: .editor) }
         .preferredColorScheme(.dark)
         .onAppear {
             if let script {
@@ -143,6 +145,7 @@ struct ScriptEditorView: View {
                 }
             }
             .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
+            .coachSpotlight(step: 1, manager: coachManager)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -185,6 +188,10 @@ struct ScriptEditorView: View {
                 optimizeError = "Could not format script. Check connection."
             }
             isOptimizing = false
+            // Auto-advance coach mark after optimization
+            if coachManager.isActive && coachManager.currentStep == 1 {
+                coachManager.advance()
+            }
         }
     }
 

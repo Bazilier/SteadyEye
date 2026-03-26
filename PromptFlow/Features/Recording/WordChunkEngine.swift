@@ -20,21 +20,25 @@ enum WordChunkEngine {
     // MARK: - Speed / duration utilities (language-independent)
 
     /// Converts a 0…1 slider value to milliseconds per character.
-    /// 0.0 = slowest (80ms), 1.0 = fastest (12ms).
+    /// Exponential mapping — extreme positions feel dramatically different.
+    /// 0.0 → 120ms (very slow), 0.5 → ~11ms (normal), 1.0 → 1ms (instant)
     static func msPerChar(forSlider value: Double) -> Double {
-        80.0 * pow(0.15, value)
+        let minMs = 1.0
+        let maxMs = 120.0
+        let t = 1.0 - value
+        return minMs * pow(maxMs / minMs, t)
     }
 
     /// Base duration for a chunk given character count and slider value.
-    /// Used by strategies internally. Clamps to 0.25s–2.0s.
+    /// Minimum clamping is handled by ChunkPlayerEngine.calculateDuration().
     static func duration(for chunk: String, sliderValue: Double) -> TimeInterval {
         let ms = msPerChar(forSlider: sliderValue) * Double(chunk.count)
-        return max(0.25, min(2.0, ms / 1000.0))
+        return min(3.0, ms / 1000.0)
     }
 
     /// Duration of the blank gap shown between chunks.
     static func gapDuration(sliderValue: Double) -> TimeInterval {
-        let gap = 0.12 - 0.08 * sliderValue
-        return max(0.03, gap)
+        let gap = 0.15 - 0.12 * sliderValue
+        return max(0.02, gap)
     }
 }

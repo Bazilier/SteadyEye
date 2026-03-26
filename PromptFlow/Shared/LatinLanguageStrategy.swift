@@ -29,15 +29,14 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
     }
 
     func duration(for chunk: String, msPerChar: Double) -> TimeInterval {
+        let effectiveChars: Double
         if isAbbreviation(chunk) {
             let trimmed = chunk.trimmingCharacters(in: .punctuationCharacters)
-            let letterCount = trimmed.filter { $0.isLetter }.count
-            let effectiveChars = letterCount * 3
-            let ms = msPerChar * Double(effectiveChars)
-            return max(minimumDuration, min(2.0, ms / 1000.0))
+            effectiveChars = Double(trimmed.filter { $0.isLetter }.count) * 3.0
+        } else {
+            effectiveChars = Double(chunk.count)
         }
-        let ms = msPerChar * Double(chunk.count)
-        return max(0.25, min(2.0, ms / 1000.0))
+        return effectiveChars * msPerChar / 1000.0
     }
 
     func chunks(from text: String) -> [String] {

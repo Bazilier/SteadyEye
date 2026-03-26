@@ -13,7 +13,8 @@ struct RecordingView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @State private var cameraManager = CameraManager()
+    @EnvironmentObject private var coachManager: CoachMarkManager
+    @ObservedObject private var cameraManager = CameraManager.shared
     @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
     @State private var previewVideo: IdentifiableURL?
@@ -118,8 +119,9 @@ struct RecordingView: View {
                         .fill(Color.black)
                         .frame(
                             width: isExpanded ? expandedWidth : cfg.collapsedWidth,
-                            height: isExpanded ? expandedContentHeight : collapsedHeight
+                            height: isExpanded ? expandedContentHeight : 0
                         )
+                        .opacity(isExpanded ? 1 : 0)
                         .overlay(alignment: .top) {
                             if showTextContent {
                                 wordDisplay
@@ -130,6 +132,8 @@ struct RecordingView: View {
                             }
                         }
                         .clipped()
+                        .coachSpotlight(step: 2, manager: coachManager)
+                        .coachSpotlight(step: 3, manager: coachManager)
                         .overlay(alignment: .topTrailing) {
                             if isExpanded {
                                 Button {
@@ -304,7 +308,7 @@ struct RecordingView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             player.loadScript(script.content)
             player.sliderValue = speedSlider
-            cameraManager.configure(position: .front)
+            cameraManager.start(position: .front)
             scheduleControlsHide()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
@@ -331,7 +335,7 @@ struct RecordingView: View {
             UIApplication.shared.isIdleTimerDisabled = false
             player.pause()
             cameraManager.stopRecording()
-            cameraManager.stopSession()
+            cameraManager.stop()
             showTextContent = false
             isExpanded = false
         }
@@ -345,7 +349,7 @@ struct RecordingView: View {
                 smoothProgress = 0
                 showSavedToast = true
             }
-            cameraManager.stopSession()
+            cameraManager.stop()
             dismiss()
         }
         .onTapGesture {
@@ -356,6 +360,7 @@ struct RecordingView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        .overlay { CoachMarkOverlay(manager: coachManager, screen: .recording) }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
@@ -473,7 +478,7 @@ struct RecordingView: View {
             HStack(spacing: 4) {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 10))
-                Text(cameraManager.audioSourceName)
+                Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
                     .font(.caption2)
             }
             .foregroundStyle(.white.opacity(0.5))
@@ -500,7 +505,7 @@ struct RecordingView: View {
                         .frame(width: 56, height: 56)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                .disabled(player.chunks.isEmpty)
+                .disabled(!player.isReady)
 
                 Button { toggleRecording() } label: {
                     ZStack {
@@ -554,7 +559,7 @@ struct RecordingView: View {
     // MARK: - Teleprompter control
 
     private func togglePlay() {
-        guard !player.chunks.isEmpty else { return }
+        guard player.isReady else { return }
         if !hasStartedPlayback { hasStartedPlayback = true }
         if player.isPlaying {
             player.pause()

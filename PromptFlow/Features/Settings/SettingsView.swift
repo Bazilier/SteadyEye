@@ -51,12 +51,28 @@ struct SettingsView: View {
                     Toggle("Dim Screen While Recording", isOn: $dimDuringRecording)
                 }
 
-                // DEBUG — remove before release
-                Section {
-                    Button("Preview Paywall (debug)") {
-                        showPaywall = true
+                #if DEV
+                Section("Debug") {
+                    Button("Preview Paywall") { showPaywall = true }
+                    Button("Reset Onboarding") {
+                        UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
                     }
+                    Button("Reset Rate Limits") {
+                        UserDefaults.standard.removeObject(forKey: "apiCallsToday")
+                        UserDefaults.standard.removeObject(forKey: "bulkImportsToday")
+                        UserDefaults.standard.removeObject(forKey: "rateLimitDate")
+                    }
+                    HStack {
+                        Text("API calls today")
+                        Spacer()
+                        Text("\(UserDefaults.standard.integer(forKey: "apiCallsToday")) / 20")
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Build: DEV")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
+                #endif
 
                 Section("About") {
                     HStack {
@@ -76,6 +92,18 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            #if DEV
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("DEV")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.orange.opacity(0.2), in: Capsule())
+                }
+            }
+            #endif
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
             }

@@ -7,8 +7,14 @@ import Combine
 final class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
-    /// Set to false when ready to test real purchases
-    static var devMode = true
+    /// Compile-time: true in Debug (DEV flag), false in Release (App Store)
+    static var devMode: Bool {
+        #if DEV
+        return true
+        #else
+        return false
+        #endif
+    }
 
     @Published var isSubscribed: Bool = true
     @Published var isTrialActive: Bool = false
