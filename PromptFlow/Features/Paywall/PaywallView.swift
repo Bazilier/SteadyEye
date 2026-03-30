@@ -114,6 +114,7 @@ struct PaywallView: View {
                             Link("Terms of Use", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!)
                         }
                         .foregroundStyle(.white.opacity(0.4))
+                        Text("7-day free trial, then $49.99/year. Cancel anytime.")
                         Text("Subscriptions auto-renew unless cancelled 24 hours before the end of the current period.")
                             .foregroundStyle(.white.opacity(0.3))
                     }
@@ -150,16 +151,11 @@ struct PaywallView: View {
         return String(format: "$%.2f/month", monthlyPrice)
     }
 
-    private var trialText: String? {
-        guard let intro = annualPackage?.storeProduct.introductoryDiscount,
-              intro.paymentMode == .freeTrial else { return "7-day free trial" }
-        let days = intro.subscriptionPeriod.value
-        return "\(days)-day free trial"
-    }
+    private var trialText: String { "7-day free trial" }
 
     private var buttonLabel: String {
         switch selectedPlan {
-        case .annual: return trialText != nil ? "Start Free Trial" : "Subscribe"
+        case .annual: return "Start Free Trial"
         case .monthly: return "Subscribe"
         case .lifetime: return "Buy Lifetime"
         }
