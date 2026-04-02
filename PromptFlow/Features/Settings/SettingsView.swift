@@ -8,6 +8,9 @@ struct SettingsView: View {
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
+
+    @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
+    @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
     @State private var showPaywall = false
 
     private var settings: AppSettings {
@@ -49,6 +52,14 @@ struct SettingsView: View {
                     }
 
                     Toggle("Dim Screen While Recording", isOn: $dimDuringRecording)
+
+                    Toggle("Video Stabilization", isOn: $stabilizationEnabled)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Auto-Start Prompting", isOn: $autoStartPrompting)
+                        Text("When off, tap play to start the script manually after recording begins")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 #if DEV

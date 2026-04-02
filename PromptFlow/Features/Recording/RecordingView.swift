@@ -32,6 +32,9 @@ struct RecordingView: View {
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
     @AppStorage("textVerticalOffset") private var textVerticalOffset: Double = 0
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
+    @State private var exposureCompensation: Double = 0
+    @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
+    @State private var showCameraSettings = false
 
     // Drag state
     @State private var dragOffsetX: CGFloat = 0
@@ -337,6 +340,14 @@ struct RecordingView: View {
         .onChange(of: speedSlider) { _, newVal in
             player.sliderValue = newVal
         }
+        .onChange(of: exposureCompensation) { _, newVal in
+            cameraManager.setExposureCompensation(Float(newVal))
+        }
+        .onChange(of: cameraManager.isRecording) { _, recording in
+            if recording {
+                withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
+            }
+        }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             player.pause()
@@ -470,6 +481,16 @@ struct RecordingView: View {
                             .shadow(radius: 4)
                     }
                     Spacer()
+                    Button {
+                        withAnimation(.spring(duration: 0.25)) {
+                            showCameraSettings.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
                 }
                 .padding(.horizontal, 20)
             }
@@ -488,6 +509,30 @@ struct RecordingView: View {
                     .font(.caption2)
             }
             .foregroundStyle(.white.opacity(0.5))
+
+            // Camera settings panel
+            if showCameraSettings {
+                VStack(spacing: 12) {
+                    // Exposure
+                    HStack {
+                        Text("Exposure")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                        Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
+                            .tint(.orange)
+                        Text(String(format: "%+.1f EV", exposureCompensation))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(width: 55, alignment: .trailing)
+                    }
+
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
 
             HStack(spacing: 10) {
                 Image(systemName: "tortoise.fill")
@@ -610,7 +655,9 @@ struct RecordingView: View {
                     countdownTimer = nil
                     isCountingDown = false
                     cameraManager.startRecording()
-                    player.play()
+                    if autoStartPrompting {
+                        player.play()
+                    }
                 }
             }
         }

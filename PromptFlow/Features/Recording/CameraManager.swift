@@ -140,7 +140,19 @@ final class CameraManager: NSObject, ObservableObject {
         }
 
         session.commitConfiguration()
+
+        // Stabilization BEFORE startRunning — avoids crop jump
+        if let connection = movieOutput.connection(with: .video),
+           connection.isVideoStabilizationSupported {
+            let stabilize = UserDefaults.standard.object(forKey: "stabilizationEnabled") as? Bool ?? true
+            connection.preferredVideoStabilizationMode = stabilize ? .cinematic : .off
+        }
+
         session.startRunning()
+
+        // Exposure needs a running session
+        let exposure = UserDefaults.standard.double(forKey: "exposureCompensation")
+        if exposure != 0 { setExposureCompensation(Float(exposure)) }
 
         DispatchQueue.main.async { [weak self] in
             self?.isSessionReady = true
@@ -197,6 +209,38 @@ final class CameraManager: NSObject, ObservableObject {
             self?.isAudioReady = true
             self?.updateAudioSourceName()
         }
+    }
+
+    // MARK: - Exposure & Stabilization
+
+    private var currentCamera: AVCaptureDevice? {
+        session.inputs.compactMap { ($0 as? AVCaptureDeviceInput)?.device }
+            .first(where: { $0.hasMediaType(.video) })
+    }
+
+    func setExposureCompensation(_ value: Float) {
+        guard let device = currentCamera else { return }
+        let clamped = max(device.minExposureTargetBias, min(value, device.maxExposureTargetBias))
+        do {
+            try device.lockForConfiguration()
+            device.setExposureTargetBias(clamped) { _ in }
+            device.unlockForConfiguration()
+        } catch {}
+    }
+
+    func setStabilization(_ enabled: Bool) {
+        guard let device = currentCamera else { return }
+        let connection = session.connections.first(where: { $0.output is AVCaptureMovieFileOutput })
+        if let connection, connection.isVideoStabilizationSupported {
+            connection.preferredVideoStabilizationMode = enabled ? .auto : .off
+        }
+    }
+
+    func applySavedSettings() {
+        let exposure = UserDefaults.standard.double(forKey: "exposureCompensation")
+        setExposureCompensation(Float(exposure))
+        let stabilization = UserDefaults.standard.object(forKey: "stabilizationEnabled") as? Bool ?? true
+        setStabilization(stabilization)
     }
 
     // MARK: - Camera switching
