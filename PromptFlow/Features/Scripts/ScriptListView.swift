@@ -24,7 +24,7 @@ enum EditorMode: Identifiable {
 
 struct ScriptListView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Script.updatedAt, order: .reverse) private var scripts: [Script]
+    @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
