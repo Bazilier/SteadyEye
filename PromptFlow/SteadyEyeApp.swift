@@ -5,6 +5,7 @@ import RevenueCat
 
 @main
 struct SteadyEyeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var container: ModelContainer?
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 

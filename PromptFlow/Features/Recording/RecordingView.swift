@@ -30,7 +30,6 @@ struct RecordingView: View {
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
-    @AppStorage("textVerticalOffset") private var textVerticalOffset: Double = 0
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
     @State private var exposureCompensation: Double = 0
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
@@ -39,8 +38,10 @@ struct RecordingView: View {
     // Drag state
     @State private var dragOffsetX: CGFloat = 0
     @State private var isDragging = false
-    @State private var isTextEditMode = false
-    @State private var textDragY: CGFloat = 0
+
+    // Orientation — interface is portrait-locked; we track device orientation
+    // to rotate button icons and update camera output angles.
+    @State private var deviceOrientation: UIDeviceOrientation = .portrait
 
     // Recording countdown
     @State private var countdownValue: Int = 0
@@ -49,13 +50,12 @@ struct RecordingView: View {
     private let countdownSeconds = 3
 
     // UI
-
     @State private var isExpanded = false
     @State private var showTextContent = false
     @State private var smoothProgress: Double = 0
+    @State private var hasStartedPlayback = false
     @State private var isScrubbing = false
     @State private var wasPlayingBeforeScrub = false
-    @State private var hasStartedPlayback = false
 
     var body: some View {
         ZStack {
@@ -86,7 +86,10 @@ struct RecordingView: View {
                 let classicContentHeight: CGFloat = 28 * 3 + 10
                 let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
                 let expandedContentHeight = collapsedHeight + contentHeight
-                let expandedWidth = geo.size.width * 0.65
+                // LandscapeLeft: fixed size using the larger classic height so mode toggle doesn't resize
+                let landscapeFixedHeight = collapsedHeight + wbwContentHeight
+                let expandedWidth = isLandscapeLeft ? landscapeFixedHeight * 2.5 : geo.size.width * 0.65
+                let expandedHeight = isLandscapeLeft ? geo.size.width * 0.65 : expandedContentHeight
 
                 let minOffset: CGFloat = 0
                 let diCoverLimit = (expandedWidth - cfg.collapsedWidth) / 2 - 16
@@ -104,41 +107,32 @@ struct RecordingView: View {
                     return rawX
                 }()
 
-                let textDisplayY: CGFloat = {
-                    let rawY = CGFloat(textVerticalOffset) + textDragY
-                    let minY: CGFloat = -15
-                    let maxY: CGFloat = 20
-                    if rawY < minY { return minY + (rawY - minY) * 0.05 }
-                    if rawY > maxY { return maxY + (rawY - maxY) * 0.05 }
-                    return rawY
-                }()
-
                 VStack(spacing: 8) {
                     UnevenRoundedRectangle(
-                        topLeadingRadius: cfg.topCornerRadius,
-                        bottomLeadingRadius: cfg.bottomCornerRadius,
-                        bottomTrailingRadius: cfg.bottomCornerRadius,
-                        topTrailingRadius: cfg.topCornerRadius,
+                        topLeadingRadius: isLandscapeLeft ? 28 : cfg.topCornerRadius,
+                        bottomLeadingRadius: 28,
+                        bottomTrailingRadius: 28,
+                        topTrailingRadius: isLandscapeLeft ? 28 : cfg.topCornerRadius,
                         style: .continuous
                     )
                         .fill(Color.black)
                         .frame(
-                            width: isExpanded ? expandedWidth : cfg.collapsedWidth,
-                            height: isExpanded ? expandedContentHeight : 0
+                            width: (isExpanded || isLandscapeLeft) ? expandedWidth : cfg.collapsedWidth,
+                            height: (isExpanded || isLandscapeLeft) ? expandedHeight : 0
                         )
-                        .opacity(isExpanded ? 1 : 0)
-                        .overlay(alignment: .top) {
-                            if showTextContent {
+                        .opacity((isExpanded || isLandscapeLeft) ? 1 : 0)
+                        .overlay(alignment: .center) {
+                            if showTextContent && (isLandscapeLeft || isExpanded) {
+                                let textFrameWidth = isLandscapeLeft ? expandedHeight - 32 : expandedWidth - 32
                                 wordDisplay
-                                    .frame(width: expandedWidth - 32)
-                                    .padding(.top, cfg.textTopOffset)
-                                    .offset(y: textDisplayY)
+                                    .frame(width: textFrameWidth)
+                                    .rotationEffect(isLandscapeLeft ? .degrees(90) : .degrees(0))
                                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
                             }
                         }
                         .clipped()
                         .overlay(alignment: .topTrailing) {
-                            if isExpanded {
+                            if isExpanded || isLandscapeLeft {
                                 Button {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                         displayMode = isClassicMode ? "wbw" : "classic"
@@ -147,20 +141,21 @@ struct RecordingView: View {
                                     Image(systemName: isClassicMode ? "chevron.up" : "chevron.down")
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(.white.opacity(0.4))
+                                        .rotationEffect(isLandscapeLeft ? .degrees(90) : .degrees(0))
                                         .frame(width: 44, height: 44)
                                 }
                             }
                         }
-                        .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
+                        .scaleEffect(isDragging ? 1.02 : 1.0)
                         .overlay(
                             UnevenRoundedRectangle(
-                                topLeadingRadius: cfg.topCornerRadius,
-                                bottomLeadingRadius: cfg.bottomCornerRadius,
-                                bottomTrailingRadius: cfg.bottomCornerRadius,
-                                topTrailingRadius: cfg.topCornerRadius,
+                                topLeadingRadius: isLandscapeLeft ? 28 : cfg.topCornerRadius,
+                                bottomLeadingRadius: 28,
+                                bottomTrailingRadius: 28,
+                                topTrailingRadius: isLandscapeLeft ? 28 : cfg.topCornerRadius,
                                 style: .continuous
                             )
-                            .strokeBorder(.white.opacity(isTextEditMode ? 0.2 : 0), lineWidth: 1)
+                            .strokeBorder(.clear, lineWidth: 0)
                         )
                         .offset(x: isExpanded ? displayX : 0)
                         .gesture(
@@ -181,37 +176,7 @@ struct RecordingView: View {
                                 }
                             : nil
                         )
-                        // Long press + vertical drag = text offset inside container
-                        .simultaneousGesture(
-                            isExpanded ?
-                            LongPressGesture(minimumDuration: 0.5)
-                                .sequenced(before: DragGesture())
-                                .onChanged { value in
-                                    switch value {
-                                    case .second(true, let drag):
-                                        if !isTextEditMode {
-                                            isTextEditMode = true
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        }
-                                        if let drag {
-                                            textDragY = drag.translation.height
-                                        }
-                                    default:
-                                        break
-                                    }
-                                }
-                                .onEnded { _ in
-                                    let rawY = CGFloat(textVerticalOffset) + textDragY
-                                    let clampedY = min(max(rawY, -15), 20)
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        textVerticalOffset = Double(clampedY)
-                                        textDragY = 0
-                                        isTextEditMode = false
-                                    }
-                                }
-                            : nil
-                        )
-                        // Double tap = reset text and container position
+                        // Double tap = reset container position
                         .simultaneousGesture(
                             isExpanded ?
                             TapGesture(count: 2)
@@ -219,8 +184,6 @@ struct RecordingView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         savedOffsetX = cfg.defaultOffset
-                                        textVerticalOffset = 0
-                                        textDragY = 0
                                         dragOffsetX = 0
                                     }
                                 }
@@ -240,6 +203,7 @@ struct RecordingView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.black.opacity(0.5), in: Capsule())
+                        .rotationEffect(isLandscapeLeft ? .degrees(90) : .degrees(0))
                         .offset(x: isExpanded ? displayX : 0)
                     }
 
@@ -247,16 +211,28 @@ struct RecordingView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, cfg.topPadding)
                 .ignoresSafeArea(edges: .top)
+                .animation(.easeInOut(duration: 0.3), value: isLandscapeLeft)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
                 .animation(.interactiveSpring(), value: isDragging)
-                .animation(.interactiveSpring(), value: isTextEditMode)
             }
 
-            // 3. Controls — always visible
+            // 3a. Sliders block — bottom in portrait, centered+rotated in landscape
+            slidersOverlay
+
+            // 3b. Action buttons — always bottom center
             VStack {
                 Spacer()
-                controlsOverlay
+                CameraControlsBlock(
+                    player: player,
+                    isRecording: cameraManager.isRecording,
+                    smoothProgress: $smoothProgress,
+                    deviceOrientation: deviceOrientation,
+                    onTogglePlay: togglePlay,
+                    onToggleRecording: toggleRecording,
+                    onReset: resetDisplay
+                )
+                .padding(.bottom, 48)
             }
 
             // 4. Countdown
@@ -304,7 +280,21 @@ struct RecordingView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            let newOrientation = UIDevice.current.orientation
+            // Only respond to portrait and landscapeLeft; treat landscapeRight as portrait
+            if newOrientation == .landscapeLeft {
+                deviceOrientation = .landscapeLeft
+            } else if newOrientation.isPortrait {
+                deviceOrientation = .portrait
+            }
+            // Camera preview rotation is handled automatically by RotationCoordinator
+        }
         .onAppear {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            if UIDevice.current.orientation == .landscapeLeft {
+                deviceOrientation = .landscapeLeft
+            }
             UIApplication.shared.isIdleTimerDisabled = true
             player.loadScript(script.content)
             player.sliderValue = speedSlider
@@ -326,16 +316,7 @@ struct RecordingView: View {
         .alert("Tip", isPresented: $showRecordingTip) {
             Button("Got it") { hasSeenRecordingTip = true }
         } message: {
-            Text("Drag the text bar left or right to position it under your camera.\n\nLong press and drag up or down to adjust height.")
-        }
-        .onChange(of: player.currentChunkIndex) { _, newIndex in
-            guard newIndex < player.chunks.count, player.isPlaying else { return }
-            animateProgressForChunk(at: newIndex)
-        }
-        .onChange(of: player.isPlaying) { _, playing in
-            if playing && player.currentChunkIndex < player.chunks.count {
-                animateProgressForChunk(at: player.currentChunkIndex)
-            }
+            Text("Drag the text bar left or right to position it under your camera.\n\nDouble tap to reset position.")
         }
         .onChange(of: speedSlider) { _, newVal in
             player.sliderValue = newVal
@@ -412,7 +393,119 @@ struct RecordingView: View {
         }
     }
 
-    // MARK: - Scrubable progress bar
+    // MARK: - Sliders overlay (close, gear, audio, exposure, speed, scrub)
+
+    private var isLandscapeLeft: Bool {
+        deviceOrientation == .landscapeLeft
+    }
+
+    private var slidersContent: some View {
+        VStack(spacing: 16) {
+            // Close/gear buttons — hidden during recording
+            if !cameraManager.isRecording {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(duration: 0.25)) {
+                            showCameraSettings.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+
+            // Audio source + video quality indicators
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 10))
+                    Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
+                        .font(.caption2)
+                }
+                Text("·")
+                    .font(.caption2)
+                Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
+                    .font(.caption2)
+            }
+            .foregroundStyle(.white.opacity(0.5))
+
+            // Camera settings panel
+            if showCameraSettings {
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Exposure")
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                        Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
+                            .tint(.orange)
+                        Text(String(format: "%+.1f EV", exposureCompensation))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.7))
+                            .frame(width: 55, alignment: .trailing)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Speed slider
+            HStack(spacing: 10) {
+                Image(systemName: "tortoise.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.5))
+                Slider(value: $speedSlider, in: 0...1)
+                    .tint(.orange)
+                Image(systemName: "hare.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.horizontal, 24)
+
+            // Scrub bar
+            scrubBar
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var slidersOverlay: some View {
+        GeometryReader { geo in
+            if isLandscapeLeft {
+                slidersContent
+                    .frame(width: geo.size.height * 0.5)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .rotationEffect(.degrees(90))
+                    .position(
+                        x: 120,
+                        y: geo.size.height * 0.5
+                    )
+                    .animation(.easeInOut(duration: 0.3), value: deviceOrientation.rawValue)
+            } else {
+                // Portrait — bottom, above the action buttons
+                slidersContent
+                    .frame(width: geo.size.width)
+                    .padding(.vertical, 12)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .offset(y: -130)
+                    .animation(.easeInOut(duration: 0.3), value: deviceOrientation.rawValue)
+            }
+        }
+    }
+
+    // MARK: - Scrub bar
 
     private var scrubBar: some View {
         GeometryReader { geo in
@@ -457,141 +550,6 @@ struct RecordingView: View {
         }
         .frame(height: 44)
         .padding(.horizontal, 24)
-    }
-
-    private func animateProgressForChunk(at index: Int) {
-        guard !player.chunks.isEmpty, !isScrubbing else { return }
-        let target = Double(index + 1) / Double(player.chunks.count)
-        let duration = player.chunkDuration(player.chunks[index])
-        withAnimation(.linear(duration: duration)) {
-            smoothProgress = target
-        }
-    }
-
-    // MARK: - Controls overlay
-
-    private var controlsOverlay: some View {
-        VStack(spacing: 16) {
-            if !cameraManager.isRecording {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 4)
-                    }
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(duration: 0.25)) {
-                            showCameraSettings.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 4)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-
-            // Audio source + video quality indicators
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
-                    Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
-                        .font(.caption2)
-                }
-                Text("·")
-                    .font(.caption2)
-                Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
-                    .font(.caption2)
-            }
-            .foregroundStyle(.white.opacity(0.5))
-
-            // Camera settings panel
-            if showCameraSettings {
-                VStack(spacing: 12) {
-                    // Exposure
-                    HStack {
-                        Text("Exposure")
-                            .font(.caption)
-                            .foregroundStyle(.white)
-                        Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
-                            .tint(.orange)
-                        Text(String(format: "%+.1f EV", exposureCompensation))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.white.opacity(0.7))
-                            .frame(width: 55, alignment: .trailing)
-                    }
-
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            HStack(spacing: 10) {
-                Image(systemName: "tortoise.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.5))
-                Slider(value: $speedSlider, in: 0...1)
-                    .tint(.orange)
-                Image(systemName: "hare.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-            .padding(.horizontal, 24)
-
-            scrubBar
-
-            HStack(spacing: 48) {
-                Button { togglePlay() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .disabled(!player.isReady)
-
-                Button { toggleRecording() } label: {
-                    ZStack {
-                        Circle()
-                            .strokeBorder(.white, lineWidth: 3)
-                            .frame(width: 72, height: 72)
-                        RoundedRectangle(cornerRadius: cameraManager.isRecording ? 6 : 28)
-                            .fill(.red)
-                            .frame(
-                                width: cameraManager.isRecording ? 28 : 52,
-                                height: cameraManager.isRecording ? 28 : 52
-                            )
-                            .animation(.easeInOut(duration: 0.2), value: cameraManager.isRecording)
-                    }
-                }
-
-                Button { resetDisplay() } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-            }
-        }
-        .padding(.bottom, 48)
-        .padding(.top, 12)
-        .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.65)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
     }
 
     // MARK: - Countdown overlay

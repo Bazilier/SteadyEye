@@ -26,6 +26,9 @@ final class CameraManager: NSObject, ObservableObject {
     private var recordingStartTime: Date?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var routeChangeObserver: NSObjectProtocol?
+    weak var previewLayer: AVCaptureVideoPreviewLayer?
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var previewRotationObservation: NSKeyValueObservation?
 
     private override init() {
         super.init()
@@ -46,6 +49,9 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     func stop() {
+        previewRotationObservation?.invalidate()
+        previewRotationObservation = nil
+        rotationCoordinator = nil
         if let observer = routeChangeObserver {
             NotificationCenter.default.removeObserver(observer)
             routeChangeObserver = nil
@@ -150,6 +156,9 @@ final class CameraManager: NSObject, ObservableObject {
 
         session.startRunning()
 
+        // Set up RotationCoordinator for automatic preview/capture orientation
+        setupRotationCoordinator(for: videoDevice)
+
         // Exposure needs a running session
         let exposure = UserDefaults.standard.double(forKey: "exposureCompensation")
         if exposure != 0 { setExposureCompensation(Float(exposure)) }
@@ -243,6 +252,69 @@ final class CameraManager: NSObject, ObservableObject {
         setStabilization(stabilization)
     }
 
+    // MARK: - Orientation
+
+    /// Set up RotationCoordinator to automatically keep preview and capture
+    /// orientation correct. Works regardless of interface orientation lock.
+    private func setupRotationCoordinator(for device: AVCaptureDevice) {
+        // Must be called after previewLayer is set (from CameraPreviewView.makeUIView)
+        // and after session.startRunning(). We dispatch to main to ensure previewLayer is wired.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            let coordinator = AVCaptureDevice.RotationCoordinator(
+                device: device,
+                previewLayer: self.previewLayer
+            )
+            self.rotationCoordinator = coordinator
+
+            // Apply initial preview angle
+            if let conn = self.previewLayer?.connection {
+                let previewAngle = coordinator.videoRotationAngleForHorizonLevelPreview
+                if conn.isVideoRotationAngleSupported(previewAngle) {
+                    conn.videoRotationAngle = previewAngle
+                }
+            }
+
+            // Apply initial capture angle
+            Self.cameraQueue.async { [weak self] in
+                if let conn = self?.movieOutput.connection(with: .video) {
+                    let captureAngle = coordinator.videoRotationAngleForHorizonLevelCapture
+                    if conn.isVideoRotationAngleSupported(captureAngle) {
+                        conn.videoRotationAngle = captureAngle
+                    }
+                }
+            }
+
+            // Observe preview rotation changes via KVO
+            self.previewRotationObservation = coordinator.observe(
+                \.videoRotationAngleForHorizonLevelPreview,
+                options: [.new]
+            ) { [weak self] coord, _ in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    let angle = coord.videoRotationAngleForHorizonLevelPreview
+                    if let conn = self.previewLayer?.connection,
+                       conn.isVideoRotationAngleSupported(angle) {
+                        conn.videoRotationAngle = angle
+                    }
+                }
+            }
+        }
+    }
+
+    /// Update movie output rotation angle for capture. Called before recording starts.
+    func updateCaptureOrientation() {
+        guard let coordinator = rotationCoordinator else { return }
+        let angle = coordinator.videoRotationAngleForHorizonLevelCapture
+        Self.cameraQueue.async { [weak self] in
+            if let conn = self?.movieOutput.connection(with: .video),
+               conn.isVideoRotationAngleSupported(angle) {
+                conn.videoRotationAngle = angle
+            }
+        }
+    }
+
     // MARK: - Camera switching
 
     func switchCamera() {
@@ -258,6 +330,9 @@ final class CameraManager: NSObject, ObservableObject {
 
     func startRecording() {
         guard !isRecording else { return }
+
+        // Lock capture orientation to current device orientation before recording
+        updateCaptureOrientation()
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

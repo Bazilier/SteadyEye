@@ -9,6 +9,7 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = PreviewUIView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        CameraManager.shared.previewLayer = view.previewLayer
         return view
     }
 
