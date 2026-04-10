@@ -26,6 +26,7 @@ struct CJKLanguageStrategy: LanguageStrategy, Sendable {
 
     let maxChunkWeight = 6
     let language: String
+    var supportsORP: Bool { false }
 
     init(language: String = "ja") {
         self.language = language

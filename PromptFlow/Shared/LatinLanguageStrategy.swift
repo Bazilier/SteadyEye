@@ -15,6 +15,7 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
     ]
 
     let maxChunkLength = 10
+    var supportsORP: Bool { true }
 
     func endsSentence(_ word: String) -> Bool {
         word.hasSuffix(".") || word.hasSuffix("!") || word.hasSuffix("?")
@@ -105,6 +106,46 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
             if chunk.contains(" ") { return [chunk] }
             return splitLongWord(chunk)
         }
+    }
+
+    // MARK: - ORP (per-word) chunking
+
+    /// Strict one-word-per-chunk chunker. Each token becomes a chunk verbatim
+    /// (including any attached punctuation). Pause markers `//` become empty strings.
+    func chunksPerWord(text: String, baseSpeedMs: Int) -> [String] {
+        let tokens = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        return tokens.map { $0 == "//" ? "" : $0 }
+    }
+
+    /// Per-word duration. Empty string = pause chunk with a fixed duration.
+    func durationPerWord(chunk: String, baseSpeedMs: Int) -> TimeInterval {
+        // Tuning constants
+        let perCharMs: Int = 15
+        let commaBonusMs: Int = 80
+        let sentenceBonusMs: Int = 200
+        let pauseMs: Int = 250
+
+        if chunk.isEmpty { return Double(pauseMs) / 1000.0 }
+
+        // Strip trailing punctuation for character count
+        let trailingPunct: Set<Character> = [".", ",", "!", "?", ";", ":"]
+        var cleanCount = chunk.count
+        for ch in chunk.reversed() {
+            if trailingPunct.contains(ch) { cleanCount -= 1 } else { break }
+        }
+        if cleanCount < 0 { cleanCount = 0 }
+
+        var ms = baseSpeedMs + cleanCount * perCharMs
+        if let last = chunk.last {
+            switch last {
+            case ".", "!", "?": ms += sentenceBonusMs
+            case ",", ";":      ms += commaBonusMs
+            default: break
+            }
+        }
+        return Double(ms) / 1000.0
     }
 
     // MARK: - Long word splitting

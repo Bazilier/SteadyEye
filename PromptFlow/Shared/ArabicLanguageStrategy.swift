@@ -6,6 +6,7 @@ import Foundation
 struct ArabicLanguageStrategy: LanguageStrategy, Sendable {
 
     let maxChunkLength = 10
+    var supportsORP: Bool { false }
 
     func endsSentence(_ word: String) -> Bool {
         word.hasSuffix(".") || word.hasSuffix("!") || word.hasSuffix("?") ||

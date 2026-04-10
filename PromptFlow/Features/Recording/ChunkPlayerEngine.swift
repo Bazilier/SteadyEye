@@ -11,9 +11,29 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published var isReady = false
 
     var sliderValue: Double = 0.5
-    private var strategy: any LanguageStrategy = LatinLanguageStrategy()
+    @Published private(set) var supportsORP: Bool = true
+    /// ORP per-word mode. Toggling this triggers re-chunking via reloadChunks().
+    /// Initialised from UserDefaults so `loadScript` at startup sees the correct mode.
+    var orpEnabled: Bool = UserDefaults.standard.bool(forKey: "orpAlignmentEnabled")
+    private var strategy: any LanguageStrategy = LatinLanguageStrategy() {
+        didSet { supportsORP = strategy.supportsORP }
+    }
+    private var loadedScriptText: String = ""
     private var advanceTask: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
+
+    /// Maps the 0…1 slider to a base per-word duration in milliseconds.
+    /// 0.0 → 400ms (slow), 0.5 → ~140ms (normal), 1.0 → 50ms (fast).
+    private var orpBaseSpeedMs: Int {
+        let minMs = 50.0
+        let maxMs = 400.0
+        let t = 1.0 - sliderValue
+        return Int(minMs * pow(maxMs / minMs, t))
+    }
+
+    private var useORPPath: Bool {
+        orpEnabled && strategy.supportsORP
+    }
 
     // MARK: - Public API
 
@@ -27,12 +47,19 @@ final class ChunkPlayerEngine: ObservableObject {
         isPlaying = false
         isReady = false
 
+        loadedScriptText = text
         let scriptText = text
+        let orpMode = orpEnabled
+        let baseSpeed = orpBaseSpeedMs
         loadTask = Task { [weak self] in
             // Detect + chunk on background, only return Sendable results
             let newChunks = await Task.detached {
                 let strat = LanguageDetector.detect(scriptText)
-                return strat.chunks(from: scriptText)
+                if orpMode && strat.supportsORP {
+                    return strat.chunksPerWord(text: scriptText, baseSpeedMs: baseSpeed)
+                } else {
+                    return strat.chunks(from: scriptText)
+                }
             }.value
             guard let self else { return }
             // Strategy is cheap to recreate on MainActor
@@ -40,6 +67,24 @@ final class ChunkPlayerEngine: ObservableObject {
             self.chunks = newChunks
             self.currentChunkIndex = 0
             self.isReady = true
+        }
+    }
+
+    /// Re-chunk the currently loaded script, e.g. after ORP toggle.
+    /// Resets playback to chunk 0.
+    func reloadChunks() {
+        guard !loadedScriptText.isEmpty else { return }
+        let wasPlaying = isPlaying
+        advanceTask?.cancel()
+        advanceTask = nil
+        isPlaying = false
+        loadScript(loadedScriptText)
+        if wasPlaying {
+            Task { @MainActor [weak self] in
+                // Wait for async loadTask to finish
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                self?.play()
+            }
         }
     }
 
@@ -81,7 +126,10 @@ final class ChunkPlayerEngine: ObservableObject {
     // MARK: - Duration
 
     func chunkDuration(_ chunk: String) -> TimeInterval {
-        ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
+        if useORPPath {
+            return strategy.durationPerWord(chunk: chunk, baseSpeedMs: orpBaseSpeedMs)
+        }
+        return ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
     }
 
     // MARK: - Internal scheduling

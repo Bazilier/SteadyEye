@@ -11,6 +11,8 @@ struct SettingsView: View {
 
     @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
     @State private var showPaywall = false
 
     private var settings: AppSettings {
@@ -60,6 +62,12 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                Section("Anchor Alignment") {
+                    Toggle("Align words by anchor letter", isOn: $orpAlignmentEnabled)
+                    Toggle("Highlight anchor letter", isOn: $orpHighlightAnchor)
+                        .disabled(!orpAlignmentEnabled)
                 }
 
                 #if DEV

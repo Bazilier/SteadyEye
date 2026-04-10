@@ -125,24 +125,65 @@ struct WordByWordView: View {
     @ObservedObject var player: ChunkPlayerEngine
     let fontSize: CGFloat
 
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
+
     @State private var displayedText: String = ""
     @State private var textOpacity: Double = 1
     @State private var lastIndex: Int = -1
 
+    private var useORP: Bool {
+        orpAlignmentEnabled
+            && player.supportsORP
+            && displayedText != "..."
+            && displayedText != "✓"
+    }
+
     var body: some View {
-        Text(displayedText)
-            .font(.system(size: fontSize, weight: .semibold))
-            .foregroundStyle(.white)
-            .opacity(textOpacity)
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .multilineTextAlignment(.center)
-            .padding(.top, -4)
-            .padding(.horizontal, 16)
-            .onAppear { syncToPlayer() }
-            .onChange(of: player.currentChunkIndex) { _, _ in
-                crossfadeToCurrentChunk()
+        Group {
+            if useORP {
+                if displayedText.isEmpty {
+                    // Pause chunk in ORP mode — transparent spacer keeps layout stable
+                    Text(" ")
+                        .font(.system(size: fontSize, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.clear)
+                        .padding(.top, -4)
+                        .padding(.horizontal, 16)
+                } else {
+                    ORPWord(
+                        word: displayedText,
+                        fontSize: fontSize,
+                        highlightAnchor: orpHighlightAnchor
+                    )
+                    .opacity(textOpacity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.top, -4)
+                    .padding(.horizontal, 16)
+                }
+            } else {
+                Text(displayedText)
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .opacity(textOpacity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, -4)
+                    .padding(.horizontal, 16)
             }
+        }
+        .onAppear {
+            player.orpEnabled = orpAlignmentEnabled
+            syncToPlayer()
+        }
+        .onChange(of: player.currentChunkIndex) { _, _ in
+            crossfadeToCurrentChunk()
+        }
+        .onChange(of: orpAlignmentEnabled) { _, newValue in
+            player.orpEnabled = newValue
+            player.reloadChunks()
+        }
     }
 
     /// CJK sentence-ending punctuation to strip from display (but keep for timing)
