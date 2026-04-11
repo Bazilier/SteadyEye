@@ -14,6 +14,9 @@ enum AnthropicService {
         case decodingError
         case emptyResponse
 
+        // Developer-facing only. The user sees the wrapped message produced by
+        // ScriptEditorView (`scripts.editor.error.formatFailed`) — these strings
+        // are intentionally not localized.
         var errorDescription: String? {
             switch self {
             case .missingAPIKey: return "API key not configured."

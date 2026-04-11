@@ -26,48 +26,82 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Resolution", selection: $videoResolution) {
-                        Text("1080p").tag("1080p")
-                        Text("4K").tag("4k")
+                    Picker(selection: $videoResolution) {
+                        // 1080p / 4K are technical resolution labels — intentionally not localized.
+                        Text(verbatim: "1080p").tag("1080p")
+                        Text(verbatim: "4K").tag("4k")
+                    } label: {
+                        Text("settings.video.resolution", comment: "Picker label for video resolution")
                     }
 
-                    Picker("Frame Rate", selection: $videoFPS) {
-                        Text("24 fps").tag(24)
-                        Text("30 fps").tag(30)
-                        Text("60 fps").tag(60)
+                    Picker(selection: $videoFPS) {
+                        // Frame rate labels are universal technical strings — intentionally not localized.
+                        Text(verbatim: "24 fps").tag(24)
+                        Text(verbatim: "30 fps").tag(30)
+                        Text(verbatim: "60 fps").tag(60)
+                    } label: {
+                        Text("settings.video.frameRate", comment: "Picker label for video frame rate")
                     }
                 } header: {
-                    Text("Video Quality")
+                    Text("settings.section.videoQuality", comment: "Settings section header")
                 } footer: {
-                    Text("Higher quality uses more storage")
+                    Text("settings.video.qualityFooter", comment: "Footer below the video quality picker")
                 }
 
-                Section("Recording") {
-                    Picker("Countdown", selection: Binding(
+                Section {
+                    Picker(selection: Binding(
                         get: { settings.countdownDuration },
                         set: { settings.countdownDuration = $0 }
                     )) {
-                        Text("Off").tag(0)
-                        Text("3 sec").tag(3)
-                        Text("5 sec").tag(5)
-                        Text("10 sec").tag(10)
+                        Text("settings.countdown.off", comment: "Picker option disabling the countdown").tag(0)
+                        Text(String(
+                            localized: "settings.countdown.seconds",
+                            defaultValue: "\(3) sec",
+                            comment: "Countdown duration picker option (3 seconds)"
+                        )).tag(3)
+                        Text(String(
+                            localized: "settings.countdown.seconds",
+                            defaultValue: "\(5) sec",
+                            comment: "Countdown duration picker option (5 seconds)"
+                        )).tag(5)
+                        Text(String(
+                            localized: "settings.countdown.seconds",
+                            defaultValue: "\(10) sec",
+                            comment: "Countdown duration picker option (10 seconds)"
+                        )).tag(10)
+                    } label: {
+                        Text("settings.recording.countdown", comment: "Picker label for the pre-recording countdown")
                     }
 
-                    Toggle("Dim Screen While Recording", isOn: $dimDuringRecording)
+                    Toggle(isOn: $dimDuringRecording) {
+                        Text("settings.recording.dimScreen", comment: "Toggle: dim screen while recording")
+                    }
 
-                    Toggle("Video Stabilization", isOn: $stabilizationEnabled)
+                    Toggle(isOn: $stabilizationEnabled) {
+                        Text("settings.recording.stabilization", comment: "Toggle: video stabilization")
+                    }
                     VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Auto-Start Prompting", isOn: $autoStartPrompting)
-                        Text("When off, tap play to start the script manually after recording begins")
+                        Toggle(isOn: $autoStartPrompting) {
+                            Text("settings.recording.autoStart", comment: "Toggle: auto-start the prompter when recording begins")
+                        }
+                        Text("settings.recording.autoStartFooter", comment: "Helper text below the auto-start toggle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("settings.section.recording", comment: "Settings section header")
                 }
 
-                Section("Anchor Alignment") {
-                    Toggle("Align words by anchor letter", isOn: $orpAlignmentEnabled)
-                    Toggle("Highlight anchor letter", isOn: $orpHighlightAnchor)
-                        .disabled(!orpAlignmentEnabled)
+                Section {
+                    Toggle(isOn: $orpAlignmentEnabled) {
+                        Text("settings.anchor.align", comment: "Toggle: align words by anchor letter")
+                    }
+                    Toggle(isOn: $orpHighlightAnchor) {
+                        Text("settings.anchor.highlight", comment: "Toggle: highlight anchor letter")
+                    }
+                    .disabled(!orpAlignmentEnabled)
+                } header: {
+                    Text("settings.section.anchorAlignment", comment: "Settings section header for ORP toggles")
                 }
 
                 #if DEV
@@ -104,24 +138,34 @@ struct SettingsView: View {
                 }
                 #endif
 
-                Section("About") {
+                Section {
                     HStack {
-                        Text("Version")
+                        Text("settings.about.version", comment: "Settings: app version row label")
                         Spacer()
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("settings.section.about", comment: "Settings section header for app metadata")
                 }
 
-                Section("Support & Legal") {
-                    Button("Send Feedback") {
+                Section {
+                    Button {
                         sendFeedback()
+                    } label: {
+                        Text("settings.support.feedback", comment: "Button: send feedback via mail")
                     }
-                    Link("Privacy Policy", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!)
-                    Link("Terms of Use", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!)
+                    Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+                        Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
+                    }
+                    Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
+                        Text("common.termsOfUse", comment: "Terms of use link in Settings")
+                    }
+                } header: {
+                    Text("settings.section.support", comment: "Settings section header for support and legal")
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(Text("settings.title", comment: "Settings nav title"))
             #if DEV
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -148,7 +192,11 @@ struct SettingsView: View {
         let lang = Locale.current.language.languageCode?.identifier ?? "?"
 
         let body = "\n\n\n---\nApp version: \(appVersion)\niOS version: \(iosVersion)\nDevice: \(device)\nLanguage: \(lang)"
-        let subject = "SteadyEye Feedback"
+        let subject = String(
+            localized: "settings.feedback.mailSubject",
+            defaultValue: "SteadyEye Feedback",
+            comment: "Mail subject for the Send Feedback button. 'SteadyEye' is the brand name and must not be translated."
+        )
         let to = "heybazilier@gmail.com"
 
         let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject

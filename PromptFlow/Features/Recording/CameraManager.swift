@@ -15,7 +15,11 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var saveDirectlyOnStop = false
     @Published var isSessionReady = false
     @Published var isAudioReady = false
-    @Published var audioSourceName: String = "iPhone Microphone"
+    @Published var audioSourceName: String = String(
+        localized: "camera.audio.iPhoneMic",
+        defaultValue: "iPhone Microphone",
+        comment: "Default audio source name in the recording HUD."
+    )
     @Published var audioRouteToast: String?
 
     // MARK: - Private
@@ -94,7 +98,13 @@ final class CameraManager: NSObject, ObservableObject {
             .builtInWideAngleCamera, for: .video, position: position
         ) else {
             session.commitConfiguration()
-            DispatchQueue.main.async { [weak self] in self?.errorMessage = "Camera not available." }
+            DispatchQueue.main.async { [weak self] in
+                self?.errorMessage = String(
+                    localized: "camera.error.notAvailable",
+                    defaultValue: "Camera not available.",
+                    comment: "Shown when the requested camera is not available on this device."
+                )
+            }
             return
         }
 
@@ -104,7 +114,11 @@ final class CameraManager: NSObject, ObservableObject {
         } catch {
             session.commitConfiguration()
             DispatchQueue.main.async { [weak self] in
-                self?.errorMessage = "Failed to access camera: \(error.localizedDescription)"
+                self?.errorMessage = String(
+                    localized: "camera.error.failedToAccess",
+                    defaultValue: "Failed to access camera: \(error.localizedDescription)",
+                    comment: "Camera access failure with system-localized error description."
+                )
             }
             return
         }
@@ -196,9 +210,17 @@ final class CameraManager: NSObject, ObservableObject {
                 if self.isRecording {
                     switch reason {
                     case .oldDeviceUnavailable:
-                        self.audioRouteToast = "Switched to iPhone microphone"
+                        self.audioRouteToast = String(
+                            localized: "camera.audio.toast.switchedToBuiltin",
+                            defaultValue: "Switched to iPhone microphone",
+                            comment: "Toast when audio route falls back to the built-in mic."
+                        )
                     case .newDeviceAvailable:
-                        self.audioRouteToast = "New mic detected. Will use on next recording."
+                        self.audioRouteToast = String(
+                            localized: "camera.audio.toast.newMicDetected",
+                            defaultValue: "New mic detected. Will use on next recording.",
+                            comment: "Toast when a new external mic is connected."
+                        )
                     default: break
                     }
                 }
@@ -301,7 +323,11 @@ final class CameraManager: NSObject, ObservableObject {
 
     private func updateAudioSourceName() {
         let input = AVAudioSession.sharedInstance().currentRoute.inputs.first
-        audioSourceName = input?.portName ?? "iPhone Microphone"
+        audioSourceName = input?.portName ?? String(
+            localized: "camera.audio.iPhoneMic",
+            defaultValue: "iPhone Microphone",
+            comment: "Default audio source name in the recording HUD."
+        )
     }
 }
 
@@ -318,7 +344,11 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
             defer { self?.endBackgroundTask() }
 
             if let error {
-                self?.errorMessage = "Recording error: \(error.localizedDescription)"
+                self?.errorMessage = String(
+                    localized: "camera.error.recordingError",
+                    defaultValue: "Recording error: \(error.localizedDescription)",
+                    comment: "Recording session error with system-localized error description."
+                )
                 return
             }
             if self?.saveDirectlyOnStop == true {

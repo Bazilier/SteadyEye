@@ -287,7 +287,7 @@ struct RecordingView: View {
             // 6. Toast
             if showSavedToast {
                 VStack {
-                    Text("Recording saved")
+                    Text("recording.toast.saved", comment: "Toast shown after a recording is auto-saved when the app goes to background")
                         .font(.subheadline.bold())
                         .foregroundStyle(.white)
                         .padding(.horizontal, 20)
@@ -323,10 +323,17 @@ struct RecordingView: View {
                 }
             }
         }
-        .alert("Tip", isPresented: $showRecordingTip) {
-            Button("Got it") { hasSeenRecordingTip = true }
+        .alert(
+            Text("common.tip.title", comment: "First-run tip alert title on the recording screen"),
+            isPresented: $showRecordingTip
+        ) {
+            Button {
+                hasSeenRecordingTip = true
+            } label: {
+                Text("common.tip.gotIt", comment: "Got it button dismissing the recording tip")
+            }
         } message: {
-            Text("Drag the text bar left or right to position it under your camera.\n\nLong press and drag up or down to adjust height.")
+            Text("recording.tip.body", comment: "First-run tip body explaining how to position the teleprompter text bar")
         }
         .onChange(of: player.currentChunkIndex) { _, newIndex in
             guard newIndex < player.chunks.count, player.isPlaying else { return }
@@ -389,8 +396,15 @@ struct RecordingView: View {
                 }
             )
         }
-        .alert("Camera Error", isPresented: .constant(cameraManager.errorMessage != nil)) {
-            Button("OK") { cameraManager.errorMessage = nil }
+        .alert(
+            Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
+            isPresented: .constant(cameraManager.errorMessage != nil)
+        ) {
+            Button {
+                cameraManager.errorMessage = nil
+            } label: {
+                Text("common.ok", comment: "OK button on the camera error alert")
+            }
         } message: {
             Text(cameraManager.errorMessage ?? "")
         }
@@ -500,7 +514,9 @@ struct RecordingView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 10))
-                    Text(cameraManager.isAudioReady ? cameraManager.audioSourceName : "Connecting audio...")
+                    Text(cameraManager.isAudioReady
+                        ? cameraManager.audioSourceName
+                        : String(localized: "recording.audio.connecting", defaultValue: "Connecting audio...", comment: "Status until the audio session has fully connected"))
                         .font(.caption2)
                 }
                 Text("·")
@@ -515,7 +531,7 @@ struct RecordingView: View {
                 VStack(spacing: 12) {
                     // Exposure
                     HStack {
-                        Text("Exposure")
+                        Text("camera.exposure.label", comment: "Label for the exposure compensation slider")
                             .font(.caption)
                             .foregroundStyle(.white)
                         Slider(value: $exposureCompensation, in: -2...2, step: 0.1)

@@ -24,24 +24,31 @@ struct BulkImportView: View {
                     editorView
                 }
             }
-            .navigationTitle("Import Scripts")
+            .navigationTitle(Text("scripts.import.navTitle", comment: "Bulk import sheet nav title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(isProcessing ? "Stop" : "Cancel") {
+                    Button {
                         if isProcessing {
                             isCancelled = true
                         } else {
                             dismiss()
                         }
+                    } label: {
+                        Text(
+                            isProcessing ? "scripts.import.stop" : "common.cancel",
+                            comment: "Toolbar button: 'scripts.import.stop' while processing, 'common.cancel' otherwise"
+                        )
                     }
                 }
                 if !isProcessing {
                     ToolbarItem(placement: .keyboard) {
-                        Button("Paste from Clipboard") {
+                        Button {
                             if let text = UIPasteboard.general.string, !text.isEmpty {
                                 inputText = text
                             }
+                        } label: {
+                            Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
                         }
                         .font(.caption)
                     }
@@ -50,10 +57,15 @@ struct BulkImportView: View {
         }
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled(isProcessing)
-        .alert("Daily limit reached", isPresented: $showRateLimitAlert) {
-            Button("OK") {}
+        .alert(
+            Text("common.dailyLimit.title", comment: "Daily limit alert title in bulk import"),
+            isPresented: $showRateLimitAlert
+        ) {
+            Button {} label: {
+                Text("common.ok", comment: "OK button on daily limit alert")
+            }
         } message: {
-            Text("Try again tomorrow.")
+            Text("common.dailyLimit.message", comment: "Daily limit alert message in bulk import")
         }
         .sheet(isPresented: $showPaywall) {
             PaywallView()
@@ -69,7 +81,7 @@ struct BulkImportView: View {
                 .padding(.horizontal, 12)
                 .overlay(alignment: .topLeading) {
                     if inputText.isEmpty {
-                        Text("Paste your document with multiple scripts here...")
+                        Text("scripts.import.placeholder", comment: "Placeholder shown inside the empty bulk import editor")
                             .foregroundStyle(.tertiary)
                             .padding(.horizontal, 17)
                             .padding(.vertical, 12)
@@ -97,7 +109,11 @@ struct BulkImportView: View {
                 Button {
                     startImport()
                 } label: {
-                    Label("Import & Optimize", systemImage: "wand.and.stars")
+                    Label {
+                        Text("scripts.import.button", comment: "Primary button on bulk import view")
+                    } icon: {
+                        Image(systemName: "wand.and.stars")
+                    }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                 }
@@ -152,7 +168,11 @@ struct BulkImportView: View {
         isCancelled = false
         errorMessage = nil
         progress = 0
-        statusText = "Splitting document..."
+        statusText = String(
+            localized: "scripts.import.status.splitting",
+            defaultValue: "Splitting document...",
+            comment: "Status during bulk import splitting phase"
+        )
 
         Task {
             do {
@@ -167,7 +187,11 @@ struct BulkImportView: View {
                 }
 
                 guard !rawScripts.isEmpty else {
-                    errorMessage = "No scripts found in the text."
+                    errorMessage = String(
+                        localized: "scripts.import.error.noScripts",
+                        defaultValue: "No scripts found in the text.",
+                        comment: "Bulk import error when AI splitter returns nothing"
+                    )
                     isProcessing = false
                     return
                 }
@@ -181,7 +205,11 @@ struct BulkImportView: View {
                 for (i, item) in rawScripts.enumerated() {
                     if isCancelled { break }
 
-                    statusText = "Optimizing script \(i + 1) of \(total)..."
+                    statusText = String(
+                        localized: "scripts.optimizing.progress",
+                        defaultValue: "Optimizing script \(i + 1) of \(total)...",
+                        comment: "Progress text during bulk optimization. Two cardinal numbers."
+                    )
                     progress = Double(i) / Double(total)
 
                     var finalContent = item.content
@@ -199,13 +227,21 @@ struct BulkImportView: View {
 
                 try? modelContext.save()
                 progress = 1.0
-                statusText = "\(savedCount) scripts imported"
+                statusText = String(
+                    localized: "scripts.imported.count",
+                    defaultValue: "\(savedCount) scripts imported",
+                    comment: "Completion status after bulk import"
+                )
 
                 // Brief pause so user sees completion
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 dismiss()
             } catch {
-                errorMessage = "Could not process text. Check connection."
+                errorMessage = String(
+                    localized: "scripts.import.error.processFailed",
+                    defaultValue: "Could not process text. Check connection.",
+                    comment: "Error when bulk import network call fails"
+                )
                 isProcessing = false
             }
         }

@@ -35,15 +35,28 @@ struct ScriptEditorView: View {
         let seconds = Double(wordCount) / 150.0 * 60.0
         let minutes = Int(seconds) / 60
         let secs = Int(seconds) % 60
-        if minutes > 0 { return "\(minutes) min \(secs) sec" }
-        return "\(secs) sec"
+        if minutes > 0 {
+            return String(
+                localized: "script.readTime.minSec",
+                defaultValue: "\(minutes) min \(secs) sec",
+                comment: "Estimated read time when ≥ 1 minute. Two cardinal numbers."
+            )
+        }
+        return String(
+            localized: "script.readTime.secOnly",
+            defaultValue: "\(secs) sec",
+            comment: "Estimated read time under one minute."
+        )
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Title field
-                TextField("Script title", text: $title)
+                TextField(
+                    String(localized: "scripts.editor.titleField", defaultValue: "Script title", comment: "Placeholder for the script title text field"),
+                    text: $title
+                )
                     .font(.title2.bold())
                     .padding(.horizontal)
                     .padding(.top, 16)
@@ -62,48 +75,76 @@ struct ScriptEditorView: View {
                 // Stats bar
                 statsBar
             }
-            .navigationTitle(isNew ? "New Script" : "Edit Script")
+            .navigationTitle(Text(
+                isNew ? "scripts.new" : "scripts.editor.title.edit",
+                comment: "Editor nav title — 'scripts.new' for new script, 'scripts.editor.title.edit' for existing"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button {
                         if hasChanges {
                             showingDiscardAlert = true
                         } else {
                             dismiss()
                         }
+                    } label: {
+                        Text("common.cancel", comment: "Cancel button in script editor toolbar")
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
                         save()
+                    } label: {
+                        Text("common.save", comment: "Save button in script editor toolbar")
                     }
                     .bold()
                     .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 ToolbarItem(placement: .keyboard) {
-                    Button("Paste from Clipboard") {
+                    Button {
                         pasteFromClipboard()
+                    } label: {
+                        Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
                     }
                     .font(.caption)
                 }
             }
-            .alert("Discard Changes?", isPresented: $showingDiscardAlert) {
-                Button("Discard", role: .destructive) { dismiss() }
-                Button("Keep Editing", role: .cancel) {}
+            .alert(
+                Text("scripts.editor.discardAlert.title", comment: "Title of discard-changes alert"),
+                isPresented: $showingDiscardAlert
+            ) {
+                Button(role: .destructive) { dismiss() } label: {
+                    Text("scripts.editor.discardAlert.discard", comment: "Destructive button on discard-changes alert")
+                }
+                Button(role: .cancel) {} label: {
+                    Text("scripts.editor.discardAlert.keepEditing", comment: "Cancel button on discard-changes alert")
+                }
             }
-            .alert("Optimization Failed", isPresented: .init(
-                get: { optimizeError != nil },
-                set: { if !$0 { optimizeError = nil } }
-            )) {
-                Button("OK") { optimizeError = nil }
+            .alert(
+                Text("scripts.editor.optimizeFailed.title", comment: "Optimization failed alert title"),
+                isPresented: .init(
+                    get: { optimizeError != nil },
+                    set: { if !$0 { optimizeError = nil } }
+                )
+            ) {
+                Button {
+                    optimizeError = nil
+                } label: {
+                    Text("common.ok", comment: "OK button on optimization-failed alert")
+                }
             } message: {
                 Text(optimizeError ?? "")
             }
-            .alert("Daily limit reached", isPresented: $showRateLimitAlert) {
-                Button("OK") {}
+            .alert(
+                Text("common.dailyLimit.title", comment: "Daily limit alert title in editor"),
+                isPresented: $showRateLimitAlert
+            ) {
+                Button {} label: {
+                    Text("common.ok", comment: "OK button on daily limit alert")
+                }
             } message: {
-                Text("Try again tomorrow.")
+                Text("common.dailyLimit.message", comment: "Daily limit alert message in editor")
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
@@ -121,10 +162,17 @@ struct ScriptEditorView: View {
                 showEditorTip = true
             }
         }
-        .alert("Tip", isPresented: $showEditorTip) {
-            Button("Got it") { hasSeenEditorTip = true }
+        .alert(
+            Text("common.tip.title", comment: "First-run tip alert title in editor"),
+            isPresented: $showEditorTip
+        ) {
+            Button {
+                hasSeenEditorTip = true
+            } label: {
+                Text("common.tip.gotIt", comment: "Got it button dismissing the editor tip")
+            }
         } message: {
-            Text("Tap \"Optimize\" to let AI clean up your script for reading aloud.\n\nUse // to add a pause between sections.")
+            Text("scripts.editor.tip.body", comment: "Editor first-run tip body — references the Optimize button and the // pause-marker syntax")
         }
     }
 
@@ -140,7 +188,15 @@ struct ScriptEditorView: View {
         let sub = SubscriptionManager.shared
         return VStack(spacing: 4) {
             HStack(spacing: 20) {
-                Label("\(wordCount) words", systemImage: "text.word.spacing")
+                Label {
+                    Text(String(
+                        localized: "script.wordCount",
+                        defaultValue: "\(wordCount) words",
+                        comment: "Word count display in the editor stats bar"
+                    ))
+                } icon: {
+                    Image(systemName: "text.word.spacing")
+                }
                 Text("\(content.count.formatted()) / \(maxChars.formatted())")
                     .foregroundStyle(charCountColor)
                 Spacer()
@@ -155,14 +211,22 @@ struct ScriptEditorView: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Label("Optimize", systemImage: "wand.and.stars")
+                        Label {
+                            Text("scripts.editor.optimize", comment: "Optimize button label in editor stats bar")
+                        } icon: {
+                            Image(systemName: "wand.and.stars")
+                        }
                             .foregroundStyle(sub.canOptimize ? .orange : .gray)
                     }
                 }
                 .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
             }
             if !sub.isSubscribed && sub.canOptimize {
-                Text("\(sub.freeOptimizationsRemaining) free optimization\(sub.freeOptimizationsRemaining == 1 ? "" : "s") left")
+                Text(String(
+                    localized: "script.optimizationsRemaining",
+                    defaultValue: "\(sub.freeOptimizationsRemaining) free optimizations left",
+                    comment: "Footer showing the number of free AI optimizations the user has left this lifetime"
+                ))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -179,7 +243,12 @@ struct ScriptEditorView: View {
     private func save() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalTitle = trimmedTitle.isEmpty ? "Untitled Script" : trimmedTitle
+        let untitled = String(
+            localized: "script.untitled",
+            defaultValue: "Untitled Script",
+            comment: "Fallback title used when the user saves a script without a title"
+        )
+        let finalTitle = trimmedTitle.isEmpty ? untitled : trimmedTitle
 
         if let script {
             script.update(title: finalTitle, content: trimmedContent)
@@ -207,7 +276,11 @@ struct ScriptEditorView: View {
                 content = cleaned
                 SubscriptionManager.shared.recordOptimizationUse()
             } catch {
-                optimizeError = "Could not format script. Check connection."
+                optimizeError = String(
+                    localized: "scripts.editor.error.formatFailed",
+                    defaultValue: "Could not format script. Check connection.",
+                    comment: "User-facing error when AI optimization fails. Wraps the underlying ServiceError which is developer-only."
+                )
             }
             isOptimizing = false
         }

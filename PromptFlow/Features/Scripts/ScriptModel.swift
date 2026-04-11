@@ -36,9 +36,17 @@ final class Script {
         let minutes = Int(estimatedReadTime) / 60
         let seconds = Int(estimatedReadTime) % 60
         if minutes > 0 {
-            return "\(minutes) min \(seconds) sec"
+            return String(
+                localized: "script.readTime.minSec",
+                defaultValue: "\(minutes) min \(seconds) sec",
+                comment: "Estimated read time when ≥ 1 minute. Two cardinal numbers."
+            )
         } else {
-            return "\(seconds) sec"
+            return String(
+                localized: "script.readTime.secOnly",
+                defaultValue: "\(seconds) sec",
+                comment: "Estimated read time under one minute."
+            )
         }
     }
 }

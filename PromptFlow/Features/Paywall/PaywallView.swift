@@ -29,10 +29,10 @@ struct PaywallView: View {
             VStack(spacing: 0) {
                 // Header — pinned above scroll
                 VStack(spacing: 8) {
-                    Text("Unlock SteadyEye")
+                    Text("paywall.title", comment: "Paywall header title — 'SteadyEye' brand name must not be translated")
                         .font(.largeTitle.bold())
                         .foregroundStyle(.white)
-                    Text("Record with perfect eye contact")
+                    Text("paywall.subtitle", comment: "Paywall header subtitle — marketing tagline")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
                 }
@@ -48,25 +48,36 @@ struct PaywallView: View {
                     VStack(spacing: 12) {
                         planCard(
                             plan: .annual,
-                            title: "Annual",
-                            price: annualPackage?.localizedPriceString ?? "$49.99/year",
+                            title: String(localized: "paywall.plan.annual", defaultValue: "Annual", comment: "Annual plan card title"),
+                            price: String(
+                                localized: "paywall.price.perYear",
+                                // Fallback "$49.99" only — shown if RC offerings fail to load. Intentionally not localized.
+                                defaultValue: "\(annualPackage?.localizedPriceString ?? "$49.99")/year",
+                                comment: "Annual plan card price label. %@ is the localized RC price."
+                            ),
                             detail: monthlyEquivalent,
-                            badge: "BEST VALUE",
+                            badge: String(localized: "paywall.plan.bestValueBadge", defaultValue: "BEST VALUE", comment: "Annual plan badge"),
                             trial: trialText
                         )
                         planCard(
                             plan: .monthly,
-                            title: "Monthly",
-                            price: monthlyPackage?.localizedPriceString ?? "$6.99/month",
+                            title: String(localized: "paywall.plan.monthly", defaultValue: "Monthly", comment: "Monthly plan card title"),
+                            price: String(
+                                localized: "paywall.price.perMonth",
+                                // Fallback "$6.99" only — shown if RC offerings fail to load. Intentionally not localized.
+                                defaultValue: "\(monthlyPackage?.localizedPriceString ?? "$6.99")/month",
+                                comment: "Monthly plan card price label. %@ is the localized RC price."
+                            ),
                             detail: nil,
                             badge: nil,
                             trial: nil
                         )
                         planCard(
                             plan: .lifetime,
-                            title: "Lifetime",
+                            title: String(localized: "paywall.plan.lifetime", defaultValue: "Lifetime", comment: "Lifetime plan card title"),
+                            // Fallback only — shown if RC offerings fail to load. Intentionally not localized.
                             price: lifetimePackage?.localizedPriceString ?? "$99.99",
-                            detail: "Pay once, own forever",
+                            detail: String(localized: "paywall.plan.lifetime.detail", defaultValue: "Pay once, own forever", comment: "Subtitle under the lifetime plan title"),
                             badge: nil,
                             trial: nil
                         )
@@ -100,8 +111,10 @@ struct PaywallView: View {
                     .padding(.horizontal, 20)
 
                     // Restore
-                    Button("Restore Purchases") {
+                    Button {
                         restorePurchases()
+                    } label: {
+                        Text("paywall.restore", comment: "Restore Purchases button on the paywall")
                     }
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.5))
@@ -109,13 +122,17 @@ struct PaywallView: View {
                     // Legal
                     VStack(spacing: 4) {
                         HStack(spacing: 4) {
-                            Link("Privacy Policy", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!)
-                            Text("•")
-                            Link("Terms of Use", destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!)
+                            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+                                Text("common.privacyPolicy", comment: "Privacy policy link on paywall")
+                            }
+                            Text(verbatim: "•")
+                            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
+                                Text("common.termsOfUse", comment: "Terms of use link on paywall")
+                            }
                         }
                         .foregroundStyle(.white.opacity(0.4))
-                        Text("7-day free trial, then $49.99/year. Cancel anytime.")
-                        Text("Subscriptions auto-renew unless cancelled 24 hours before the end of the current period.")
+                        Text(legalTrialAndPriceText)
+                        Text("paywall.legal.autoRenew", comment: "Apple-required auto-renew disclosure")
                             .foregroundStyle(.white.opacity(0.3))
                     }
                     .font(.caption2)
@@ -146,18 +163,57 @@ struct PaywallView: View {
     // MARK: - Computed helpers
 
     private var monthlyEquivalent: String? {
-        guard let annual = annualPackage else { return "$4.17/month" }
-        let monthlyPrice = NSDecimalNumber(decimal: annual.storeProduct.price as Decimal / 12).doubleValue
-        return String(format: "$%.2f/month", monthlyPrice)
+        guard let annual = annualPackage else {
+            // Fallback only — shown if RC offerings fail to load. Intentionally not localized.
+            return "$4.17/month"
+        }
+        let monthlyValue = (annual.storeProduct.price as Decimal) / 12
+        // Use the StoreProduct's own NumberFormatter so the currency symbol and
+        // decimal style match the user's App Store region (not the device locale).
+        let formattedAmount: String
+        if let formatter = annual.storeProduct.priceFormatter,
+           let amount = formatter.string(from: monthlyValue as NSDecimalNumber) {
+            formattedAmount = amount
+        } else {
+            formattedAmount = "\(NSDecimalNumber(decimal: monthlyValue).doubleValue)"
+        }
+        return String(
+            localized: "paywall.monthlyEquivalent",
+            defaultValue: "\(formattedAmount)/month",
+            comment: "Small monthly-equivalent label under the annual plan price. %@ is the localized currency amount."
+        )
     }
 
-    private var trialText: String { "7-day free trial" }
+    private var trialText: String {
+        String(localized: "paywall.trialText", defaultValue: "7-day free trial", comment: "Trial label on the annual plan card")
+    }
+
+    /// Legal disclosure under the subscribe button. Substitutes the formatted
+    /// "$XX/year" label (already produced via `paywall.price.perYear`) into the
+    /// format key `paywall.legal.trialAndPrice`, so RC-loaded and fallback paths
+    /// produce identical structure: "7-day free trial, then [price]/year. Cancel anytime."
+    private var legalTrialAndPriceText: String {
+        let pricePerYear = String(
+            localized: "paywall.price.perYear",
+            // Fallback "$49.99" only — shown if RC offerings fail to load. Intentionally not localized.
+            defaultValue: "\(annualPackage?.localizedPriceString ?? "$49.99")/year",
+            comment: "Annual price with /year suffix, reused inside the legal disclosure."
+        )
+        return String(
+            localized: "paywall.legal.trialAndPrice",
+            defaultValue: "7-day free trial, then \(pricePerYear). Cancel anytime.",
+            comment: "Legal disclosure under the subscribe button. %@ is the full annual price label including the /year suffix (e.g. '$49.99/year', 'R$ 249,90/ano')."
+        )
+    }
 
     private var buttonLabel: String {
         switch selectedPlan {
-        case .annual: return "Start Free Trial"
-        case .monthly: return "Subscribe"
-        case .lifetime: return "Buy Lifetime"
+        case .annual:
+            return String(localized: "paywall.button.startTrial", defaultValue: "Start Free Trial", comment: "Subscribe button when annual plan is selected")
+        case .monthly:
+            return String(localized: "paywall.button.subscribe", defaultValue: "Subscribe", comment: "Subscribe button when monthly plan is selected")
+        case .lifetime:
+            return String(localized: "paywall.button.buyLifetime", defaultValue: "Buy Lifetime", comment: "Subscribe button when lifetime plan is selected")
         }
     }
 
@@ -165,23 +221,23 @@ struct PaywallView: View {
 
     private var featureList: some View {
         VStack(alignment: .leading, spacing: 10) {
-            featureRow("Word-by-word teleprompter")
-            featureRow("3-line reading mode")
-            featureRow("AI script optimization")
-            featureRow("Bulk script import")
-            featureRow("4K recording")
-            featureRow("Unlimited scripts")
-            featureRow("External mic support")
+            featureRow(Text("paywall.feature.wbw", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.threeLine", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.aiOptimization", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.bulkImport", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.fourK", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.unlimited", comment: "Paywall feature row"))
+            featureRow(Text("paywall.feature.externalMic", comment: "Paywall feature row"))
         }
         .padding(.horizontal, 32)
     }
 
-    private func featureRow(_ text: String) -> some View {
+    private func featureRow(_ text: Text) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(.orange)
-            Text(text)
+            text
                 .font(.subheadline)
                 .foregroundStyle(.white)
         }
@@ -234,14 +290,25 @@ struct PaywallView: View {
 
     private func purchaseSelected() {
         guard let pkg = selectedPackage else {
-            errorMessage = "Please select a plan"
+            errorMessage = String(
+                localized: "paywall.error.noPlan",
+                defaultValue: "Please select a plan",
+                comment: "Defensive error if subscribe is tapped without a selected plan"
+            )
             return
         }
         errorMessage = nil
         Task {
             let success = await manager.purchase(pkg)
-            if success { dismiss() }
-            else { errorMessage = "Purchase failed. Please try again." }
+            if success {
+                dismiss()
+            } else {
+                errorMessage = String(
+                    localized: "paywall.error.purchaseFailed",
+                    defaultValue: "Purchase failed. Please try again.",
+                    comment: "Error when a RevenueCat purchase attempt fails"
+                )
+            }
         }
     }
 
@@ -249,8 +316,15 @@ struct PaywallView: View {
         errorMessage = nil
         Task {
             let success = await manager.restorePurchases()
-            if success { dismiss() }
-            else { errorMessage = "No active subscription found." }
+            if success {
+                dismiss()
+            } else {
+                errorMessage = String(
+                    localized: "paywall.error.noSubscription",
+                    defaultValue: "No active subscription found.",
+                    comment: "Error when Restore Purchases finds nothing to restore"
+                )
+            }
         }
     }
 }

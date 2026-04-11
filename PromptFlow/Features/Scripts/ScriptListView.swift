@@ -49,8 +49,8 @@ struct ScriptListView: View {
                     scriptsList
                 }
             }
-            .navigationTitle("Scripts")
-            .searchable(text: $searchText, prompt: "Search scripts")
+            .navigationTitle(Text("scripts.title", comment: "Scripts list nav title"))
+            .searchable(text: $searchText, prompt: Text("scripts.search.prompt", comment: "Search bar placeholder above the script list"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -83,9 +83,9 @@ struct ScriptListView: View {
             Image(systemName: "doc.text")
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
-            Text("No Scripts Yet")
+            Text("scripts.empty.title", comment: "Empty state title when the user has no scripts")
                 .font(.title2.bold())
-            Text("Create a script to start recording with a teleprompter.")
+            Text("scripts.empty.body", comment: "Empty state body when the user has no scripts")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -93,7 +93,11 @@ struct ScriptListView: View {
             Button {
                 editorMode = .new
             } label: {
-                Label("New Script", systemImage: "plus")
+                Label {
+                    Text("scripts.new", comment: "New Script button label and editor nav title")
+                } icon: {
+                    Image(systemName: "plus")
+                }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
             }
@@ -107,7 +111,11 @@ struct ScriptListView: View {
                     showPaywall = true
                 }
             } label: {
-                Label("Import Multiple Scripts", systemImage: "doc.on.doc")
+                Label {
+                    Text("scripts.import.title", comment: "Import Multiple Scripts button label")
+                } icon: {
+                    Image(systemName: "doc.on.doc")
+                }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
             }
@@ -145,7 +153,11 @@ struct ScriptListView: View {
                     Button(role: .destructive) {
                         deleteScript(script)
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                        Label {
+                            Text("scripts.delete", comment: "Swipe-to-delete action on a script row")
+                        } icon: {
+                            Image(systemName: "trash")
+                        }
                     }
                 }
             }
@@ -157,7 +169,11 @@ struct ScriptListView: View {
                     showPaywall = true
                 }
             } label: {
-                Label("Import Multiple Scripts", systemImage: "doc.on.doc")
+                Label {
+                    Text("scripts.import.title", comment: "Import Multiple Scripts button label")
+                } icon: {
+                    Image(systemName: "doc.on.doc")
+                }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -179,14 +195,24 @@ struct ScriptRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(script.title.isEmpty ? "Untitled Script" : script.title)
+            Text(script.title.isEmpty
+                ? String(localized: "script.untitled", defaultValue: "Untitled Script", comment: "Fallback title for an untitled script")
+                : script.title)
                 .font(.headline)
             Text(script.content)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
             HStack(spacing: 12) {
-                Label("\(script.wordCount) words", systemImage: "text.word.spacing")
+                Label {
+                    Text(String(
+                        localized: "script.wordCount",
+                        defaultValue: "\(script.wordCount) words",
+                        comment: "Word count display in script row and editor stats bar"
+                    ))
+                } icon: {
+                    Image(systemName: "text.word.spacing")
+                }
                 Label(script.estimatedReadTimeFormatted, systemImage: "clock")
             }
             .font(.caption)

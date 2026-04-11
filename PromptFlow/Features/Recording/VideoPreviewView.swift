@@ -40,7 +40,7 @@ struct VideoPreviewView: View {
                                 .foregroundStyle(.white)
                                 .frame(width: 60, height: 60)
                                 .background(.white.opacity(0.15), in: Circle())
-                            Text("Retake")
+                            Text("video.preview.retake", comment: "Button label that discards the recording and returns to the recording screen")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.7))
                         }
@@ -66,7 +66,7 @@ struct VideoPreviewView: View {
                                         in: Circle()
                                     )
                             }
-                            Text("Save")
+                            Text("common.save", comment: "Save-to-Photos button label in the recorded video preview")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.7))
                         }
