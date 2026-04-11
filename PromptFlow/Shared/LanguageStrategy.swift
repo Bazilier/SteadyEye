@@ -24,6 +24,9 @@ protocol LanguageStrategy: Sendable {
     /// Whether this language supports ORP (Optimal Recognition Point) alignment
     var supportsORP: Bool { get }
 
+    /// Locale used for long-word hyphenation in ORP mode. `nil` = no hyphenation.
+    var hyphenationLocale: Locale? { get }
+
     /// Strict one-word-per-chunk chunker for ORP mode.
     /// Returns chunks where each entry is either a single word (with any attached
     /// punctuation) or an empty string representing a pause marker.
@@ -38,6 +41,7 @@ extension LanguageStrategy {
     var minimumDuration: TimeInterval { 0.3 }
 
     // Default: non-ORP strategies return empty / zero — they're never called.
+    var hyphenationLocale: Locale? { nil }
     func chunksPerWord(text: String, baseSpeedMs: Int) -> [String] { [] }
     func durationPerWord(chunk: String, baseSpeedMs: Int) -> TimeInterval { 0.3 }
 }

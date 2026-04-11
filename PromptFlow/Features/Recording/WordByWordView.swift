@@ -6,6 +6,9 @@ struct PlaceholderLoopView: View {
     let fontSize: CGFloat
     let isClassicMode: Bool
 
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
+
     private let words = ["Your", "script", "will", "appear", "here"]
     @State private var currentIndex = 0
     @State private var opacity: Double = 1
@@ -36,15 +39,31 @@ struct PlaceholderLoopView: View {
     // MARK: - WbW placeholder
 
     private var wbwPlaceholder: some View {
-        Text(words[currentIndex])
-            .font(.system(size: fontSize, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.5))
-            .opacity(opacity)
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .multilineTextAlignment(.center)
-            .padding(.top, -4)
-            .padding(.horizontal, 16)
+        Group {
+            if orpAlignmentEnabled {
+                ORPWord(
+                    word: words[currentIndex],
+                    fontSize: fontSize,
+                    highlightAnchor: orpHighlightAnchor,
+                    textColor: .white.opacity(0.5)
+                )
+                .opacity(opacity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .padding(.top, -4)
+                .padding(.horizontal, 16)
+            } else {
+                Text(words[currentIndex])
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .opacity(opacity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, -4)
+                    .padding(.horizontal, 16)
+            }
+        }
     }
 
     // MARK: - Classic placeholder

@@ -16,6 +16,7 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
 
     let maxChunkLength = 10
     var supportsORP: Bool { true }
+    var hyphenationLocale: Locale? { Locale(identifier: "en_US") }
 
     func endsSentence(_ word: String) -> Bool {
         word.hasSuffix(".") || word.hasSuffix("!") || word.hasSuffix("?")
@@ -110,38 +111,69 @@ struct LatinLanguageStrategy: LanguageStrategy, Sendable {
 
     // MARK: - ORP (per-word) chunking
 
+    // Tuning constants for ORP per-word mode
+    private static let syllableThreshold = 10
+    private static let rightBudget = 6  // chars from anchor to end (incl. trailing "-")
+    private static let perCharMs = 15
+    private static let continuationPenaltyMs = 50
+    private static let commaBonusMs = 80
+    private static let sentenceBonusMs = 200
+    private static let pauseMs = 250
+
     /// Strict one-word-per-chunk chunker. Each token becomes a chunk verbatim
-    /// (including any attached punctuation). Pause markers `//` become empty strings.
+    /// (including any attached punctuation). Long tokens are syllable-split via
+    /// hyphenation. Pause markers `//` become empty strings.
     func chunksPerWord(text: String, baseSpeedMs: Int) -> [String] {
         let tokens = text
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
-        return tokens.map { $0 == "//" ? "" : $0 }
+
+        var result: [String] = []
+        for token in tokens {
+            if token == "//" {
+                result.append("")
+                continue
+            }
+            let rawParts = PromptFlow.splitLongWord(
+                token,
+                threshold: Self.syllableThreshold,
+                locale: hyphenationLocale
+            )
+            let safeParts = rawParts.flatMap {
+                enforceBudget($0, rightBudget: Self.rightBudget)
+            }
+            result.append(contentsOf: safeParts)
+        }
+        return result
     }
 
     /// Per-word duration. Empty string = pause chunk with a fixed duration.
+    /// Chunks ending with `-` are continuation syllables and get a small penalty.
     func durationPerWord(chunk: String, baseSpeedMs: Int) -> TimeInterval {
-        // Tuning constants
-        let perCharMs: Int = 15
-        let commaBonusMs: Int = 80
-        let sentenceBonusMs: Int = 200
-        let pauseMs: Int = 250
+        if chunk.isEmpty { return Double(Self.pauseMs) / 1000.0 }
 
-        if chunk.isEmpty { return Double(pauseMs) / 1000.0 }
+        let isContinuation = chunk.hasSuffix("-")
 
-        // Strip trailing punctuation for character count
+        // Strip trailing continuation hyphen or ellipsis, then trailing punctuation
+        var cleaned = chunk
+        if cleaned.hasSuffix("-") { cleaned = String(cleaned.dropLast()) }
+        if cleaned.hasSuffix("…") { cleaned = String(cleaned.dropLast()) }
+
         let trailingPunct: Set<Character> = [".", ",", "!", "?", ";", ":"]
-        var cleanCount = chunk.count
-        for ch in chunk.reversed() {
+        var cleanCount = cleaned.count
+        for ch in cleaned.reversed() {
             if trailingPunct.contains(ch) { cleanCount -= 1 } else { break }
         }
         if cleanCount < 0 { cleanCount = 0 }
 
-        var ms = baseSpeedMs + cleanCount * perCharMs
-        if let last = chunk.last {
+        var ms = baseSpeedMs + cleanCount * Self.perCharMs
+
+        if isContinuation {
+            ms += Self.continuationPenaltyMs
+        } else if let last = cleaned.last {
             switch last {
-            case ".", "!", "?": ms += sentenceBonusMs
-            case ",", ";":      ms += commaBonusMs
+            case ".", "!", "?": ms += Self.sentenceBonusMs
+            case ",", ";":      ms += Self.commaBonusMs
             default: break
             }
         }
