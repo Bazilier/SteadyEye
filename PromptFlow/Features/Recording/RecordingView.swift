@@ -26,7 +26,16 @@ struct RecordingView: View {
     @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
+    @AppStorage("screenshotMode") private var screenshotMode: Bool = false
     private var isClassicMode: Bool { displayMode == "classic" }
+    /// True when the UI should be clean for App Store screencast recording.
+    private var isScreencastMode: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return screenshotMode
+        #endif
+    }
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
@@ -486,7 +495,7 @@ struct RecordingView: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 16) {
-            if !cameraManager.isRecording {
+            if !cameraManager.isRecording && !isScreencastMode {
                 HStack {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -509,22 +518,24 @@ struct RecordingView: View {
                 .padding(.horizontal, 20)
             }
 
-            // Audio source + video quality indicators
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
-                    Text(cameraManager.isAudioReady
-                        ? cameraManager.audioSourceName
-                        : String(localized: "recording.audio.connecting", defaultValue: "Connecting audio...", comment: "Status until the audio session has fully connected"))
+            // Audio source + video quality indicators (hidden in screencast mode)
+            if !isScreencastMode {
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 10))
+                        Text(cameraManager.isAudioReady
+                            ? cameraManager.audioSourceName
+                            : String(localized: "recording.audio.connecting", defaultValue: "Connecting audio...", comment: "Status until the audio session has fully connected"))
+                            .font(.caption2)
+                    }
+                    Text("·")
+                        .font(.caption2)
+                    Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
                         .font(.caption2)
                 }
-                Text("·")
-                    .font(.caption2)
-                Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
-                    .font(.caption2)
+                .foregroundStyle(.white.opacity(0.5))
             }
-            .foregroundStyle(.white.opacity(0.5))
 
             // Camera settings panel
             if showCameraSettings {
@@ -600,14 +611,6 @@ struct RecordingView: View {
         }
         .padding(.bottom, 48)
         .padding(.top, 12)
-        .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.65)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
     }
 
     // MARK: - Countdown overlay

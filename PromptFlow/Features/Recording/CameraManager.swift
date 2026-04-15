@@ -39,6 +39,11 @@ final class CameraManager: NSObject, ObservableObject {
 
     func start(position: AVCaptureDevice.Position = .front) {
         cameraPosition = position
+        #if targetEnvironment(simulator)
+        // No real camera in Simulator — mark session ready immediately so UI is fully interactive.
+        isSessionReady = true
+        isAudioReady = true
+        #else
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
             if self.session.isRunning {
@@ -47,9 +52,14 @@ final class CameraManager: NSObject, ObservableObject {
             }
             self.setupSession(position: position)
         }
+        #endif
     }
 
     func stop() {
+        #if targetEnvironment(simulator)
+        isSessionReady = false
+        isAudioReady = false
+        #else
         if let observer = routeChangeObserver {
             NotificationCenter.default.removeObserver(observer)
             routeChangeObserver = nil
@@ -65,10 +75,12 @@ final class CameraManager: NSObject, ObservableObject {
                 self.isAudioReady = false
             }
         }
+        #endif
     }
 
     // MARK: - Phase 1: Video + audio with built-in mic (instant)
 
+    #if !targetEnvironment(simulator)
     private func setupSession(position: AVCaptureDevice.Position) {
         session.automaticallyConfiguresApplicationAudioSession = false
 
@@ -232,6 +244,7 @@ final class CameraManager: NSObject, ObservableObject {
             self?.updateAudioSourceName()
         }
     }
+    #endif // !targetEnvironment(simulator)
 
     // MARK: - Exposure & Stabilization
 
@@ -241,6 +254,7 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     func setExposureCompensation(_ value: Float) {
+        #if !targetEnvironment(simulator)
         guard let device = currentCamera else { return }
         let clamped = max(device.minExposureTargetBias, min(value, device.maxExposureTargetBias))
         do {
@@ -248,14 +262,17 @@ final class CameraManager: NSObject, ObservableObject {
             device.setExposureTargetBias(clamped) { _ in }
             device.unlockForConfiguration()
         } catch {}
+        #endif
     }
 
     func setStabilization(_ enabled: Bool) {
+        #if !targetEnvironment(simulator)
         guard let device = currentCamera else { return }
         let connection = session.connections.first(where: { $0.output is AVCaptureMovieFileOutput })
         if let connection, connection.isVideoStabilizationSupported {
             connection.preferredVideoStabilizationMode = enabled ? .auto : .off
         }
+        #endif
     }
 
     func applySavedSettings() {
@@ -268,12 +285,14 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: - Camera switching
 
     func switchCamera() {
+        #if !targetEnvironment(simulator)
         let newPosition: AVCaptureDevice.Position = (cameraPosition == .front) ? .back : .front
         cameraPosition = newPosition
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
             self.setupSession(position: newPosition)
         }
+        #endif
     }
 
     // MARK: - Recording
@@ -281,6 +300,15 @@ final class CameraManager: NSObject, ObservableObject {
     func startRecording() {
         guard !isRecording else { return }
 
+        #if targetEnvironment(simulator)
+        // Fake recording: flip UI state and start the duration timer — no AVCapture calls.
+        recordingStartTime = Date()
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self, let start = self.recordingStartTime else { return }
+            self.recordingDuration = Date().timeIntervalSince(start)
+        }
+        isRecording = true
+        #else
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("mov")
@@ -295,10 +323,21 @@ final class CameraManager: NSObject, ObservableObject {
             self.recordingDuration = Date().timeIntervalSince(start)
         }
         isRecording = true
+        #endif
     }
 
     func stopRecording() {
         guard isRecording else { return }
+
+        durationTimer?.invalidate()
+        durationTimer = nil
+        isRecording = false
+        recordingDuration = 0
+        recordingStartTime = nil
+
+        #if targetEnvironment(simulator)
+        // No file to write — nothing to do. lastRecordedURL stays nil so VideoPreviewView is not triggered.
+        #else
         // Register background task so the video file finishes writing even if app is backgrounded
         backgroundTaskID = UIApplication.shared.beginBackgroundTask { [weak self] in
             self?.endBackgroundTask()
@@ -306,11 +345,7 @@ final class CameraManager: NSObject, ObservableObject {
         Self.cameraQueue.async { [weak self] in
             self?.movieOutput.stopRecording()
         }
-        durationTimer?.invalidate()
-        durationTimer = nil
-        isRecording = false
-        recordingDuration = 0
-        recordingStartTime = nil
+        #endif
     }
 
     private func endBackgroundTask() {
@@ -319,15 +354,15 @@ final class CameraManager: NSObject, ObservableObject {
         backgroundTaskID = .invalid
     }
 
-    // stopSession removed — use stop() instead
-
     private func updateAudioSourceName() {
+        #if !targetEnvironment(simulator)
         let input = AVAudioSession.sharedInstance().currentRoute.inputs.first
         audioSourceName = input?.portName ?? String(
             localized: "camera.audio.iPhoneMic",
             defaultValue: "iPhone Microphone",
             comment: "Default audio source name in the recording HUD."
         )
+        #endif
     }
 }
 
@@ -340,6 +375,7 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
         from connections: [AVCaptureConnection],
         error: Error?
     ) {
+        #if !targetEnvironment(simulator)
         Task { @MainActor [weak self] in
             defer { self?.endBackgroundTask() }
 
@@ -358,5 +394,6 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
                 self?.lastRecordedURL = outputFileURL
             }
         }
+        #endif
     }
 }
