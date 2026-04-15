@@ -1,6 +1,6 @@
 import Foundation
 
-enum CJKTokenizer {
+nonisolated enum CJKTokenizer {
 
     /// Detect if text contains CJK characters
     static func containsCJK(_ text: String) -> Bool {

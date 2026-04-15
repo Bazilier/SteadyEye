@@ -3,7 +3,7 @@ import UIKit
 
 /// Optimal Recognition Point index for a word.
 /// Anchor letter index used for horizontal alignment (Spritz-style).
-func orpIndex(for word: String) -> Int {
+nonisolated func orpIndex(for word: String) -> Int {
     let clean = word.trimmingCharacters(in: .punctuationCharacters)
     let len = clean.count
     switch len {

@@ -267,7 +267,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     func setStabilization(_ enabled: Bool) {
         #if !targetEnvironment(simulator)
-        guard let device = currentCamera else { return }
+        guard currentCamera != nil else { return }
         let connection = session.connections.first(where: { $0.output is AVCaptureMovieFileOutput })
         if let connection, connection.isVideoStabilizationSupported {
             connection.preferredVideoStabilizationMode = enabled ? .auto : .off

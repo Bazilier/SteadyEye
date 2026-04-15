@@ -4,6 +4,15 @@ import Foundation
 enum ChunkTimingCalculator {
     static let pauseMarker = "//"
 
+    /// Maps the 0…1 speed slider to the base per-word duration (ms) used by ORP.
+    /// 0.0 → 400ms (slow), 0.5 → ~140ms (normal), 1.0 → 50ms (fast).
+    static func orpBaseSpeedMs(sliderValue: Double) -> Int {
+        let minMs = 50.0
+        let maxMs = 400.0
+        let t = 1.0 - sliderValue
+        return Int(minMs * pow(maxMs / minMs, t))
+    }
+
     static func isPause(_ chunk: String) -> Bool {
         let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed == "//" || trimmed == "／／"

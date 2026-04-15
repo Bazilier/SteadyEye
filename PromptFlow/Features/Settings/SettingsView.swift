@@ -11,9 +11,8 @@ struct SettingsView: View {
 
     @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
-    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
-    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
-    @AppStorage("screenshotMode") private var screenshotMode: Bool = false
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @State private var showPaywall = false
 
     private var settings: AppSettings {
@@ -107,14 +106,6 @@ struct SettingsView: View {
 
                 #if DEV
                 Section("Debug") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle(isOn: $screenshotMode) {
-                            Text("Screencast Mode")
-                        }
-                        Text("Green-screen camera, no close/gear buttons, no audio/resolution labels. Simulator always uses this mode.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     Button("Preview Paywall") { showPaywall = true }
                     Button("Reset Tips") {
                         UserDefaults.standard.set(false, forKey: "hasSeenEditorTip")

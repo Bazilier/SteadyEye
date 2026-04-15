@@ -22,7 +22,7 @@ struct CJKChunk: Sendable {
 // MARK: - Strategy
 
 /// Handles Japanese, Chinese, and Korean text.
-struct CJKLanguageStrategy: LanguageStrategy, Sendable {
+nonisolated struct CJKLanguageStrategy: LanguageStrategy, Sendable {
 
     let maxChunkWeight = 6
     let language: String

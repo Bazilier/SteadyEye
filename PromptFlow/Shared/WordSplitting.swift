@@ -4,22 +4,22 @@ import NaturalLanguage
 // Tunable: max characters on the right side of the anchor (including the anchor
 // letter itself and any trailing "-"). Syllables whose right side exceeds this
 // are force-split by `enforceBudget`.
-private let rightBudget = 6
+nonisolated private let rightBudget = 6
 
 // Tunable: minimum clean (non-punctuation, non-hyphen) characters per emitted
 // syllable. Splits that would produce shorter fragments are rejected.
-private let minSyllableLength = 3
+nonisolated private let minSyllableLength = 3
 
 // Vowels recognised by the post-split sanity check (Latin + Cyrillic).
-private let vowelSet: Set<Character> = Set("aeiouyAEIOUYаеёиоуыэюяАЕЁИОУЫЭЮЯ")
+nonisolated private let vowelSet: Set<Character> = Set("aeiouyAEIOUYаеёиоуыэюяАЕЁИОУЫЭЮЯ")
 
-private func hasVowel(_ s: String) -> Bool {
+nonisolated private func hasVowel(_ s: String) -> Bool {
     s.contains { vowelSet.contains($0) }
 }
 
 /// Hyphenation points for a word using Apple's CFStringGetHyphenationLocationBeforeIndex.
 /// Returns sorted indices where the word can be broken (ascending).
-func hyphenationPoints(for word: String, locale: Locale) -> [Int] {
+nonisolated func hyphenationPoints(for word: String, locale: Locale) -> [Int] {
     let cfWord = word as CFString
     let length = CFStringGetLength(cfWord)
     guard length > 0 else { return [] }
@@ -44,7 +44,7 @@ func hyphenationPoints(for word: String, locale: Locale) -> [Int] {
 
 /// Detects the dominant language of a word and maps it to a Locale whose
 /// hyphenation dictionary Apple actually ships.
-private func detectLocale(for word: String) -> Locale? {
+nonisolated private func detectLocale(for word: String) -> Locale? {
     let recognizer = NLLanguageRecognizer()
     recognizer.processString(word)
     guard let language = recognizer.dominantLanguage else { return nil }
@@ -68,7 +68,7 @@ private func detectLocale(for word: String) -> Locale? {
 /// (inclusive of trailing "-") exceed `rightBudget`. Validates that emitted
 /// parts are at least `minSyllableLength` clean chars and contain a vowel;
 /// returns the syllable as-is when no good split exists.
-func enforceBudget(_ syllable: String, rightBudget: Int) -> [String] {
+nonisolated func enforceBudget(_ syllable: String, rightBudget: Int) -> [String] {
     let anchorIdx = orpIndex(for: syllable)
     let suffixLen = syllable.count - anchorIdx  // anchor letter + tail incl. "-"
 
@@ -136,7 +136,7 @@ func enforceBudget(_ syllable: String, rightBudget: Int) -> [String] {
 /// Merges any tail syllable shorter than `minSyllableLength` clean characters
 /// into the previous syllable. Repeats in case the merge produces a new short
 /// tail. Single-element inputs are returned unchanged.
-func mergeShortTail(_ syllables: [String]) -> [String] {
+nonisolated func mergeShortTail(_ syllables: [String]) -> [String] {
     guard syllables.count >= 2 else { return syllables }
     let trailingTrim = CharacterSet(charactersIn: "-,.!?;:")
     var result = syllables
@@ -158,7 +158,7 @@ func mergeShortTail(_ syllables: [String]) -> [String] {
 
 /// Fallback: split a word into fixed-length chunks of approximately `threshold - 1`
 /// characters with trailing hyphens on all but the last chunk.
-private func fixedLengthSplit(_ word: String, threshold: Int) -> [String] {
+nonisolated private func fixedLengthSplit(_ word: String, threshold: Int) -> [String] {
     var result: [String] = []
     let chunkSize = max(1, threshold - 1)
     var idx = word.startIndex
@@ -179,7 +179,7 @@ private func fixedLengthSplit(_ word: String, threshold: Int) -> [String] {
 /// Locale handling: per-word language is detected via NLLanguageRecognizer.
 /// The passed-in `locale` is used as a fallback when detection fails.
 /// If hyphenation returns no points, falls back to fixed-length splitting.
-func splitLongWord(_ word: String, threshold: Int, locale: Locale?) -> [String] {
+nonisolated func splitLongWord(_ word: String, threshold: Int, locale: Locale?) -> [String] {
     // 1. Split on existing hyphens first, recurse on each segment.
     if word.contains("-") {
         let parts = word.split(separator: "-", omittingEmptySubsequences: false).map(String.init)

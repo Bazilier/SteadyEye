@@ -14,7 +14,7 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published private(set) var supportsORP: Bool = true
     /// ORP per-word mode. Toggling this triggers re-chunking via reloadChunks().
     /// Initialised from UserDefaults so `loadScript` at startup sees the correct mode.
-    var orpEnabled: Bool = UserDefaults.standard.bool(forKey: "orpAlignmentEnabled")
+    var orpEnabled: Bool = (UserDefaults.standard.object(forKey: "orpAlignmentEnabled") as? Bool) ?? true
     private var strategy: any LanguageStrategy = LatinLanguageStrategy() {
         didSet { supportsORP = strategy.supportsORP }
     }
@@ -22,13 +22,8 @@ final class ChunkPlayerEngine: ObservableObject {
     private var advanceTask: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
 
-    /// Maps the 0…1 slider to a base per-word duration in milliseconds.
-    /// 0.0 → 400ms (slow), 0.5 → ~140ms (normal), 1.0 → 50ms (fast).
     private var orpBaseSpeedMs: Int {
-        let minMs = 50.0
-        let maxMs = 400.0
-        let t = 1.0 - sliderValue
-        return Int(minMs * pow(maxMs / minMs, t))
+        ChunkTimingCalculator.orpBaseSpeedMs(sliderValue: sliderValue)
     }
 
     private var useORPPath: Bool {

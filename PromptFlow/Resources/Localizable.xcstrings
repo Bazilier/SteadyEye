@@ -1778,6 +1778,36 @@
         }
       }
     },
+    "recording.placeholder.phrase" : {
+      "comment" : "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should be 4–6 short words and read naturally when split on spaces.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script will appear here"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guión aparecerá aquí"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro aparecerá aqui"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Здесь появится ваш текст"
+          }
+        }
+      }
+    },
     "recording.tip.body" : {
       "comment" : "Body of the first-run tip on the recording screen explaining how to position the teleprompter text bar.",
       "extractionState" : "manual",

@@ -3,7 +3,7 @@ import Foundation
 /// Handles Arabic, Hebrew, and Farsi scripts.
 /// Space-based splitting, no glue words, no abbreviations.
 /// RTL rendering handled automatically by SwiftUI Text.
-struct ArabicLanguageStrategy: LanguageStrategy, Sendable {
+nonisolated struct ArabicLanguageStrategy: LanguageStrategy, Sendable {
 
     let maxChunkLength = 10
     var supportsORP: Bool { false }

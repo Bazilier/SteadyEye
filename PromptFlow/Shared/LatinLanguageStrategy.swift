@@ -2,7 +2,7 @@ import Foundation
 
 /// Handles English, Russian, and European languages.
 /// Space-based word splitting with glue-word grouping.
-struct LatinLanguageStrategy: LanguageStrategy, Sendable {
+nonisolated struct LatinLanguageStrategy: LanguageStrategy, Sendable {
 
     static let glueWords: Set<String> = [
         "a", "an", "the",

@@ -6,16 +6,26 @@ struct PlaceholderLoopView: View {
     let fontSize: CGFloat
     let isClassicMode: Bool
 
-    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
-    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
+    @AppStorage("speedSliderValue") private var sliderValue: Double = 0.5
+    @Environment(\.locale) private var locale
 
-    private let words = ["Your", "script", "will", "appear", "here"]
+    @State private var chunks: [String] = [""]
+    @State private var strategy: any LanguageStrategy = LatinLanguageStrategy()
+    @State private var supportsORP: Bool = true
     @State private var currentIndex = 0
     @State private var opacity: Double = 1
     @State private var scrollOffset: CGFloat = 0
     @State private var loopTask: Task<Void, Never>?
 
     private let lineHeight: CGFloat = 28
+
+    private var useORP: Bool { orpAlignmentEnabled && supportsORP }
+    private var currentChunk: String {
+        guard !chunks.isEmpty else { return "" }
+        return chunks[currentIndex % chunks.count]
+    }
 
     var body: some View {
         Group {
@@ -25,7 +35,10 @@ struct PlaceholderLoopView: View {
                 wbwPlaceholder
             }
         }
-        .onAppear { startLoop() }
+        .onAppear {
+            recomputeChunks()
+            startLoop()
+        }
         .onDisappear { loopTask?.cancel() }
         .onChange(of: isClassicMode) { _, _ in
             // Restart loop after container animation settles
@@ -34,15 +47,23 @@ struct PlaceholderLoopView: View {
                 startLoop()
             }
         }
+        .onChange(of: orpAlignmentEnabled) { _, _ in
+            recomputeChunks()
+            restartLoop()
+        }
+        .onChange(of: locale) { _, _ in
+            recomputeChunks()
+            restartLoop()
+        }
     }
 
     // MARK: - WbW placeholder
 
     private var wbwPlaceholder: some View {
         Group {
-            if orpAlignmentEnabled {
+            if useORP {
                 ORPWord(
-                    word: words[currentIndex],
+                    word: currentChunk,
                     fontSize: fontSize,
                     highlightAnchor: orpHighlightAnchor,
                     textColor: .white.opacity(0.5)
@@ -53,7 +74,7 @@ struct PlaceholderLoopView: View {
                 .padding(.top, -4)
                 .padding(.horizontal, 16)
             } else {
-                Text(words[currentIndex])
+                Text(currentChunk)
                     .font(.system(size: fontSize, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
                     .opacity(opacity)
@@ -72,8 +93,10 @@ struct PlaceholderLoopView: View {
         VStack(spacing: 0) {
             ForEach(0..<4, id: \.self) { slot in
                 let idx = currentIndex - 1 + slot
-                let wrapped = ((idx % words.count) + words.count) % words.count
-                Text(idx < 0 ? "" : words[wrapped])
+                let count = max(chunks.count, 1)
+                let wrapped = ((idx % count) + count) % count
+                let text = (idx < 0 || chunks.isEmpty) ? "" : chunks[wrapped]
+                Text(text)
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(.white.opacity(classicSlotOpacity(slot) * 0.5))
                     .lineLimit(1)
@@ -97,12 +120,56 @@ struct PlaceholderLoopView: View {
         }
     }
 
+    // MARK: - Chunking
+
+    private func recomputeChunks() {
+        let phrase = String(
+            localized: "recording.placeholder.phrase",
+            defaultValue: "Your script will appear here",
+            comment: "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should be 4–6 short words and read naturally when split on spaces."
+        )
+        let detected = LanguageDetector.detect(phrase)
+        let baseMs = ChunkTimingCalculator.orpBaseSpeedMs(sliderValue: sliderValue)
+        let newChunks: [String]
+        if orpAlignmentEnabled && detected.supportsORP {
+            newChunks = detected.chunksPerWord(text: phrase, baseSpeedMs: baseMs)
+        } else {
+            newChunks = detected.chunks(from: phrase)
+        }
+        strategy = detected
+        supportsORP = detected.supportsORP
+        chunks = newChunks.isEmpty ? [phrase] : newChunks
+        currentIndex = 0
+    }
+
     // MARK: - Loop
 
     private func chunkDelay() -> UInt64 {
-        let speed = UserDefaults.standard.double(forKey: "speedSliderValue")
-        let duration = ChunkTimingCalculator.calculateDuration(for: words[currentIndex], sliderValue: speed)
+        // Read slider live from UserDefaults each tick. The @AppStorage wrapper
+        // stops seeing fresh writes once captured into a long-lived Task closure,
+        // so reading from UserDefaults directly is the only way to pick up
+        // mid-loop slider changes without restarting the loop.
+        let liveSlider = (UserDefaults.standard.object(forKey: "speedSliderValue") as? Double) ?? 0.5
+        let chunk = currentChunk
+        let duration: TimeInterval
+        if useORP {
+            duration = strategy.durationPerWord(
+                chunk: chunk,
+                baseSpeedMs: ChunkTimingCalculator.orpBaseSpeedMs(sliderValue: liveSlider)
+            )
+        } else {
+            duration = ChunkTimingCalculator.calculateDuration(
+                for: chunk,
+                sliderValue: liveSlider,
+                strategy: strategy
+            )
+        }
         return UInt64(duration * 1_000_000_000)
+    }
+
+    private func restartLoop() {
+        loopTask?.cancel()
+        startLoop()
     }
 
     private func startLoop() {
@@ -124,13 +191,15 @@ struct PlaceholderLoopView: View {
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         scrollOffset = 0
-                        currentIndex = (currentIndex + 1) % words.count
+                        currentIndex = chunks.isEmpty ? 0 : (currentIndex + 1) % chunks.count
                     }
                 } else {
                     await MainActor.run { withAnimation(.easeOut(duration: 0.08)) { opacity = 0 } }
                     try? await Task.sleep(nanoseconds: 80_000_000)
                     guard !Task.isCancelled else { return }
-                    await MainActor.run { currentIndex = (currentIndex + 1) % words.count }
+                    await MainActor.run {
+                        currentIndex = chunks.isEmpty ? 0 : (currentIndex + 1) % chunks.count
+                    }
                     await MainActor.run { withAnimation(.easeIn(duration: 0.08)) { opacity = 1 } }
                 }
             }
@@ -144,8 +213,8 @@ struct WordByWordView: View {
     @ObservedObject var player: ChunkPlayerEngine
     let fontSize: CGFloat
 
-    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = false
-    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = false
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
 
     @State private var displayedText: String = ""
     @State private var textOpacity: Double = 1
