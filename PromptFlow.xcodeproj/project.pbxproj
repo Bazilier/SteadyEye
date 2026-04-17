@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		116FE5382F6EFA540094999F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 116FE5372F6EFA540094999F /* RevenueCat */; };
+		117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 117704112F912F15001E40FC /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */,
 				116FE5382F6EFA540094999F /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -134,6 +136,7 @@
 			name = PromptFlow;
 			packageProductDependencies = (
 				116FE5372F6EFA540094999F /* RevenueCat */,
+				117704112F912F15001E40FC /* FirebaseAnalytics */,
 			);
 			productName = PromptFlow;
 			productReference = 1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */;
@@ -172,6 +175,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+				117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1195F13F2F5ADD78003B4DD2 /* Products */;
@@ -508,6 +512,14 @@
 				minimumVersion = 5.66.0;
 			};
 		};
+		117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -515,6 +527,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCat;
+		};
+		117704112F912F15001E40FC /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

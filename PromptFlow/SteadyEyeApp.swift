@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import AdServices
+import FirebaseAnalytics
+import FirebaseCore
 import RevenueCat
 
 @main
@@ -12,11 +15,17 @@ struct SteadyEyeApp: App {
         cleanUpTempRecordings()
 
         #if !DEV
+        FirebaseApp.configure()
         if let apiKey = SecretsManager.revenueCatAPIKey(), !apiKey.isEmpty {
             #if DEV
             Purchases.logLevel = .debug
             #endif
             Purchases.configure(withAPIKey: apiKey)
+            Purchases.shared.attribution.enableAdServicesAttributionTokenCollection()
+
+            if let firebaseAppInstanceID = Analytics.appInstanceID() {
+                Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
+            }
         }
         #endif
 

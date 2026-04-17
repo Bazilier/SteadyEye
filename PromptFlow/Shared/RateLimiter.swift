@@ -23,16 +23,23 @@ enum RateLimiter {
 
     /// Returns true if an API call is allowed. Increments the counter.
     static func canMakeAPICall() -> Bool {
+        #if DEV
+        return true
+        #else
         resetIfNeeded()
         let count = UserDefaults.standard.integer(forKey: "apiCallsToday")
         guard count < 20 else { return false }
         UserDefaults.standard.set(count + 1, forKey: "apiCallsToday")
         return true
+        #endif
     }
 
     /// Returns true if a bulk import is allowed. Increments both counters.
     /// Counts as 2 API calls (1 split + 1 batch optimize).
     static func canBulkImport() -> Bool {
+        #if DEV
+        return true
+        #else
         resetIfNeeded()
         let apiCount = UserDefaults.standard.integer(forKey: "apiCallsToday")
         let bulkCount = UserDefaults.standard.integer(forKey: "bulkImportsToday")
@@ -40,5 +47,6 @@ enum RateLimiter {
         UserDefaults.standard.set(apiCount + 2, forKey: "apiCallsToday")
         UserDefaults.standard.set(bulkCount + 1, forKey: "bulkImportsToday")
         return true
+        #endif
     }
 }
