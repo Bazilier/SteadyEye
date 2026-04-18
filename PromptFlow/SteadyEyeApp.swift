@@ -8,6 +8,7 @@ import RevenueCat
 
 @main
 struct SteadyEyeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var container: ModelContainer?
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
@@ -27,6 +28,7 @@ struct SteadyEyeApp: App {
                 Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
             }
         }
+        MetaAnalytics.logAppActivation()
         #endif
 
         SubscriptionManager.shared.configure()
@@ -40,6 +42,10 @@ struct SteadyEyeApp: App {
                         .modelContainer(container)
                         .environmentObject(subscriptionManager)
                         .transition(.opacity)
+                        .task {
+                            try? await Task.sleep(for: .seconds(1))
+                            await ATTManager.requestIfNeeded()
+                        }
                 } else {
                     SplashView()
                         .transition(.opacity)

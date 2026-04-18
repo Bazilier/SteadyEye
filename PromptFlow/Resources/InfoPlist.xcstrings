@@ -150,6 +150,30 @@
           }
         }
       }
+    },
+    "NSUserTrackingUsageDescription" : {
+      "comment" : "Permission prompt shown when SteadyEye requests App Tracking Transparency authorization. Apple App Store requires this to be localized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que SteadyEye mida qué anuncios ayudan a nuevos creadores a encontrar la app. Tus datos siguen siendo anónimos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permita que o SteadyEye veja quais anúncios trazem novos criadores ao app. Seus dados permanecem anônimos."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

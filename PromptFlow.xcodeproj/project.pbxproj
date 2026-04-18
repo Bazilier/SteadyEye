@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = 114690072F936C6500CAC8C6 /* FacebookCore */; };
 		116FE5382F6EFA540094999F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 116FE5372F6EFA540094999F /* RevenueCat */; };
 		117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 117704112F912F15001E40FC /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
@@ -66,6 +67,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */,
+				114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */,
 				116FE5382F6EFA540094999F /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -137,6 +139,7 @@
 			packageProductDependencies = (
 				116FE5372F6EFA540094999F /* RevenueCat */,
 				117704112F912F15001E40FC /* FirebaseAnalytics */,
+				114690072F936C6500CAC8C6 /* FacebookCore */,
 			);
 			productName = PromptFlow;
 			productReference = 1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */;
@@ -176,6 +179,7 @@
 			packageReferences = (
 				116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 				117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				114690062F936C6500CAC8C6 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1195F13F2F5ADD78003B4DD2 /* Products */;
@@ -403,11 +407,13 @@
 				DEVELOPMENT_TEAM = NB4UJ8958V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PromptFlow/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -418,7 +424,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kirillvasilyev.SteadyEye;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -443,11 +449,13 @@
 				DEVELOPMENT_TEAM = NB4UJ8958V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PromptFlow/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -458,7 +466,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kirillvasilyev.SteadyEye;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -504,6 +512,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		114690062F936C6500CAC8C6 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/facebook-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 18.0.3;
+			};
+		};
 		116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
@@ -523,6 +539,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		114690072F936C6500CAC8C6 /* FacebookCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 114690062F936C6500CAC8C6 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookCore;
+		};
 		116FE5372F6EFA540094999F /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 116FE5362F6EFA540094999F /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;

@@ -7,6 +7,8 @@ struct VideoPreviewView: View {
     let onRetake: () -> Void
     let onSaved: () -> Void
 
+    @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
+
     @State private var player: AVPlayer?
     @State private var isSaving = false
     @State private var showSavedCheck = false
@@ -173,6 +175,10 @@ struct VideoPreviewView: View {
                 if success {
                     showSavedCheck = true
                     try? FileManager.default.removeItem(at: videoURL)
+                    if !hasCompletedFirstRecording {
+                        hasCompletedFirstRecording = true
+                        MetaAnalytics.logFirstRecordingCompleted()
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         onSaved()
                     }

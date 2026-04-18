@@ -2,15 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>SteadyEye uses the camera so you can record yourself while reading your script.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>SteadyEye uses the microphone to record audio while you film your video.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>SteadyEye saves your recorded videos to your Photo Library.</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<true/>
+	<key>FacebookAutoLogAppEventsEnabled</key>
 	<false/>
-	<key>CFBundleDisplayName</key>
+	<key>FacebookDisplayName</key>
 	<string>SteadyEye</string>
 </dict>
 </plist>
