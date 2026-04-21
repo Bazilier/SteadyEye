@@ -68,7 +68,7 @@ struct BulkImportView: View {
             Text("common.dailyLimit.message", comment: "Daily limit alert message in bulk import")
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView()
+            PaywallView(source: "import_gate_row")
         }
     }
 

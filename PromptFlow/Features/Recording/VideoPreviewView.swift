@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Photos
+import FirebaseAnalytics
 
 struct VideoPreviewView: View {
     let videoURL: URL
@@ -178,6 +179,11 @@ struct VideoPreviewView: View {
                     if !hasCompletedFirstRecording {
                         hasCompletedFirstRecording = true
                         MetaAnalytics.logFirstRecordingCompleted()
+                        #if !DEV
+                        Analytics.logEvent("first_recording_completed", parameters: [
+                            "duration_sec": Int(duration)
+                        ])
+                        #endif
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         onSaved()

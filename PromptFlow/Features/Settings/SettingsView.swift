@@ -179,7 +179,7 @@ struct SettingsView: View {
             }
             #endif
             .sheet(isPresented: $showPaywall) {
-                PaywallView()
+                PaywallView(source: "settings_preview")
             }
         }
         .preferredColorScheme(.dark)

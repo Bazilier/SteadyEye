@@ -55,6 +55,7 @@ struct ContentView: View {
             title: demoTitle,
             content: demoContent
         )
+        demo.isDemo = true
         modelContext.insert(demo)
         try? modelContext.save()
         demoScriptCreated = true

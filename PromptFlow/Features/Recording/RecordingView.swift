@@ -19,6 +19,7 @@ struct RecordingView: View {
     @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
     @State private var previewVideo: IdentifiableURL?
+    @State private var showPaywall: Bool = false
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -396,6 +397,11 @@ struct RecordingView: View {
                 }
             )
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(source: "record_button", onPurchaseSuccess: {
+                startCountdown()
+            })
+        }
         .alert(
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
             isPresented: .constant(cameraManager.errorMessage != nil)
@@ -640,6 +646,10 @@ struct RecordingView: View {
             player.pause()
             // Stay on current chunk — do not reset
         } else {
+            guard SubscriptionManager.shared.canRecord else {
+                showPaywall = true
+                return
+            }
             startCountdown()
         }
     }

@@ -1,7 +1,11 @@
 import SwiftUI
 import RevenueCat
+import FirebaseAnalytics
 
 struct PaywallView: View {
+    let source: String
+    var onPurchaseSuccess: (() -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var manager = SubscriptionManager.shared
 
@@ -157,6 +161,21 @@ struct PaywallView: View {
         .onAppear {
             selectedPlan = .annual
             Task { await manager.loadOfferings() }
+            #if !DEV
+            let trialAvailable = manager.offerings?.current?.annual?.storeProduct.introductoryDiscount != nil
+            Analytics.logEvent("paywall_shown", parameters: [
+                "source": source,
+                "trial_available": trialAvailable
+            ])
+            #endif
+        }
+        .onDisappear {
+            #if !DEV
+            Analytics.logEvent("paywall_dismissed", parameters: [
+                "source": source,
+                "purchased": SubscriptionManager.shared.isSubscribed
+            ])
+            #endif
         }
     }
 
@@ -298,9 +317,22 @@ struct PaywallView: View {
             return
         }
         errorMessage = nil
+        #if !DEV
+        let planName: String
+        switch selectedPlan {
+        case .annual: planName = "annual"
+        case .monthly: planName = "monthly"
+        case .lifetime: planName = "lifetime"
+        }
+        Analytics.logEvent("purchase_initiated", parameters: [
+            "plan": planName,
+            "source": source
+        ])
+        #endif
         Task {
             let success = await manager.purchase(pkg)
             if success {
+                onPurchaseSuccess?()
                 dismiss()
             } else {
                 errorMessage = String(

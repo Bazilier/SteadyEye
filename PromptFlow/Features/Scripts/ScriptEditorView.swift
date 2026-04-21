@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import FirebaseAnalytics
 
 struct ScriptEditorView: View {
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +17,8 @@ struct ScriptEditorView: View {
     @State private var showPaywall = false
     @State private var showEditorTip = false
     @AppStorage("hasSeenEditorTip") private var hasSeenEditorTip = false
+    @State private var didLogOpen = false
+    @AppStorage("hasSavedFirstScript") private var hasSavedFirstScript = false
     @FocusState private var contentFocused: Bool
 
     private let maxChars = 5000
@@ -147,7 +150,7 @@ struct ScriptEditorView: View {
                 Text("common.dailyLimit.message", comment: "Daily limit alert message in editor")
             }
             .sheet(isPresented: $showPaywall) {
-                PaywallView()
+                PaywallView(source: "optimize_gate")
             }
         }
         .preferredColorScheme(.dark)
@@ -157,6 +160,20 @@ struct ScriptEditorView: View {
                 content = script.content
             } else {
                 contentFocused = true
+            }
+            if !didLogOpen {
+                didLogOpen = true
+                #if !DEV
+                let source: String
+                if let script {
+                    source = script.isDemo ? "demo" : "user"
+                } else {
+                    source = "new"
+                }
+                Analytics.logEvent("script_opened", parameters: [
+                    "source": source
+                ])
+                #endif
             }
             if !hasSeenEditorTip {
                 showEditorTip = true
@@ -255,6 +272,12 @@ struct ScriptEditorView: View {
         } else {
             let newScript = Script(title: finalTitle, content: trimmedContent)
             modelContext.insert(newScript)
+            if !hasSavedFirstScript {
+                #if !DEV
+                Analytics.logEvent("first_script_saved", parameters: nil)
+                #endif
+                hasSavedFirstScript = true
+            }
         }
         dismiss()
     }

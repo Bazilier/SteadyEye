@@ -31,6 +31,7 @@ struct ScriptListView: View {
     @State private var scriptToRecord: Script?
     @State private var showBulkImport = false
     @State private var showPaywall = false
+    @State private var paywallSource: String = ""
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -70,7 +71,7 @@ struct ScriptListView: View {
                 BulkImportView()
             }
             .sheet(isPresented: $showPaywall) {
-                PaywallView()
+                PaywallView(source: paywallSource)
             }
         }
         .preferredColorScheme(.dark)
@@ -108,6 +109,7 @@ struct ScriptListView: View {
                 if SubscriptionManager.shared.canBulkImport {
                     showBulkImport = true
                 } else {
+                    paywallSource = "import_gate_empty"
                     showPaywall = true
                 }
             } label: {
@@ -131,11 +133,7 @@ struct ScriptListView: View {
                     ScriptRowView(script: script)
                     Spacer()
                     Button {
-                        if SubscriptionManager.shared.canUseCamera {
-                            scriptToRecord = script
-                        } else {
-                            showPaywall = true
-                        }
+                        scriptToRecord = script
                     } label: {
                         Image(systemName: "video.fill")
                             .font(.body)
@@ -166,6 +164,7 @@ struct ScriptListView: View {
                 if SubscriptionManager.shared.canBulkImport {
                     showBulkImport = true
                 } else {
+                    paywallSource = "import_gate_list"
                     showPaywall = true
                 }
             } label: {

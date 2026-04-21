@@ -38,7 +38,7 @@ final class SubscriptionManager: ObservableObject {
 
     // MARK: - Feature access
 
-    var canUseCamera: Bool { Self.devMode || isSubscribed }
+    var canRecord: Bool { Self.devMode || isSubscribed }
     var canOptimize: Bool {
         if Self.devMode || isSubscribed { return true }
         return freeOptimizationsUsed < Self.freeOptimizationLimit

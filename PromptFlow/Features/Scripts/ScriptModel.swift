@@ -10,6 +10,7 @@ final class Script {
     var updatedAt: Date
     var wordCount: Int
     var estimatedReadTime: TimeInterval  // seconds, based on ~150 WPM
+    var isDemo: Bool = false
 
     init(title: String, content: String) {
         self.id = UUID()
