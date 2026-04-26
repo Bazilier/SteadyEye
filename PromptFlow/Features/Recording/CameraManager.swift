@@ -28,6 +28,7 @@ final class CameraManager: NSObject, ObservableObject {
     private var movieOutput = AVCaptureMovieFileOutput()
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
+    private var lastRecordingDuration: TimeInterval = 0
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var routeChangeObserver: NSObjectProtocol?
 
@@ -329,6 +330,13 @@ final class CameraManager: NSObject, ObservableObject {
     func stopRecording() {
         guard isRecording else { return }
 
+        let elapsed = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        lastRecordingDuration = elapsed
+        AppAnalytics.log("recording_stopped", params: [
+            "duration_sec": Int(elapsed.rounded()),
+            "display_mode": UserDefaults.standard.string(forKey: "teleprompterMode") ?? "wbw"
+        ])
+
         durationTimer?.invalidate()
         durationTimer = nil
         isRecording = false
@@ -390,6 +398,11 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
             if self?.saveDirectlyOnStop == true {
                 self?.saveDirectlyOnStop = false
                 UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
+                AppAnalytics.log("recording_saved", params: [
+                    "duration_sec": Int((self?.lastRecordingDuration ?? 0).rounded()),
+                    "was_first": UserDefaults.standard.bool(forKey: "hasCompletedFirstRecording"),
+                    "via": "background_autosave"
+                ])
             } else {
                 self?.lastRecordedURL = outputFileURL
             }

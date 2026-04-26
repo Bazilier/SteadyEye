@@ -2,6 +2,12 @@ import Foundation
 import Combine
 import RevenueCat
 
+enum PurchaseOutcome {
+    case succeeded(isTrial: Bool)
+    case failed(reason: String)
+    case userCancelled
+}
+
 /// Manages subscription state via RevenueCat.
 /// In DEV builds, all features are unlocked without RC calls.
 final class SubscriptionManager: ObservableObject {
@@ -95,16 +101,40 @@ final class SubscriptionManager: ObservableObject {
     }
 
     @MainActor
-    func purchase(_ package: Package) async -> Bool {
+    func purchase(_ package: Package) async -> PurchaseOutcome {
         isLoading = true
         defer { isLoading = false }
         do {
             let result = try await Purchases.shared.purchase(package: package)
+            if result.userCancelled {
+                return .userCancelled
+            }
             let entitlement = result.customerInfo.entitlements[Self.entitlementID]
-            isSubscribed = entitlement?.isActive == true
-            return isSubscribed
+            guard entitlement?.isActive == true else {
+                return .failed(reason: "entitlement_inactive")
+            }
+            let isTrial = entitlement?.periodType == .trial
+            isSubscribed = true
+            isTrialActive = isTrial
+            return .succeeded(isTrial: isTrial)
         } catch {
-            return false
+            guard let code = error as? RevenueCat.ErrorCode else {
+                return .failed(reason: "unknown")
+            }
+            switch code {
+            case .purchaseCancelledError:
+                return .userCancelled
+            case .networkError:
+                return .failed(reason: "network")
+            case .paymentPendingError:
+                return .failed(reason: "payment_pending")
+            case .productNotAvailableForPurchaseError:
+                return .failed(reason: "product_unavailable")
+            case .storeProblemError:
+                return .failed(reason: "store_problem")
+            default:
+                return .failed(reason: "unknown")
+            }
         }
     }
 

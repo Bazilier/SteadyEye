@@ -176,10 +176,16 @@ struct VideoPreviewView: View {
                 if success {
                     showSavedCheck = true
                     try? FileManager.default.removeItem(at: videoURL)
-                    if !hasCompletedFirstRecording {
+                    let wasFirst = !hasCompletedFirstRecording
+                    AppAnalytics.log("recording_saved", params: [
+                        "duration_sec": Int(duration),
+                        "was_first": wasFirst,
+                        "via": "preview"
+                    ])
+                    if wasFirst {
                         hasCompletedFirstRecording = true
-                        MetaAnalytics.logFirstRecordingCompleted()
                         #if !DEV
+                        MetaAnalytics.logFirstRecordingCompleted()
                         Analytics.logEvent("first_recording_completed", parameters: [
                             "duration_sec": Int(duration)
                         ])
@@ -198,6 +204,9 @@ struct VideoPreviewView: View {
     }
 
     private func discardAndRetake() {
+        AppAnalytics.log("recording_discarded", params: [
+            "duration_sec": Int(duration)
+        ])
         try? FileManager.default.removeItem(at: videoURL)
         onRetake()
     }

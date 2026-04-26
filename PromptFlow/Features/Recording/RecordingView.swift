@@ -306,6 +306,11 @@ struct RecordingView: View {
             }
         }
         .onAppear {
+            AppAnalytics.log("recording_view_opened", params: [
+                "display_mode": displayMode,
+                "script_source": script.isDemo ? "demo" : "user",
+                "script_length_words": script.content.split(separator: " ").count
+            ])
             UIApplication.shared.isIdleTimerDisabled = true
             player.loadScript(script.content)
             player.sliderValue = speedSlider
@@ -673,6 +678,10 @@ struct RecordingView: View {
                     countdownTimer = nil
                     isCountingDown = false
                     cameraManager.startRecording()
+                    AppAnalytics.log("recording_started", params: [
+                        "display_mode": displayMode,
+                        "script_length_words": script.content.split(separator: " ").count
+                    ])
                     if autoStartPrompting {
                         player.play()
                     }

@@ -58,11 +58,25 @@ struct SteadyEyeApp: App {
 
     private func prepareApp() async {
         // 1. Request permissions (shows system dialogs over splash)
+        let cameraWasPrompt = AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            AVCaptureDevice.requestAccess(for: .video) { _ in cont.resume() }
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                AppAnalytics.log(
+                    granted ? "permissions_camera_granted" : "permissions_camera_denied",
+                    params: ["was_prompt": cameraWasPrompt]
+                )
+                cont.resume()
+            }
         }
+        let micWasPrompt = AVAudioApplication.shared.recordPermission == .undetermined
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            AVCaptureDevice.requestAccess(for: .audio) { _ in cont.resume() }
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                AppAnalytics.log(
+                    granted ? "permissions_mic_granted" : "permissions_mic_denied",
+                    params: ["was_prompt": micWasPrompt]
+                )
+                cont.resume()
+            }
         }
 
         // 2. ModelContainer (off main thread to avoid blocking UI)

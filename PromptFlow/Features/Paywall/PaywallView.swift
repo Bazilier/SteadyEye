@@ -317,24 +317,41 @@ struct PaywallView: View {
             return
         }
         errorMessage = nil
-        #if !DEV
         let planName: String
         switch selectedPlan {
         case .annual: planName = "annual"
         case .monthly: planName = "monthly"
         case .lifetime: planName = "lifetime"
         }
+        #if !DEV
         Analytics.logEvent("purchase_initiated", parameters: [
             "plan": planName,
             "source": source
         ])
         #endif
         Task {
-            let success = await manager.purchase(pkg)
-            if success {
+            let outcome = await manager.purchase(pkg)
+            switch outcome {
+            case .succeeded(let isTrial):
+                AppAnalytics.log("purchase_succeeded", params: [
+                    "plan": planName,
+                    "source": source,
+                    "was_trial": isTrial
+                ])
                 onPurchaseSuccess?()
                 dismiss()
-            } else {
+            case .userCancelled:
+                AppAnalytics.log("purchase_failed", params: [
+                    "plan": planName,
+                    "source": source,
+                    "error_reason": "user_cancelled"
+                ])
+            case .failed(let reason):
+                AppAnalytics.log("purchase_failed", params: [
+                    "plan": planName,
+                    "source": source,
+                    "error_reason": reason
+                ])
                 errorMessage = String(
                     localized: "paywall.error.purchaseFailed",
                     defaultValue: "Purchase failed. Please try again.",

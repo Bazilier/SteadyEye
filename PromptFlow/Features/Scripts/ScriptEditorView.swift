@@ -291,14 +291,38 @@ struct ScriptEditorView: View {
             showRateLimitAlert = true
             return
         }
+        AppAnalytics.log("ai_optimize_tapped", params: [
+            "free_uses_remaining": SubscriptionManager.shared.freeOptimizationsRemaining,
+            "is_subscribed": SubscriptionManager.shared.isSubscribed
+        ])
         isOptimizing = true
         Task {
+            let startTime = Date()
             do {
                 let aiResult = try await AnthropicService.optimizeForReading(content)
                 let cleaned = ScriptFormatter.cleanUp(aiResult)
                 content = cleaned
                 SubscriptionManager.shared.recordOptimizationUse()
+                AppAnalytics.log("ai_optimize_succeeded", params: [
+                    "duration_ms": Int(Date().timeIntervalSince(startTime) * 1000)
+                ])
             } catch {
+                let reason: String
+                if let svc = error as? AnthropicService.ServiceError {
+                    switch svc {
+                    case .missingAPIKey: reason = "missing_api_key"
+                    case .networkError: reason = "network"
+                    case .httpError: reason = "http_error"
+                    case .decodingError: reason = "decoding"
+                    case .emptyResponse: reason = "empty_response"
+                    }
+                } else {
+                    reason = String(describing: type(of: error))
+                }
+                AppAnalytics.log("ai_optimize_failed", params: [
+                    "error_reason": reason,
+                    "duration_ms": Int(Date().timeIntervalSince(startTime) * 1000)
+                ])
                 optimizeError = String(
                     localized: "scripts.editor.error.formatFailed",
                     defaultValue: "Could not format script. Check connection.",
