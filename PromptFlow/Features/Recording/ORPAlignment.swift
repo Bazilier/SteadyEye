@@ -26,7 +26,7 @@ struct ORPWord: View {
     let word: String
     let fontSize: CGFloat
     let highlightAnchor: Bool
-    var anchorColor: Color = .red
+    var anchorColor: Color = .orange
     var textColor: Color = .white
 
     var body: some View {

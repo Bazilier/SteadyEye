@@ -20,6 +20,9 @@ struct RecordingView: View {
     @State private var showSavedToast = false
     @State private var previewVideo: IdentifiableURL?
     @State private var showPaywall: Bool = false
+    @State private var showMicPermissionAlert: Bool = false
+    @State private var cameraAuthStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -59,6 +62,8 @@ struct RecordingView: View {
     @State private var hasStartedPlayback = false
 
     var body: some View {
+        Group {
+        if cameraAuthStatus == .authorized {
         ZStack {
             // 1. Camera preview
             CameraPreviewView(session: cameraManager.session)
@@ -305,6 +310,10 @@ struct RecordingView: View {
                 }
             }
         }
+        } else {
+            permissionEmptyState
+        }
+        }
         .onAppear {
             AppAnalytics.log("recording_view_opened", params: [
                 "display_mode": displayMode,
@@ -314,7 +323,11 @@ struct RecordingView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             player.loadScript(script.content)
             player.sliderValue = speedSlider
-            cameraManager.start(position: .front)
+            cameraAuthStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            micAuthStatus = AVAudioApplication.shared.recordPermission
+            if cameraAuthStatus == .authorized {
+                cameraManager.start(position: .front)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -419,6 +432,85 @@ struct RecordingView: View {
         } message: {
             Text(cameraManager.errorMessage ?? "")
         }
+        .alert(
+            Text("recording.mic_alert.title", comment: "Title of the alert shown when the user taps record but mic permission is denied"),
+            isPresented: $showMicPermissionAlert
+        ) {
+            Button(String(localized: "common.open_settings", defaultValue: "Open Settings")) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
+        } message: {
+            Text("recording.mic_alert.body", comment: "Body of the alert shown when the user taps record but mic permission is denied")
+        }
+    }
+
+    // MARK: - Permission empty state
+
+    private var permissionEmptyState: some View {
+        let bothDenied = cameraAuthStatus != .authorized && micAuthStatus != .granted
+        return ZStack {
+            LinearGradient(
+                colors: [Color(red: 0, green: 0, blue: 0),
+                         Color(red: 0.1, green: 0.04, blue: 0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            VStack(spacing: 16) {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 4)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                Spacer()
+                Image(systemName: "video.slash.fill")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.white.opacity(0.6))
+                Text("recording.permission.title", comment: "Title of the inline empty state shown when camera permission is denied in the recording view")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Text(bothDenied
+                     ? String(localized: "recording.permission.body_both", defaultValue: "SteadyEye needs camera and microphone access to record your videos. Enable both in iOS Settings.")
+                     : String(localized: "recording.permission.body_camera", defaultValue: "SteadyEye needs camera access to record your videos. Enable it in iOS Settings."))
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .padding(.horizontal, 32)
+                Spacer().frame(height: 24)
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Text(String(localized: "common.open_settings", defaultValue: "Open Settings"))
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.orange, in: Capsule())
+                }
+                .padding(.horizontal, 24)
+                Button(String(localized: "recording.permission.go_back", defaultValue: "Go back")) {
+                    dismiss()
+                }
+                .foregroundStyle(.white.opacity(0.7))
+                Spacer()
+            }
+        }
+        .preferredColorScheme(.dark)
+        .statusBarHidden(true)
     }
 
     // MARK: - Word display area
@@ -653,6 +745,10 @@ struct RecordingView: View {
         } else {
             guard SubscriptionManager.shared.canRecord else {
                 showPaywall = true
+                return
+            }
+            if AVAudioApplication.shared.recordPermission != .granted {
+                showMicPermissionAlert = true
                 return
             }
             startCountdown()

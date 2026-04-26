@@ -4,6 +4,7 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("demoScriptCreated") private var demoScriptCreated = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
 
     var body: some View {
         TabView {
@@ -28,6 +29,12 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .tint(.orange)
         .onAppear { createDemoScriptIfNeeded() }
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasSeenOnboarding },
+            set: { _ in /* dismiss handled by hasSeenOnboarding flag inside OnboardingView */ }
+        )) {
+            OnboardingView()
+        }
     }
 
     private func createDemoScriptIfNeeded() {
@@ -36,7 +43,7 @@ struct ContentView: View {
         // existence-check predicate so users who already had the seeded English
         // demo on their device do not get a second copy after upgrading.
         let descriptor = FetchDescriptor<Script>(
-            predicate: #Predicate { $0.title == "Demo Script" }
+            predicate: #Predicate { $0.title == "Demo Script" || $0.title == "Try it now" }
         )
         let existing = (try? modelContext.fetch(descriptor)) ?? []
         guard existing.isEmpty else { demoScriptCreated = true; return }

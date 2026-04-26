@@ -133,19 +133,18 @@ struct ScriptListView: View {
                     ScriptRowView(script: script)
                     Spacer()
                     Button {
-                        scriptToRecord = script
+                        editorMode = .edit(script)
                     } label: {
-                        Image(systemName: "video.fill")
+                        Image(systemName: "pencil")
                             .font(.body)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.secondary)
                             .frame(width: 36, height: 36)
-                            .background(.red, in: Circle())
                     }
                     .buttonStyle(.borderless)
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    editorMode = .edit(script)
+                    scriptToRecord = script
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
