@@ -23,6 +23,8 @@ struct RecordingView: View {
     @State private var showMicPermissionAlert: Bool = false
     @State private var cameraAuthStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
+    @AppStorage("hasSeenDemoRecordingNudge") private var hasSeenDemoRecordingNudge: Bool = false
+    @AppStorage("pendingDemoNudge") private var pendingDemoNudge: Bool = false
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -412,6 +414,9 @@ struct RecordingView: View {
                     previewVideo = nil
                     resetDisplay()
                     showSavedToast = true
+                    if script.isDemo && !SubscriptionManager.shared.isSubscribed && !hasSeenDemoRecordingNudge {
+                        pendingDemoNudge = true
+                    }
                 }
             )
         }
@@ -743,13 +748,20 @@ struct RecordingView: View {
             player.pause()
             // Stay on current chunk — do not reset
         } else {
-            guard SubscriptionManager.shared.canRecord else {
+            let isDemoScript = script.isDemo
+            let canRecord = isDemoScript || SubscriptionManager.shared.canRecord
+            guard canRecord else {
                 showPaywall = true
                 return
             }
             if AVAudioApplication.shared.recordPermission != .granted {
                 showMicPermissionAlert = true
                 return
+            }
+            if isDemoScript && !SubscriptionManager.shared.isSubscribed {
+                AppAnalytics.log("recording_demo_bypass", params: [
+                    "script_length_words": script.content.split(separator: " ").count
+                ])
             }
             startCountdown()
         }

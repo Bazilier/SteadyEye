@@ -32,6 +32,9 @@ struct ScriptListView: View {
     @State private var showBulkImport = false
     @State private var showPaywall = false
     @State private var paywallSource: String = ""
+    @State private var showDemoNudge: Bool = false
+    @AppStorage("hasSeenDemoRecordingNudge") private var hasSeenDemoRecordingNudge: Bool = false
+    @AppStorage("pendingDemoNudge") private var pendingDemoNudge: Bool = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -64,7 +67,13 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .fullScreenCover(item: $scriptToRecord) { script in
+            .fullScreenCover(item: $scriptToRecord, onDismiss: {
+                if pendingDemoNudge {
+                    pendingDemoNudge = false
+                    AppAnalytics.log("demo_nudge_shown")
+                    showDemoNudge = true
+                }
+            }) { script in
                 RecordingView(script: script)
             }
             .sheet(isPresented: $showBulkImport) {
@@ -72,6 +81,23 @@ struct ScriptListView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView(source: paywallSource)
+            }
+            .alert(
+                Text("demo_nudge.title", comment: "Title of the post-demo-recording nudge encouraging trial signup"),
+                isPresented: $showDemoNudge
+            ) {
+                Button(String(localized: "demo_nudge.cta_primary", defaultValue: "Start free trial")) {
+                    AppAnalytics.log("demo_nudge_action", params: ["action": "start_trial"])
+                    hasSeenDemoRecordingNudge = true
+                    paywallSource = "demo_nudge"
+                    showPaywall = true
+                }
+                Button(String(localized: "demo_nudge.cta_secondary", defaultValue: "Maybe later"), role: .cancel) {
+                    AppAnalytics.log("demo_nudge_action", params: ["action": "later"])
+                    hasSeenDemoRecordingNudge = true
+                }
+            } message: {
+                Text("demo_nudge.body", comment: "Body of the post-demo-recording nudge")
             }
         }
         .preferredColorScheme(.dark)
