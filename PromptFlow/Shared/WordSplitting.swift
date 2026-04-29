@@ -4,7 +4,7 @@ import NaturalLanguage
 // Tunable: max characters on the right side of the anchor (including the anchor
 // letter itself and any trailing "-"). Syllables whose right side exceeds this
 // are force-split by `enforceBudget`.
-nonisolated private let rightBudget = 6
+nonisolated private let rightBudget = 8
 
 // Tunable: minimum clean (non-punctuation, non-hyphen) characters per emitted
 // syllable. Splits that would produce shorter fragments are rejected.

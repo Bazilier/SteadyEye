@@ -34,7 +34,7 @@ struct ORPWord: View {
         if word.isEmpty {
             Text("")
                 .font(.system(size: fontSize, weight: .medium, design: .monospaced))
-        } else if word.count > 12 {
+        } else if word.count > 16 {
             // Fallback: render centered without ORP alignment
             Text(word)
                 .font(.system(size: fontSize, weight: .medium, design: .monospaced))

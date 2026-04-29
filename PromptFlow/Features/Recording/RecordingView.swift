@@ -94,7 +94,7 @@ struct RecordingView: View {
                 let classicContentHeight: CGFloat = 28 * 3 + 10
                 let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
                 let expandedContentHeight = collapsedHeight + contentHeight
-                let expandedWidth = geo.size.width * 0.65
+                let expandedWidth = geo.size.width * 0.9
 
                 let minOffset: CGFloat = 0
                 let diCoverLimit = (expandedWidth - cfg.collapsedWidth) / 2 - 16
@@ -170,25 +170,6 @@ struct RecordingView: View {
                             )
                             .strokeBorder(.white.opacity(isTextEditMode ? 0.2 : 0), lineWidth: 1)
                         )
-                        .offset(x: isExpanded ? displayX : 0)
-                        .gesture(
-                            isExpanded && cfg.dragEnabled ?
-                            DragGesture(minimumDistance: 5)
-                                .onChanged { value in
-                                    isDragging = true
-                                    dragOffsetX = value.translation.width
-                                }
-                                .onEnded { value in
-                                    let raw = CGFloat(savedOffsetX) + value.translation.width
-                                    let clamped = min(max(raw, minOffset), maxOffset)
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        savedOffsetX = Double(clamped)
-                                        dragOffsetX = 0
-                                        isDragging = false
-                                    }
-                                }
-                            : nil
-                        )
                         // Long press + vertical drag = text offset inside container
                         .simultaneousGesture(
                             isExpanded ?
@@ -226,10 +207,8 @@ struct RecordingView: View {
                                 .onEnded {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        savedOffsetX = cfg.defaultOffset
                                         textVerticalOffset = 0
                                         textDragY = 0
-                                        dragOffsetX = 0
                                     }
                                 }
                             : nil
@@ -248,7 +227,6 @@ struct RecordingView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.black.opacity(0.5), in: Capsule())
-                        .offset(x: isExpanded ? displayX : 0)
                     }
 
                 }
@@ -354,7 +332,7 @@ struct RecordingView: View {
                 Text("common.tip.gotIt", comment: "Got it button dismissing the recording tip")
             }
         } message: {
-            Text("recording.tip.body", comment: "First-run tip body explaining how to position the teleprompter text bar")
+            Text("recording.tip.body", comment: "First-run tip body explaining the long-press gesture for vertical text-bar adjustment")
         }
         .onChange(of: player.currentChunkIndex) { _, newIndex in
             guard newIndex < player.chunks.count, player.isPlaying else { return }
