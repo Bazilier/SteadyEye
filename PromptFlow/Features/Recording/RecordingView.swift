@@ -1,30 +1,26 @@
 import SwiftUI
 import AVFoundation
-
-// MARK: - Identifiable URL wrapper for fullScreenCover
-
-struct IdentifiableURL: Identifiable {
-    let id = UUID()
-    let url: URL
-}
+import FirebaseAnalytics
 
 struct RecordingView: View {
     let script: Script
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showRecordingTip = false
-    @AppStorage("hasSeenRecordingTip") private var hasSeenRecordingTip = false
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject private var cameraManager = CameraManager.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
-    @State private var previewVideo: IdentifiableURL?
+    @State private var previewRecording: Recording?
+    @State private var isProcessingRecording: Bool = false
+    @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
     @State private var showPaywall: Bool = false
     @State private var showMicPermissionAlert: Bool = false
     @State private var cameraAuthStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
-    @AppStorage("hasSeenDemoRecordingNudge") private var hasSeenDemoRecordingNudge: Bool = false
-    @AppStorage("pendingDemoNudge") private var pendingDemoNudge: Bool = false
+    @State private var showFirstRecordingPaywall: Bool = false
+    @AppStorage("postFirstRecordingPaywallShown") private var postFirstRecordingPaywallShown: Bool = false
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -94,23 +90,7 @@ struct RecordingView: View {
                 let classicContentHeight: CGFloat = 28 * 3 + 10
                 let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
                 let expandedContentHeight = collapsedHeight + contentHeight
-                let expandedWidth = geo.size.width * 0.9
-
-                let minOffset: CGFloat = 0
-                let diCoverLimit = (expandedWidth - cfg.collapsedWidth) / 2 - 16
-                let edgeLimit = (geo.size.width - expandedWidth) / 2 - 16
-                let maxOffset = max(0, min(diCoverLimit, edgeLimit))
-
-                let displayX: CGFloat = {
-                    guard cfg.dragEnabled else { return 0 }
-                    let rawX = CGFloat(savedOffsetX) + dragOffsetX
-                    if rawX < minOffset {
-                        return minOffset + (rawX - minOffset) * 0.05
-                    } else if rawX > maxOffset {
-                        return maxOffset + (rawX - maxOffset) * 0.05
-                    }
-                    return rawX
-                }()
+                let expandedWidth = geo.size.width * 0.75
 
                 let textDisplayY: CGFloat = {
                     let rawY = CGFloat(textVerticalOffset) + textDragY
@@ -230,7 +210,12 @@ struct RecordingView: View {
                     }
 
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: cfg.isCameraOffset ? .topTrailing : .top
+                )
+                .padding(.trailing, cfg.isCameraOffset ? 8 : 0)
                 .padding(.top, cfg.topPadding)
                 .ignoresSafeArea(edges: .top)
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
@@ -294,6 +279,27 @@ struct RecordingView: View {
             permissionEmptyState
         }
         }
+        .overlay {
+            if isProcessingRecording {
+                ZStack {
+                    Color.black.opacity(0.85).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.5)
+                        Text(String(
+                            localized: "recording.processing",
+                            defaultValue: "Saving recording…",
+                            comment: "Overlay message shown while a just-finished recording is being watermarked, persisted, and indexed."
+                        ))
+                            .font(.body)
+                            .foregroundStyle(.white)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isProcessingRecording)
         .onAppear {
             AppAnalytics.log("recording_view_opened", params: [
                 "display_mode": displayMode,
@@ -316,23 +322,6 @@ struct RecordingView: View {
                     }
                 }
             }
-            if !hasSeenRecordingTip {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    showRecordingTip = true
-                }
-            }
-        }
-        .alert(
-            Text("common.tip.title", comment: "First-run tip alert title on the recording screen"),
-            isPresented: $showRecordingTip
-        ) {
-            Button {
-                hasSeenRecordingTip = true
-            } label: {
-                Text("common.tip.gotIt", comment: "Got it button dismissing the recording tip")
-            }
-        } message: {
-            Text("recording.tip.body", comment: "First-run tip body explaining the long-press gesture for vertical text-bar adjustment")
         }
         .onChange(of: player.currentChunkIndex) { _, newIndex in
             guard newIndex < player.chunks.count, player.isPlaying else { return }
@@ -379,29 +368,41 @@ struct RecordingView: View {
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
-            previewVideo = IdentifiableURL(url: url)
+            handleRecordingFinished(sourceURL: url)
         }
-        .fullScreenCover(item: $previewVideo) { item in
-            VideoPreviewView(
-                videoURL: item.url,
-                onRetake: {
-                    previewVideo = nil
-                    resetDisplay()
-                },
-                onSaved: {
-                    previewVideo = nil
-                    resetDisplay()
-                    showSavedToast = true
-                    if script.isDemo && !SubscriptionManager.shared.isSubscribed && !hasSeenDemoRecordingNudge {
-                        pendingDemoNudge = true
-                    }
+        .fullScreenCover(item: $previewRecording) { recording in
+            VideoPreviewView(recording: recording, onDismiss: {
+                previewRecording = nil
+                resetDisplay()
+                // First-recording paywall: fires once per install for free
+                // users on any preview dismissal (back / save complete /
+                // delete confirm — all routes through this onDismiss).
+                // Pro users skip without consuming the one-shot, so a later
+                // Pro→Free downgrade still gets to trigger.
+                //
+                // Read UserDefaults directly here rather than the @AppStorage
+                // wrapper. This closure is captured by VideoPreviewView and
+                // executed after the parent RecordingView struct may have
+                // been recreated by SwiftUI; the captured @AppStorage can
+                // observe a stale snapshot of the wrapped value while the
+                // underlying UserDefaults key is already true. UserDefaults
+                // reads are always live, so this avoids the stale-capture
+                // bug that caused the paywall to fire twice in testing.
+                let alreadyShown = UserDefaults.standard.bool(forKey: "postFirstRecordingPaywallShown")
+                if !alreadyShown && !subscriptionManager.isSubscribed {
+                    UserDefaults.standard.set(true, forKey: "postFirstRecordingPaywallShown")
+                    postFirstRecordingPaywallShown = true   // keep @AppStorage observers in sync
+                    showFirstRecordingPaywall = true
                 }
-            )
+            })
         }
-        .sheet(isPresented: $showPaywall) {
+        .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "record_button", onPurchaseSuccess: {
                 startCountdown()
             })
+        }
+        .fullScreenCover(isPresented: $showFirstRecordingPaywall) {
+            PaywallView(source: "firstRecording")
         }
         .alert(
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
@@ -600,14 +601,12 @@ struct RecordingView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 10))
-                    Text(cameraManager.isAudioReady
-                        ? cameraManager.audioSourceName
-                        : String(localized: "recording.audio.connecting", defaultValue: "Connecting audio...", comment: "Status until the audio session has fully connected"))
+                    Text(cameraManager.audioSourceName)
                         .font(.caption2)
                 }
                 Text("·")
                     .font(.caption2)
-                Text("\(videoResolution == "4k" ? "4K" : "1080p") · \(videoFPS)fps")
+                Text("\(videoResolution == "4k" && subscriptionManager.canRecord4K ? "4K" : "1080p") · \(videoFPS)fps")
                     .font(.caption2)
             }
             .foregroundStyle(.white.opacity(0.5))
@@ -772,6 +771,53 @@ struct RecordingView: View {
                         player.play()
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Auto-save flow
+
+    /// Persist the just-finished recording (watermark + move + thumbnail +
+    /// SwiftData entity) before presenting the preview view. Fires the
+    /// `recording_saved` analytics event with `via: "auto_persist"` and the
+    /// existing `first_recording_completed` Firebase + Meta events on the
+    /// first-ever save.
+    private func handleRecordingFinished(sourceURL: URL) {
+        let duration = cameraManager.lastRecordingDuration
+        let scriptTitle = script.title
+        isProcessingRecording = true
+
+        RecordingPersistence.persist(
+            sourceURL: sourceURL,
+            scriptTitle: scriptTitle,
+            duration: duration,
+            modelContext: modelContext
+        ) { result in
+            isProcessingRecording = false
+            switch result {
+            case .success(let recording):
+                let wasFirst = !hasCompletedFirstRecording
+                AppAnalytics.log("recording_saved", params: [
+                    "duration_sec": Int(duration.rounded()),
+                    "was_first": wasFirst,
+                    "via": "auto_persist"
+                ])
+                if wasFirst {
+                    hasCompletedFirstRecording = true
+                    #if !DEV
+                    MetaAnalytics.logFirstRecordingCompleted()
+                    Analytics.logEvent("first_recording_completed", parameters: [
+                        "duration_sec": Int(duration.rounded())
+                    ])
+                    #endif
+                }
+                previewRecording = recording
+            case .failure:
+                // Auto-save failed entirely (file move error, generator error,
+                // etc.). Don't present the preview — clean up the temp source
+                // file so it doesn't leak. The user can retake the clip.
+                try? FileManager.default.removeItem(at: sourceURL)
+                resetDisplay()
             }
         }
     }

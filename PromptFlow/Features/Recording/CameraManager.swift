@@ -24,11 +24,18 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: - Private
     private static let cameraQueue = DispatchQueue(label: "com.steadyeye.camera", qos: .userInitiated)
+    /// Single serial queue for both video and audio data outputs. Apple
+    /// requires AVAssetWriter appends to be serialized; sharing the queue
+    /// across both outputs guarantees that without explicit locking.
+    private static let sampleBufferQueue = DispatchQueue(label: "com.steadyeye.samplebuffers", qos: .userInitiated)
     let session = AVCaptureSession()
-    private var movieOutput = AVCaptureMovieFileOutput()
+    private var videoDataOutput: AVCaptureVideoDataOutput?
+    private var audioDataOutput: AVCaptureAudioDataOutput?
+    private var assetWriterRecorder: AssetWriterRecorder?
+    private var watermarkComposer: RealtimeWatermarkComposer?
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
-    private var lastRecordingDuration: TimeInterval = 0
+    private(set) var lastRecordingDuration: TimeInterval = 0
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var routeChangeObserver: NSObjectProtocol?
 
@@ -97,7 +104,8 @@ final class CameraManager: NSObject, ObservableObject {
         session.beginConfiguration()
 
         let want4K = resolution == "4k"
-        if want4K && session.canSetSessionPreset(.hd4K3840x2160) {
+        let allow4K = SubscriptionManager.shared.canRecord4K
+        if want4K && allow4K && session.canSetSessionPreset(.hd4K3840x2160) {
             session.sessionPreset = .hd4K3840x2160
         } else {
             session.sessionPreset = .hd1920x1080
@@ -161,18 +169,44 @@ final class CameraManager: NSObject, ObservableObject {
             session.addInput(aInput)
         }
 
-        // Movie output
-        if session.canAddOutput(movieOutput) {
-            session.addOutput(movieOutput)
+        // Outputs: video data + audio data. Sample buffers go through the
+        // realtime watermark composer and into AVAssetWriter via
+        // AssetWriterRecorder. Both delegates fire on `sampleBufferQueue`
+        // so writer appends are naturally serialized.
+        videoDataOutput = nil
+        audioDataOutput = nil
+
+        let videoData = AVCaptureVideoDataOutput()
+        videoData.alwaysDiscardsLateVideoFrames = true
+        videoData.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        ]
+        videoData.setSampleBufferDelegate(self, queue: Self.sampleBufferQueue)
+        if session.canAddOutput(videoData) {
+            session.addOutput(videoData)
+            videoDataOutput = videoData
+        }
+
+        let audioData = AVCaptureAudioDataOutput()
+        audioData.setSampleBufferDelegate(self, queue: Self.sampleBufferQueue)
+        if session.canAddOutput(audioData) {
+            session.addOutput(audioData)
+            audioDataOutput = audioData
         }
 
         session.commitConfiguration()
 
-        // Stabilization BEFORE startRunning — avoids crop jump
-        if let connection = movieOutput.connection(with: .video),
-           connection.isVideoStabilizationSupported {
-            let stabilize = UserDefaults.standard.object(forKey: "stabilizationEnabled") as? Bool ?? true
-            connection.preferredVideoStabilizationMode = stabilize ? .cinematic : .off
+        // Stabilization + portrait orientation on the video data output's
+        // connection. Set BEFORE startRunning to avoid a crop jump.
+        let stabilizePref = UserDefaults.standard.object(forKey: "stabilizationEnabled") as? Bool ?? true
+        let stabilize = stabilizePref && canUseStabilization
+        if let connection = videoDataOutput?.connection(with: .video) {
+            if connection.isVideoStabilizationSupported {
+                connection.preferredVideoStabilizationMode = stabilize ? .cinematic : .off
+            }
+            if connection.isVideoRotationAngleSupported(90) {
+                connection.videoRotationAngle = 90
+            }
         }
 
         session.startRunning()
@@ -185,7 +219,7 @@ final class CameraManager: NSObject, ObservableObject {
             self?.isSessionReady = true
         }
         // Phase 2: enable Bluetooth audio routing (non-blocking, no session reconfig)
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.enableBluetoothAudio()
         }
     }
@@ -266,12 +300,19 @@ final class CameraManager: NSObject, ObservableObject {
         #endif
     }
 
+    /// Mirrors `SubscriptionManager.canUseStabilization` so the camera setup
+    /// sites have a local short-name. Stabilization is paid-only.
+    private var canUseStabilization: Bool {
+        SubscriptionManager.shared.isSubscribed
+    }
+
     func setStabilization(_ enabled: Bool) {
         #if !targetEnvironment(simulator)
         guard currentCamera != nil else { return }
-        let connection = session.connections.first(where: { $0.output is AVCaptureMovieFileOutput })
-        if let connection, connection.isVideoStabilizationSupported {
-            connection.preferredVideoStabilizationMode = enabled ? .auto : .off
+        let allowed = enabled && canUseStabilization
+        if let connection = videoDataOutput?.connection(with: .video),
+           connection.isVideoStabilizationSupported {
+            connection.preferredVideoStabilizationMode = allowed ? .auto : .off
         }
         #endif
     }
@@ -315,7 +356,7 @@ final class CameraManager: NSObject, ObservableObject {
             .appendingPathExtension("mov")
 
         Self.cameraQueue.async { [weak self] in
-            self?.movieOutput.startRecording(to: outputURL, recordingDelegate: self!)
+            self?.startWriterPipeline(outputURL: outputURL)
         }
 
         recordingStartTime = Date()
@@ -326,6 +367,51 @@ final class CameraManager: NSObject, ObservableObject {
         isRecording = true
         #endif
     }
+
+    #if !targetEnvironment(simulator)
+    /// Allocates the writer and composer, hooks the writer's pixel buffer
+    /// pool into the composer, and starts the writer (encoder allocation).
+    /// After this returns, the AVCaptureVideoDataOutput /
+    /// AVCaptureAudioDataOutput delegate methods can deliver sample
+    /// buffers to the recorder via the composer.
+    private func startWriterPipeline(outputURL: URL) {
+        // Output frame size matches the configured session preset, in
+        // portrait orientation (the connection rotates to 90°).
+        let videoSize: CGSize
+        switch session.sessionPreset {
+        case .hd4K3840x2160:
+            videoSize = CGSize(width: 2160, height: 3840)
+        default:
+            videoSize = CGSize(width: 1080, height: 1920)
+        }
+        let fps = UserDefaults.standard.integer(forKey: "videoFPS")
+        let targetFPS = fps > 0 ? fps : 30
+
+        let isPro = !SubscriptionManager.shared.showWatermark
+        let composer = RealtimeWatermarkComposer(renderSize: videoSize, isPro: isPro)
+        let recorder = AssetWriterRecorder()
+
+        do {
+            try recorder.startRecording(to: outputURL, videoSize: videoSize, fps: targetFPS)
+        } catch {
+            DispatchQueue.main.async { [weak self] in
+                self?.errorMessage = String(
+                    localized: "camera.error.recordingError",
+                    defaultValue: "Recording error: \(error.localizedDescription)",
+                    comment: "Recording session error with system-localized error description."
+                )
+            }
+            return
+        }
+
+        if let pool = recorder.pixelBufferPool {
+            composer.setPixelBufferPool(pool)
+        }
+
+        self.watermarkComposer = composer
+        self.assetWriterRecorder = recorder
+    }
+    #endif
 
     func stopRecording() {
         guard isRecording else { return }
@@ -351,10 +437,66 @@ final class CameraManager: NSObject, ObservableObject {
             self?.endBackgroundTask()
         }
         Self.cameraQueue.async { [weak self] in
-            self?.movieOutput.stopRecording()
+            self?.stopWriterPipeline()
         }
         #endif
     }
+
+    #if !targetEnvironment(simulator)
+    /// Marks the writer's inputs as finished, finalizes the file, and hops
+    /// to main with the resulting URL. Honors the
+    /// `lastRecordedURL` / `saveDirectlyOnStop` contract that downstream
+    /// consumers (RecordingView, scenePhase autosave) rely on.
+    private func stopWriterPipeline() {
+        guard let recorder = assetWriterRecorder else {
+            DispatchQueue.main.async { [weak self] in self?.endBackgroundTask() }
+            return
+        }
+        recorder.stopRecording { [weak self] result in
+            // Don't nil out assetWriterRecorder / watermarkComposer here —
+            // sampleBufferQueue may still hold a reference and clearing it
+            // mid-flight can race with concurrent reads. The recorder's
+            // internal state machine (`.finishing` / `.finished`) silently
+            // drops late appends, and the next startWriterPipeline
+            // replaces both properties wholesale.
+            DispatchQueue.main.async {
+                guard let self else { return }
+                defer { self.endBackgroundTask() }
+                switch result {
+                case .success(let url):
+                    if self.saveDirectlyOnStop {
+                        self.handleSaveDirectlyOnStop(url: url)
+                    } else {
+                        self.lastRecordedURL = url
+                    }
+                case .failure(let error):
+                    self.errorMessage = String(
+                        localized: "camera.error.recordingError",
+                        defaultValue: "Recording error: \(error.localizedDescription)",
+                        comment: "Recording session error with system-localized error description."
+                    )
+                }
+            }
+        }
+    }
+
+    /// Autosave path for scenePhase-while-recording. The file already has
+    /// the watermark burned in (or doesn't, for Pro users) by the realtime
+    /// pipeline, so no post-process step is needed — direct hand-off to
+    /// PhotoKit.
+    @MainActor
+    private func handleSaveDirectlyOnStop(url: URL) {
+        saveDirectlyOnStop = false
+        let durationSec = Int(lastRecordingDuration.rounded())
+        let wasFirst = UserDefaults.standard.bool(forKey: "hasCompletedFirstRecording")
+        UISaveVideoAtPathToSavedPhotosAlbum(url.path, nil, nil, nil)
+        AppAnalytics.log("recording_saved", params: [
+            "duration_sec": durationSec,
+            "was_first": wasFirst,
+            "via": "background_autosave"
+        ])
+    }
+    #endif
 
     private func endBackgroundTask() {
         guard backgroundTaskID != .invalid else { return }
@@ -374,39 +516,26 @@ final class CameraManager: NSObject, ObservableObject {
     }
 }
 
-// MARK: - AVCaptureFileOutputRecordingDelegate
+// MARK: - Video + audio data output delegates
 
-extension CameraManager: AVCaptureFileOutputRecordingDelegate {
-    nonisolated func fileOutput(
-        _ output: AVCaptureFileOutput,
-        didFinishRecordingTo outputFileURL: URL,
-        from connections: [AVCaptureConnection],
-        error: Error?
+#if !targetEnvironment(simulator)
+extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+    nonisolated func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
     ) {
-        #if !targetEnvironment(simulator)
-        Task { @MainActor [weak self] in
-            defer { self?.endBackgroundTask() }
-
-            if let error {
-                self?.errorMessage = String(
-                    localized: "camera.error.recordingError",
-                    defaultValue: "Recording error: \(error.localizedDescription)",
-                    comment: "Recording session error with system-localized error description."
-                )
-                return
-            }
-            if self?.saveDirectlyOnStop == true {
-                self?.saveDirectlyOnStop = false
-                UISaveVideoAtPathToSavedPhotosAlbum(outputFileURL.path, nil, nil, nil)
-                AppAnalytics.log("recording_saved", params: [
-                    "duration_sec": Int((self?.lastRecordingDuration ?? 0).rounded()),
-                    "was_first": UserDefaults.standard.bool(forKey: "hasCompletedFirstRecording"),
-                    "via": "background_autosave"
-                ])
-            } else {
-                self?.lastRecordedURL = outputFileURL
-            }
+        // Delivered on `sampleBufferQueue` (set in setupSession). Both
+        // outputs share this queue so AVAssetWriter's serialization
+        // contract is satisfied without explicit locking.
+        if output is AVCaptureAudioDataOutput {
+            assetWriterRecorder?.appendAudio(sampleBuffer)
+            return
         }
-        #endif
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let processed = watermarkComposer?.process(pixelBuffer) ?? pixelBuffer
+        assetWriterRecorder?.appendVideo(processed, pts: pts)
     }
 }
+#endif

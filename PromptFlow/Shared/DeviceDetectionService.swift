@@ -31,6 +31,14 @@ final class DeviceDetectionService {
         #else
         let model = getModelIdentifier()
 
+        // Centered front camera (no display cutout): SE 2nd / 3rd gen iPhone-8
+        // form factor — Touch ID home button, bezels, camera dead-center above
+        // the screen.
+        let centeredModels: Set<String> = [
+            "iPhone12,8",                       // SE 2nd gen
+            "iPhone14,6",                       // SE 3rd gen
+        ]
+
         // Dynamic Island: iPhone 14 Pro+, 15 series, 16 series, 17 series
         let dynamicIslandModels: Set<String> = [
             "iPhone15,2", "iPhone15,3",         // 14 Pro, 14 Pro Max
@@ -49,11 +57,12 @@ final class DeviceDetectionService {
             "iPhone13,1", "iPhone13,2", "iPhone13,3", "iPhone13,4", // 12 mini/12/Pro/Pro Max
             "iPhone14,4", "iPhone14,5", "iPhone14,2", "iPhone14,3", // 13 mini/13/Pro/Pro Max
             "iPhone14,7", "iPhone14,8",         // 14, 14 Plus
-            "iPhone14,6",                       // SE 3rd gen
             "iPhone17,5",                       // SE 4th gen
         ]
 
-        if dynamicIslandModels.contains(model) {
+        if centeredModels.contains(model) {
+            return .none
+        } else if dynamicIslandModels.contains(model) {
             return .dynamicIsland
         } else if notchModels.contains(model) {
             return .notch
@@ -87,6 +96,8 @@ struct CutoutLayoutConfig {
     let collapsedWidth: CGFloat     // container width when collapsed
     let dragEnabled: Bool           // whether horizontal drag works
     let defaultOffset: CGFloat      // default horizontal position
+    let isCameraOffset: Bool        // front camera offset right of screen center
+                                    // (true for notch / Dynamic Island, false for SE-class)
 
     static func current(for cutout: CutoutType, screenWidth: CGFloat, safeAreaTop: CGFloat) -> CutoutLayoutConfig {
         switch cutout {
@@ -99,7 +110,8 @@ struct CutoutLayoutConfig {
                 topCornerRadius: 28,
                 collapsedWidth: 126,
                 dragEnabled: true,
-                defaultOffset: 20
+                defaultOffset: 20,
+                isCameraOffset: true
             )
         case .notch:
             return CutoutLayoutConfig(
@@ -109,7 +121,8 @@ struct CutoutLayoutConfig {
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: true,
-                defaultOffset: 20
+                defaultOffset: 20,
+                isCameraOffset: true
             )
         case .none:
             return CutoutLayoutConfig(
@@ -119,7 +132,8 @@ struct CutoutLayoutConfig {
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: false,
-                defaultOffset: 0
+                defaultOffset: 0,
+                isCameraOffset: false
             )
         }
     }

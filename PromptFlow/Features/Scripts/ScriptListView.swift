@@ -24,6 +24,7 @@ enum EditorMode: Identifiable {
 
 struct ScriptListView: View {
     @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
@@ -32,9 +33,6 @@ struct ScriptListView: View {
     @State private var showBulkImport = false
     @State private var showPaywall = false
     @State private var paywallSource: String = ""
-    @State private var showDemoNudge: Bool = false
-    @AppStorage("hasSeenDemoRecordingNudge") private var hasSeenDemoRecordingNudge: Bool = false
-    @AppStorage("pendingDemoNudge") private var pendingDemoNudge: Bool = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -56,6 +54,19 @@ struct ScriptListView: View {
             .navigationTitle(Text("scripts.title", comment: "Scripts list nav title"))
             .searchable(text: $searchText, prompt: Text("scripts.search.prompt", comment: "Search bar placeholder above the script list"))
             .toolbar {
+                // Free-tier upgrade entry point — hidden for Pro users.
+                ToolbarItem(placement: .topBarLeading) {
+                    if !subscriptionManager.isSubscribed {
+                        Button(action: {
+                            paywallSource = "scripts_crown"
+                            showPaywall = true
+                        }) {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.orange)
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         editorMode = .new
@@ -67,37 +78,14 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .fullScreenCover(item: $scriptToRecord, onDismiss: {
-                if pendingDemoNudge {
-                    pendingDemoNudge = false
-                    AppAnalytics.log("demo_nudge_shown")
-                    showDemoNudge = true
-                }
-            }) { script in
+            .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script)
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView()
             }
-            .sheet(isPresented: $showPaywall) {
+            .fullScreenCover(isPresented: $showPaywall) {
                 PaywallView(source: paywallSource)
-            }
-            .alert(
-                Text("demo_nudge.title", comment: "Title of the post-demo-recording nudge encouraging trial signup"),
-                isPresented: $showDemoNudge
-            ) {
-                Button(String(localized: "demo_nudge.cta_primary", defaultValue: "Start free trial")) {
-                    AppAnalytics.log("demo_nudge_action", params: ["action": "start_trial"])
-                    hasSeenDemoRecordingNudge = true
-                    paywallSource = "demo_nudge"
-                    showPaywall = true
-                }
-                Button(String(localized: "demo_nudge.cta_secondary", defaultValue: "Maybe later"), role: .cancel) {
-                    AppAnalytics.log("demo_nudge_action", params: ["action": "later"])
-                    hasSeenDemoRecordingNudge = true
-                }
-            } message: {
-                Text("demo_nudge.body", comment: "Body of the post-demo-recording nudge")
             }
         }
         .preferredColorScheme(.dark)

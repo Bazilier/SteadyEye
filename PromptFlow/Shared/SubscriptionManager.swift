@@ -21,37 +21,113 @@ final class SubscriptionManager: ObservableObject {
         #endif
     }
 
-    @Published var isSubscribed: Bool = false
+    /// The actual RevenueCat-derived subscription state. In DEV builds this is
+    /// forced to `true` by `configure()`. Use the computed `isSubscribed` for
+    /// gating decisions — it consults `devSubscriptionOverride` first.
+    @Published private(set) var isSubscribedReal: Bool = false
     @Published var isTrialActive: Bool = false
     @Published var offerings: Offerings?
     @Published var isLoading: Bool = false
 
-    // MARK: - Free optimization tracking
+    /// DEV-only escape hatch for testing freemium gating without buying or
+    /// cancelling a sandbox subscription. Values: "off", "free", "subscribed".
+    /// Ignored entirely in Release builds. Persisted in UserDefaults so the
+    /// override survives app restarts during a test session.
+    @Published var devSubscriptionOverride: String =
+        UserDefaults.standard.string(forKey: "devSubscriptionOverride") ?? "free"
+    {
+        didSet {
+            UserDefaults.standard.set(devSubscriptionOverride, forKey: "devSubscriptionOverride")
+        }
+    }
 
-    @Published var freeOptimizationsUsed: Int = UserDefaults.standard.integer(forKey: "freeOptimizationsUsed")
+    /// Effective subscription state, consulted by every gate. In DEV: respects
+    /// the override; "off" falls through to `Self.devMode || isSubscribedReal`
+    /// so DEV builds without the override remain fully unlocked. In Release:
+    /// always the real RC value.
+    var isSubscribed: Bool {
+        #if DEV
+        switch devSubscriptionOverride {
+        case "subscribed": return true
+        case "free": return false
+        default: return Self.devMode || isSubscribedReal
+        }
+        #else
+        return isSubscribedReal
+        #endif
+    }
 
-    static let freeOptimizationLimit = 3
+    // MARK: - AI optimization daily limits
 
-    var freeOptimizationsRemaining: Int {
-        max(0, Self.freeOptimizationLimit - freeOptimizationsUsed)
+    /// Free tier: 1 optimize per calendar day. timeIntervalSince1970 of last use; 0 = never used.
+    @Published var lastAIOptimizeDateInterval: Double = UserDefaults.standard.double(forKey: "lastAIOptimizeDate")
+
+    /// Pro tier: 30 optimizes per calendar day.
+    static let proOptimizationsPerDay = 30
+
+    /// Pro counter — raw stored count. Reads zero on a new day even before
+    /// `recordOptimizationUse()` runs (see `proOptimizationsToday`).
+    @Published var proOptimizationsCount: Int = UserDefaults.standard.integer(forKey: "proOptimizationsCount")
+
+    /// Effective Pro count for today. Returns 0 if the stored reset date is
+    /// not today, so the view layer always shows the correct remaining quota
+    /// even if no use has happened yet on the new day.
+    var proOptimizationsToday: Int {
+        let storedReset = UserDefaults.standard.double(forKey: "proOptimizationsResetDate")
+        let resetDate = Date(timeIntervalSince1970: storedReset)
+        if !Calendar.current.isDateInToday(resetDate) {
+            return 0
+        }
+        return proOptimizationsCount
+    }
+
+    var canOptimizeAsPro: Bool {
+        proOptimizationsToday < Self.proOptimizationsPerDay
     }
 
     func recordOptimizationUse() {
-        guard !isSubscribed else { return }
-        freeOptimizationsUsed += 1
-        UserDefaults.standard.set(freeOptimizationsUsed, forKey: "freeOptimizationsUsed")
+        if isSubscribed {
+            // Pro path: increment the daily counter, resetting if we crossed midnight.
+            let today = Calendar.current.startOfDay(for: Date())
+            let storedReset = UserDefaults.standard.double(forKey: "proOptimizationsResetDate")
+            let resetDate = Date(timeIntervalSince1970: storedReset)
+            let newCount: Int
+            if !Calendar.current.isDate(resetDate, inSameDayAs: today) {
+                UserDefaults.standard.set(today.timeIntervalSince1970, forKey: "proOptimizationsResetDate")
+                newCount = 1
+            } else {
+                newCount = proOptimizationsCount + 1
+            }
+            proOptimizationsCount = newCount
+            UserDefaults.standard.set(newCount, forKey: "proOptimizationsCount")
+        } else {
+            // Free path: stamp today's date.
+            let now = Date().timeIntervalSince1970
+            lastAIOptimizeDateInterval = now
+            UserDefaults.standard.set(now, forKey: "lastAIOptimizeDate")
+        }
     }
 
     // MARK: - Feature access
+    //
+    // All gates flow through the computed `isSubscribed` (above), which already
+    // folds in `Self.devMode` and `devSubscriptionOverride`. Don't add another
+    // `Self.devMode ||` short-circuit here — it would defeat the DEV override.
 
-    var canRecord: Bool { Self.devMode || isSubscribed }
-    var canOptimize: Bool {
-        if Self.devMode || isSubscribed { return true }
-        return freeOptimizationsUsed < Self.freeOptimizationLimit
+    var canRecord: Bool { isSubscribed }
+    var canOptimizeToday: Bool {
+        if isSubscribed {
+            return canOptimizeAsPro
+        }
+        if lastAIOptimizeDateInterval == 0 { return true }
+        let lastDate = Date(timeIntervalSince1970: lastAIOptimizeDateInterval)
+        return !Calendar.current.isDateInToday(lastDate)
     }
-    var canBulkImport: Bool { Self.devMode || isSubscribed }
-    var canRecord4K: Bool { Self.devMode || isSubscribed }
-    var showWatermark: Bool { !Self.devMode && !isSubscribed }
+    var canBulkImport: Bool { isSubscribed }
+    var canRecord4K: Bool { isSubscribed }
+    var canUseStabilization: Bool { isSubscribed }
+    var maxScriptWords: Int { isSubscribed ? .max : 50 }
+    var showWatermark: Bool { !isSubscribed }
 
     private init() {}
 
@@ -59,12 +135,33 @@ final class SubscriptionManager: ObservableObject {
 
     func configure() {
         #if DEV
-        isSubscribed = true
+        isSubscribedReal = true
         return
         #else
         Task {
             await checkAccess()
             await loadOfferings()
+        }
+        // Long-running listener on RC's customerInfoStream. Fires whenever
+        // RevenueCat detects an entitlement change — renewal, expiration,
+        // refund, family-sharing change, restore from another device.
+        // Loop never exits naturally; the singleton lives for the app's
+        // lifetime, so the implicit "leak" is intentional. `@MainActor` keeps
+        // the @Published writes on main.
+        //
+        // Skip spawning the listener if Purchases wasn't configured upstream
+        // (e.g. missing apiKey in a CI build) — touching customerInfoStream
+        // would fatal-error.
+        guard Purchases.isConfigured else {
+            print("⚠️ customerInfoStream listener skipped — Purchases not configured")
+            return
+        }
+        Task { @MainActor in
+            for await customerInfo in Purchases.shared.customerInfoStream {
+                let entitlement = customerInfo.entitlements[Self.entitlementID]
+                self.isSubscribedReal = entitlement?.isActive == true
+                self.isTrialActive = entitlement?.periodType == .trial
+            }
         }
         #endif
     }
@@ -74,12 +171,16 @@ final class SubscriptionManager: ObservableObject {
     @MainActor
     func checkAccess() async {
         #if DEV
-        isSubscribed = true
+        isSubscribedReal = true
         #else
+        guard Purchases.isConfigured else {
+            print("⚠️ checkAccess called before Purchases.configure (missing apiKey?)")
+            return
+        }
         do {
             let info = try await Purchases.shared.customerInfo()
             let entitlement = info.entitlements[Self.entitlementID]
-            isSubscribed = entitlement?.isActive == true
+            isSubscribedReal = entitlement?.isActive == true
             isTrialActive = entitlement?.periodType == .trial
         } catch {
             // Keep current state on error
@@ -92,6 +193,10 @@ final class SubscriptionManager: ObservableObject {
         #if DEV
         return
         #else
+        guard Purchases.isConfigured else {
+            print("⚠️ loadOfferings called before Purchases.configure (missing apiKey?)")
+            return
+        }
         do {
             offerings = try await Purchases.shared.offerings()
         } catch {
@@ -102,6 +207,16 @@ final class SubscriptionManager: ObservableObject {
 
     @MainActor
     func purchase(_ package: Package) async -> PurchaseOutcome {
+        #if DEV
+        // DEV builds don't talk to the live store. Today's paywall short-
+        // circuits before reaching here (package(for:) returns nil because
+        // offerings aren't loaded in DEV), so this is defense-in-depth.
+        return .failed(reason: "not_configured")
+        #else
+        guard Purchases.isConfigured else {
+            print("⚠️ purchase called before Purchases.configure")
+            return .failed(reason: "not_configured")
+        }
         isLoading = true
         defer { isLoading = false }
         do {
@@ -114,7 +229,7 @@ final class SubscriptionManager: ObservableObject {
                 return .failed(reason: "entitlement_inactive")
             }
             let isTrial = entitlement?.periodType == .trial
-            isSubscribed = true
+            isSubscribedReal = true
             isTrialActive = isTrial
             return .succeeded(isTrial: isTrial)
         } catch {
@@ -136,20 +251,30 @@ final class SubscriptionManager: ObservableObject {
                 return .failed(reason: "unknown")
             }
         }
+        #endif
     }
 
     @MainActor
     func restorePurchases() async -> Bool {
+        #if DEV
+        // DEV builds never call Purchases.configure(); nothing to restore.
+        return false
+        #else
+        guard Purchases.isConfigured else {
+            print("⚠️ restorePurchases called before Purchases.configure")
+            return false
+        }
         isLoading = true
         defer { isLoading = false }
         do {
             let info = try await Purchases.shared.restorePurchases()
             let entitlement = info.entitlements[Self.entitlementID]
-            isSubscribed = entitlement?.isActive == true
-            return isSubscribed
+            isSubscribedReal = entitlement?.isActive == true
+            return isSubscribedReal
         } catch {
             return false
         }
+        #endif
     }
 
     // MARK: - API Key

@@ -156,18 +156,35 @@
         }
       }
     },
-    "%lld / %lld" : {
+    "%lld / 20" : {
+
+    },
+    "AI optimize used today" : {
+
+    },
+    "ai.proDailyLimit.body" : {
+      "comment" : "Body of the Pro AI daily-limit alert.",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld / %2$lld"
+            "value" : "Try again tomorrow."
           }
         }
       }
     },
-    "%lld / 20" : {
-
+    "ai.proDailyLimit.title" : {
+      "comment" : "Title of the alert shown to Pro users when they hit the 30/day AI optimization limit.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Daily limit reached"
+          }
+        }
+      }
     },
     "API calls today" : {
 
@@ -726,152 +743,32 @@
     "Debug" : {
 
     },
-    "demo_nudge.body" : {
-      "comment" : "Body of the alert shown once after the user records their first demo video, encouraging them to start a free trial to record their own scripts.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recording demo videos is free. To record your own scripts, start a free 7-day trial."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grabar videos demo es gratis. Para grabar tus propios guiones, comienza una prueba gratuita de 7 días."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gravar vídeos demo é grátis. Para gravar seus próprios roteiros, comece um teste grátis de 7 dias."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запись демо-видео бесплатна. Чтобы записывать свои скрипты, начни 7-дневный бесплатный пробный период."
-          }
-        }
-      }
-    },
-    "demo_nudge.cta_primary" : {
-      "comment" : "Primary CTA button on the post-demo-recording nudge that opens the paywall.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start free trial"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciar prueba gratis"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Iniciar teste grátis"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Начать пробный период"
-          }
-        }
-      }
-    },
-    "demo_nudge.cta_secondary" : {
-      "comment" : "Cancel-role button on the post-demo-recording nudge that dismisses without opening the paywall.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Maybe later"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quizás después"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Talvez depois"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Позже"
-          }
-        }
-      }
-    },
-    "demo_nudge.title" : {
-      "comment" : "Title of the alert shown once after the user records their first demo video.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nice! Now make it yours"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¡Genial! Ahora haz el tuyo"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ótimo! Agora faça o seu"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отлично! Теперь сделай свой"
-          }
-        }
-      }
-    },
     "demo.script.content" : {
-      "comment" : "Body text of the seeded demo script created on first launch. The example uses copywriting jargon (Headline, Pain points, Benefits, CTA) that should be translated naturally for marketing content.",
+      "comment" : "Body text of the seeded demo script created on first launch. Plays through the WBW prompter to demonstrate the eye-contact mechanic. Translate naturally; the second-person closing invites the user to create their own script.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hi. I'm reading a script right now. My eyes stay on the camera. The text appears right under the lens, one word at a time. Pretty cool, right?"
+            "value" : "Hi. I'm reading a script right now, but my eyes stay on the camera. Words appear right under the lens, one at a time. Natural eye contact. Try it yourself — create your own script."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hola. Estoy leyendo un guion ahora mismo. Mis ojos siguen en la cámara. El texto aparece justo debajo del lente, una palabra a la vez. Genial, ¿verdad?"
+            "value" : "Hola. Estoy leyendo un guion ahora mismo, pero mis ojos se quedan en la cámara. Las palabras aparecen justo debajo del lente, una a la vez. Contacto visual natural. Pruébalo tú mismo — crea tu propio guion."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oi. Estou lendo um roteiro agora mesmo. Meus olhos ficam na câmera. O texto aparece bem embaixo da lente, uma palavra de cada vez. Legal, né?"
+            "value" : "Olá. Estou lendo um roteiro agora, mas meus olhos ficam na câmera. As palavras aparecem logo abaixo da lente, uma de cada vez. Contato visual natural. Experimente você mesmo — crie seu próprio roteiro."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "У твоего лендинга 5 частей — и большинство ставит пропорции НЕПРАВИЛЬНО!! Вот формула: Заголовок (5% страницы). Боли — 15%. Выгоды = 20%. Продукт — 40%. CTA — 20%. Большинство фаундеров отдают 80% продукту и забивают на боли и выгоды… Поэтому никто не конвертится!!!"
+            "value" : "Привет. Я читаю скрипт прямо сейчас, но мои глаза остаются на камере. Текст появляется прямо под объективом, по одному слову. Получается естественный визуальный контакт. Попробуй сам — создай свой скрипт."
           }
         }
       }
@@ -909,7 +806,19 @@
     "DEV" : {
 
     },
-    "Free optimizations used" : {
+    "DEV only. Forces isSubscribed state for testing." : {
+
+    },
+    "Force Free" : {
+
+    },
+    "Force Subscribed" : {
+
+    },
+    "no" : {
+
+    },
+    "Off (use RC)" : {
 
     },
     "onboarding.mini_wbw.script" : {
@@ -1032,6 +941,36 @@
         }
       }
     },
+    "onboarding.priming.photos_label" : {
+      "comment" : "Permissions priming row label on the onboarding screen for the Photos library permission, shown before the system permission dialog. Single-line dash-separated format matching the existing camera and microphone rows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos — to save to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos — para guardar en Carrete"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos — para salvar no Rolo da Câmera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Галерея — для сохранения видео"
+          }
+        }
+      }
+    },
     "Open Settings" : {
       "comment" : "A button label that opens the user's device settings.",
       "isCommentAutoGenerated" : true
@@ -1062,36 +1001,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Купить навсегда"
-          }
-        }
-      }
-    },
-    "paywall.button.startTrial" : {
-      "comment" : "Subscribe button label when the annual plan with free trial is selected.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Free Trial"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Probar gratis"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Testar grátis"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Начать пробный период"
           }
         }
       }
@@ -1456,36 +1365,6 @@
         }
       }
     },
-    "paywall.legal.trialAndPrice" : {
-      "comment" : "Legal copy displayed under the subscribe button. %@ is the FULL annual-price label already produced by paywall.price.perYear — it includes the period suffix translated for this locale (e.g. '$49.99/year', 'R$ 249,90/ano', '€49,99/Jahr'). Do not hardcode prices, do not omit the placeholder, and place the placeholder where the price reads naturally in the target language.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7-day free trial, then %@. Cancel anytime."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 días gratis, luego %@. Cancela cuando quieras."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 dias grátis, depois %@. Cancele quando quiser."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "7 дней бесплатно, затем %@. Отмена в любой момент."
-          }
-        }
-      }
-    },
     "paywall.monthlyEquivalent" : {
       "comment" : "Small monthly-equivalent label under the annual plan price (e.g. '$4.17/month' or 'R$ 3,49/month'). %@ is the localized currency amount produced by the RevenueCat StoreProduct's own NumberFormatter — do not hardcode currency symbols. The placeholder MUST appear; translate only the surrounding suffix.",
       "extractionState" : "manual",
@@ -1756,6 +1635,36 @@
         }
       }
     },
+    "paywall.restore.prompt" : {
+      "comment" : "Caption preceding the inline Restore link at the top of the paywall. The link itself reuses settings.restore.button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already subscribed?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Ya estás suscrito?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já é assinante?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уже подписаны?"
+          }
+        }
+      }
+    },
     "paywall.subtitle" : {
       "comment" : "Paywall header subtitle. Marketing tagline.",
       "extractionState" : "manual",
@@ -1816,32 +1725,368 @@
         }
       }
     },
-    "paywall.trialText" : {
-      "comment" : "Trial duration label shown on the annual plan card. Kept short and standalone.",
-      "extractionState" : "manual",
+    "paywall.v2.allPlans" : {
+      "comment" : "Paywall v2 expand-link below the Continue button when the collapsed annual card is shown.",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "7-day free trial"
+            "state" : "new",
+            "value" : "All Plans"
+          }
+        }
+      }
+    },
+    "paywall.v2.bestValue" : {
+      "comment" : "Paywall v2 static badge marking the recommended plan. Shown on the annual row regardless of which plan is currently selected.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Best Value"
+          }
+        }
+      }
+    },
+    "paywall.v2.collapsed.trialCaption" : {
+      "comment" : "Caption on the annual row reminding users of the free-trial offer. %@ is the localized annual price including period suffix (e.g. '$49.99 / year'). Apple's StoreKit sheet handles actual eligibility — this string is shown unconditionally.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "7 days free, then %@"
+          }
+        }
+      }
+    },
+    "paywall.v2.continueButton" : {
+      "comment" : "Paywall v2 CTA label shown when monthly or lifetime plan is selected.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Continue"
+          }
+        }
+      }
+    },
+    "paywall.v2.dismiss" : {
+      "comment" : "Inline link that dismisses the paywall and returns the user to the free tier.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dismiss"
+          }
+        }
+      }
+    },
+    "paywall.v2.dismissA11y" : {
+      "comment" : "VoiceOver label for the inline Dismiss link on the paywall.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dismiss paywall and continue with free tier"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.fourK" : {
+      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title. '4K' is a technical resolution label.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "4K recording"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.fourK.subtitle" : {
+      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the 4K recording feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cinematic quality for important shoots"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.noWatermark" : {
+      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No watermark on recordings"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.noWatermark.subtitle" : {
+      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the no-watermark feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Share videos without 'Made with SteadyEye'"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.stabilization" : {
+      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title for the video stabilization feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Steadicam stabilization"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.stabilization.subtitle" : {
+      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the video stabilization feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Smooth video while moving or walking"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.unlimitedAI" : {
+      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title for the AI optimization feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "AI optimization for every script"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.unlimitedAI.subtitle" : {
+      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the AI optimization feature.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Optimize every script you write"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.unlimitedLength" : {
+      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Long-form scripts"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 días gratis"
+            "value" : "Guiones largos"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 dias grátis"
+            "value" : "Roteiros longos"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 дней бесплатно"
+            "value" : "Длинные сценарии"
+          }
+        }
+      }
+    },
+    "paywall.v2.feature.unlimitedLength.subtitle" : {
+      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the long-form-scripts feature. The 5,000-character limit is the actual product cap for paying users — keep the number verbatim, localize the surrounding phrasing.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Up to 5,000 characters per script"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasta 5000 caracteres por guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Até 5000 caracteres por roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "До 5000 символов в каждом"
+          }
+        }
+      }
+    },
+    "paywall.v2.headline" : {
+      "comment" : "Paywall v2 hero headline. Marketing copy — translate naturally for each locale.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Get full access now"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получите полный доступ"
+          }
+        }
+      }
+    },
+    "paywall.v2.notInterested" : {
+      "comment" : "Caption above the inline Dismiss link on the paywall.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Not interested?"
+          }
+        }
+      }
+    },
+    "paywall.v2.plan.annual" : {
+      "comment" : "Paywall v2 plan row title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Annual"
+          }
+        }
+      }
+    },
+    "paywall.v2.plan.lifetime" : {
+      "comment" : "Paywall v2 plan row title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Lifetime"
+          }
+        }
+      }
+    },
+    "paywall.v2.plan.monthly" : {
+      "comment" : "Paywall v2 plan row title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Monthly"
+          }
+        }
+      }
+    },
+    "paywall.v2.priceLifetime" : {
+      "comment" : "Paywall v2 lifetime plan price label. %@ is the localized currency amount.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ one-time"
+          }
+        }
+      }
+    },
+    "paywall.v2.pricePerMonth" : {
+      "comment" : "Paywall v2 monthly plan price label. %@ is the localized currency amount.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ / month"
+          }
+        }
+      }
+    },
+    "paywall.v2.pricePerYear" : {
+      "comment" : "Paywall v2 annual plan price label. %@ is the localized currency amount.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ / year"
+          }
+        }
+      }
+    },
+    "paywall.v2.showLess" : {
+      "comment" : "Paywall v2 collapse-link below the Continue button when the plan-list is expanded.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Show Less"
+          }
+        }
+      }
+    },
+    "paywall.v2.startFreeTrial" : {
+      "comment" : "Paywall v2 CTA label shown when annual plan is selected (trial-eligible).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Start free trial"
+          }
+        }
+      }
+    },
+    "paywall.v2.subheadline" : {
+      "comment" : "Paywall v2 hero subheadline shown directly under the SteadyEye headline.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Start trial for free"
           }
         }
       }
@@ -1849,39 +2094,99 @@
     "Preview Paywall" : {
 
     },
-    "Read your script. Look natural." : {
-      "comment" : "A description of how to use SteadyEye to read scripts.",
-      "isCommentAutoGenerated" : true
-    },
-    "recording.audio.connecting" : {
-      "comment" : "Status text shown in the recording HUD until the audio session has fully connected.",
+    "preview.photosDenied.toast" : {
+      "comment" : "Toast shown when the user tries to save but Photos access is denied or restricted. Has a 'Settings' action button.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Connecting audio..."
+            "value" : "Photos access denied"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conectando audio..."
+            "value" : "Sin acceso a Fotos"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conectando áudio..."
+            "value" : "Sem acesso às Fotos"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Подключаем звук…"
+            "value" : "Нет доступа к Галерее"
           }
         }
       }
+    },
+    "preview.saved.toast" : {
+      "comment" : "Toast shown after the recording is successfully saved to the Photos library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardado en Carrete"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvo no Rolo da Câmera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранено в Галерею"
+          }
+        }
+      }
+    },
+    "preview.saveError.toast" : {
+      "comment" : "Toast shown when saving the recording to the Photos library fails.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo guardar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível salvar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось сохранить"
+          }
+        }
+      }
+    },
+    "Read your script. Look natural." : {
+      "comment" : "A description of how to use SteadyEye to read scripts.",
+      "isCommentAutoGenerated" : true
     },
     "recording.error.title" : {
       "comment" : "Title of the alert shown when the camera reports an error during recording.",
@@ -2123,32 +2428,14 @@
         }
       }
     },
-    "recording.tip.body" : {
-      "comment" : "Body of the first-run tip on the recording screen explaining the long-press-and-drag gesture for shifting the text bar vertically.",
-      "extractionState" : "manual",
+    "recording.processing" : {
+      "comment" : "Overlay message shown while a just-finished recording is being watermarked, persisted, and indexed.",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Long press and drag up or down to shift the text bar vertically."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mantén presionado y arrastra arriba o abajo para mover la barra de texto verticalmente."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mantenha pressionado e arraste para cima ou para baixo para mover a barra de texto verticalmente."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Зажми полосу с текстом и тяни вверх или вниз, чтобы сместить её по вертикали."
+            "state" : "new",
+            "value" : "Saving recording…"
           }
         }
       }
@@ -2183,7 +2470,286 @@
         }
       }
     },
-    "Reset Free Optimizations" : {
+    "recordings.action.delete" : {
+      "comment" : "Recordings context-menu destructive action that removes the recording.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "recordings.action.saveToCameraRoll" : {
+      "comment" : "Recordings context-menu action that exports the recording to the Photos library.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save to Camera Roll"
+          }
+        }
+      }
+    },
+    "recordings.action.share" : {
+      "comment" : "Recordings context-menu action that opens the system share sheet.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Share"
+          }
+        }
+      }
+    },
+    "recordings.card.untitled" : {
+      "comment" : "Fallback title shown on a recording card when the source script has no title.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recording"
+          }
+        }
+      }
+    },
+    "recordings.delete.confirm" : {
+      "comment" : "Destructive button on the recording delete-confirmation alert.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "recordings.delete.message" : {
+      "comment" : "Body of the recording delete-confirmation alert.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This action cannot be undone."
+          }
+        }
+      }
+    },
+    "recordings.delete.title" : {
+      "comment" : "Title of the delete-confirmation alert in the Recordings tab and finished view.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete recording?"
+          }
+        }
+      }
+    },
+    "recordings.empty.body" : {
+      "comment" : "Empty-state body in the Recordings tab encouraging the user to start recording.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pick a script and hit record to make your first video."
+          }
+        }
+      }
+    },
+    "recordings.empty.cta" : {
+      "comment" : "Empty-state CTA button on the Recordings tab that switches to the Scripts tab.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Go to Scripts"
+          }
+        }
+      }
+    },
+    "recordings.empty.title" : {
+      "comment" : "Empty-state title in the Recordings tab when the user has no saved recordings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No recordings yet"
+          }
+        }
+      }
+    },
+    "recordings.missing.delete" : {
+      "comment" : "Destructive button on the missing-recording alert that removes the orphaned entity.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "recordings.missing.message" : {
+      "comment" : "Body of the alert shown when a recording's underlying file is missing on disk.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The video file couldn't be found. Remove this recording from your library?"
+          }
+        }
+      }
+    },
+    "recordings.missing.title" : {
+      "comment" : "Title of the alert shown when the user taps a recording whose underlying file is missing on disk.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This recording is no longer available"
+          }
+        }
+      }
+    },
+    "recordings.preview.back" : {
+      "comment" : "VoiceOver label for the back button in the recording preview.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Back"
+          }
+        }
+      }
+    },
+    "recordings.preview.delete" : {
+      "comment" : "VoiceOver label for the trash button in the recording preview.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Delete recording"
+          }
+        }
+      }
+    },
+    "recordings.preview.saveToCameraRoll" : {
+      "comment" : "Primary button in the recording preview that exports the (already-persisted) video to the Photos library.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save to Camera Roll"
+          }
+        }
+      }
+    },
+    "recordings.search.noResults" : {
+      "comment" : "Shown above the recordings grid when the search text returns no matches. %@ is the search query the user typed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recordings match \"%@\""
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna grabación coincide con \"%@\""
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma gravação corresponde a \"%@\""
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет записей по запросу \"%@\""
+          }
+        }
+      }
+    },
+    "recordings.search.prompt" : {
+      "comment" : "Placeholder text for the search bar above the recordings grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search recordings"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar grabaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar gravações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск записей"
+          }
+        }
+      }
+    },
+    "recordings.tabTitle" : {
+      "comment" : "Recordings tab label / nav title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings"
+          }
+        }
+      }
+    },
+    "recordings.toast.savedToCameraRoll" : {
+      "comment" : "Toast shown after a recording is exported to the Photos library.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saved to Camera Roll"
+          }
+        }
+      }
+    },
+    "Reset AI Optimize Day Limit" : {
+
+    },
+    "Reset Pro AI counter" : {
 
     },
     "Reset Rate Limits" : {
@@ -2191,6 +2757,30 @@
     },
     "Reset Tips" : {
 
+    },
+    "script.aiDailyCaption" : {
+      "comment" : "Footer in the editor stats bar telling free users they get one AI optimization per calendar day.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Free: 1 optimization per day"
+          }
+        }
+      }
+    },
+    "script.aiProRemainingCaption" : {
+      "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%lld optimizations left today"
+          }
+        }
+      }
     },
     "script.optimizationsRemaining" : {
       "comment" : "Footer text in the script editor showing how many free AI optimizations the user has left this lifetime. %lld is the remaining count.",
@@ -2522,6 +3112,18 @@
         }
       }
     },
+    "script.wordCountLimited" : {
+      "comment" : "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%lld / 50 words"
+          }
+        }
+      }
+    },
     "scripts.delete" : {
       "comment" : "Swipe-to-delete action on a script row.",
       "extractionState" : "manual",
@@ -2732,6 +3334,42 @@
         }
       }
     },
+    "scripts.editor.pasteLimit.body" : {
+      "comment" : "Body of the paste-limit alert. %1$lld is the word count of the pasted text.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pasted text is %lld words. Free version supports up to 50. Use first 50 words or upgrade?"
+          }
+        }
+      }
+    },
+    "scripts.editor.pasteLimit.title" : {
+      "comment" : "Title of the alert shown to free users when pasting text would exceed the 50-word limit.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pasted text too long"
+          }
+        }
+      }
+    },
+    "scripts.editor.pasteLimit.useFirst50" : {
+      "comment" : "Paste-limit alert primary action: trim the combined existing+pasted text to 50 words.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use first 50 words"
+          }
+        }
+      }
+    },
     "scripts.editor.tip.body" : {
       "comment" : "First-run tip body in the script editor. The // characters are LITERAL pause-marker syntax used by the teleprompter — DO NOT translate or alter the // characters. Translate only the surrounding prose. The word 'Optimize' refers to the button labelled scripts.editor.optimize and should match it.",
       "extractionState" : "manual",
@@ -2818,6 +3456,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Название скрипта"
+          }
+        }
+      }
+    },
+    "scripts.editor.wordLimit.body" : {
+      "comment" : "Body of the word-limit alert. %1$lld is the current word count of the script.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your script is %lld words. Free version supports up to 50 words. Trim to 50 words or upgrade for unlimited length."
+          }
+        }
+      }
+    },
+    "scripts.editor.wordLimit.title" : {
+      "comment" : "Title of the alert shown to free users on Save when their script exceeds 50 words.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Script too long"
+          }
+        }
+      }
+    },
+    "scripts.editor.wordLimit.trim" : {
+      "comment" : "Word-limit alert primary action: trim the script to its first 50 words and save.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Trim to 50 words"
+          }
+        }
+      }
+    },
+    "scripts.editor.wordLimit.upgrade" : {
+      "comment" : "Paste-limit alert action that opens the paywall.\nWord-limit alert action that opens the paywall.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Upgrade"
           }
         }
       }
@@ -3722,6 +4408,156 @@
         }
       }
     },
+    "settings.restore.button" : {
+      "comment" : "Settings button that triggers RevenueCat restorePurchases against the active Apple ID. Required by App Store review and used by users installing on a new device.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Purchases"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar compras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar compras"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить покупки"
+          }
+        }
+      }
+    },
+    "settings.restore.empty.message" : {
+      "comment" : "Body of the alert shown when Restore Purchases finds no entitlement.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find an active subscription on your Apple ID."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pudimos encontrar una suscripción activa en tu Apple ID."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não encontramos uma assinatura ativa em seu Apple ID."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось найти активную подписку на вашем Apple ID."
+          }
+        }
+      }
+    },
+    "settings.restore.empty.title" : {
+      "comment" : "Title of the alert shown when Restore Purchases finds no active subscription on the user's Apple ID.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No purchases found"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron compras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma compra encontrada"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Покупки не найдены"
+          }
+        }
+      }
+    },
+    "settings.restore.success.message" : {
+      "comment" : "Body of the alert shown when Restore Purchases succeeds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome back! Your subscription has been restored."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Bienvenido de vuelta! Tu suscripción ha sido restaurada."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bem-vindo de volta! Sua assinatura foi restaurada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "С возвращением! Ваша подписка восстановлена."
+          }
+        }
+      }
+    },
+    "settings.restore.success.title" : {
+      "comment" : "Title of the alert shown when Restore Purchases finds an active subscription on the user's Apple ID.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription restored"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suscripción restaurada"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assinatura restaurada"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписка восстановлена"
+          }
+        }
+      }
+    },
     "settings.section.about" : {
       "comment" : "Settings section header for app version and metadata.",
       "extractionState" : "manual",
@@ -3808,6 +4644,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Запись"
+          }
+        }
+      }
+    },
+    "settings.section.subscription" : {
+      "comment" : "Settings section header for subscription-related actions (restore purchases, etc.).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscription"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suscripción"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assinatura"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подписка"
           }
         }
       }
@@ -3932,6 +4798,66 @@
         }
       }
     },
+    "settings.upgrade.subtitle" : {
+      "comment" : "Subtitle of the Settings → Upgrade row, one notch under the title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock all features"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquea todas las funciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloqueie todos os recursos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть все возможности"
+          }
+        }
+      }
+    },
+    "settings.upgrade.title" : {
+      "comment" : "Title of the Settings → Upgrade row that opens the paywall. Hidden for Pro users.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upgrade to Pro"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar a Pro"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar para Pro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перейти на Pro"
+          }
+        }
+      }
+    },
     "settings.video.frameRate" : {
       "comment" : "Picker label for video frame rate selection.",
       "extractionState" : "manual",
@@ -4034,6 +4960,39 @@
       "comment" : "A description of how SteadyEye works.",
       "isCommentAutoGenerated" : true
     },
+    "Subscription Override" : {
+
+    },
+    "toast.openSettings" : {
+      "comment" : "Compact button label that opens iOS Settings — used inside toasts where horizontal space is tight. The longer 'Open Settings' lives at common.open_settings for full-button surfaces. NOTE: lives in the toast.* namespace (not common.*) because Xcode's String Catalog symbol generator collapses common.openSettings and common.open_settings to the same Swift symbol.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки"
+          }
+        }
+      }
+    },
     "video.preview.retake" : {
       "comment" : "Button label in the recorded video preview that discards the take and returns to the recording screen.",
       "extractionState" : "manual",
@@ -4063,6 +5022,9 @@
           }
         }
       }
+    },
+    "yes" : {
+
     }
   },
   "version" : "1.1"

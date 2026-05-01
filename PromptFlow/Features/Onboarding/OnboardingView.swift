@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import Photos
 import UIKit
 
 enum OnboardingStage {
@@ -176,6 +177,17 @@ struct OnboardingView: View {
                     .font(.body)
                     .foregroundStyle(.white.opacity(0.7))
             }
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(String(
+                    localized: "onboarding.priming.photos_label",
+                    defaultValue: "Photos — to save to Camera Roll"
+                ))
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
         }
     }
 
@@ -260,6 +272,27 @@ struct OnboardingView: View {
             )
         }
         micGranted = micResult
+
+        // Photos (.addOnly): request only if not determined; cached states are
+        // a no-op. Outcome does not gate progression — onboarding continues
+        // regardless. The Save flow in VideoPreviewView later checks status
+        // (without requesting, to avoid tearing down the modal stack via the
+        // system prompt) and surfaces a Settings deep link if denied. Asking
+        // here, where no fullScreenCover is mounted above, is the only safe
+        // place to trigger the system Photos prompt.
+        let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if photosStatus == .notDetermined {
+            let photosResult = await withCheckedContinuation { (cont: CheckedContinuation<PHAuthorizationStatus, Never>) in
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                    cont.resume(returning: status)
+                }
+            }
+            let granted = photosResult == .authorized || photosResult == .limited
+            AppAnalytics.log(
+                granted ? "permissions_photos_granted" : "permissions_photos_denied",
+                params: ["was_prompt": true]
+            )
+        }
 
         stage = .launchCamera
     }

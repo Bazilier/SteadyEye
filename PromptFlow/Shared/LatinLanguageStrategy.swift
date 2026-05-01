@@ -112,8 +112,8 @@ nonisolated struct LatinLanguageStrategy: LanguageStrategy, Sendable {
     // MARK: - ORP (per-word) chunking
 
     // Tuning constants for ORP per-word mode
-    private static let syllableThreshold = 14
-    private static let rightBudget = 8  // chars from anchor to end (incl. trailing "-")
+    private static let syllableThreshold = 12
+    private static let rightBudget = 6  // chars from anchor to end (incl. trailing "-")
     private static let perCharMs = 15
     private static let continuationPenaltyMs = 50
     private static let commaBonusMs = 80
