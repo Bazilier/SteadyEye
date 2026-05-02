@@ -227,17 +227,20 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: - Phase 2: Bluetooth audio routing (no capture session changes)
 
     private func enableBluetoothAudio() {
-        // Reconfigure audio session WITH Bluetooth options
-        // iOS automatically routes the existing audio input to AirPods — no capture session reconfig needed
+        // BT off by default — AirPods etc. force HFP profile (16kHz mono,
+        // telephony-grade) when used as input, often worse than the built-in
+        // mic. User opt-in via Settings → "Allow Bluetooth microphones".
+        // Wired/USB mics (DJI, Rode, Shure) are unaffected by this flag —
+        // they win via iOS default routing priority regardless.
+        let useBluetoothMic = UserDefaults.standard.bool(forKey: "useBluetoothMic")
         let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(
-            .playAndRecord,
-            mode: .videoRecording,
-            options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
-        )
+        let options: AVAudioSession.CategoryOptions = useBluetoothMic
+            ? [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
+            : [.defaultToSpeaker]
+        try? audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: options)
 
-        // Prefer Bluetooth if available
-        if let btInput = audioSession.availableInputs?.first(where: {
+        // Prefer Bluetooth if available — only when the user has opted in.
+        if useBluetoothMic, let btInput = audioSession.availableInputs?.first(where: {
             $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE || $0.portType == .bluetoothA2DP
         }) {
             try? audioSession.setPreferredInput(btInput)

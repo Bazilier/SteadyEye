@@ -22,7 +22,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ScriptListView()
+            ScriptListView(selectedTab: $selectedTab)
                 .tabItem {
                     Label {
                         Text("scripts.title", comment: "Scripts tab label / nav title")

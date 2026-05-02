@@ -3,11 +3,13 @@ import SwiftUI
 enum ToastStyle {
     case success
     case error
+    case info
 
     var iconName: String {
         switch self {
         case .success: return "checkmark.circle.fill"
         case .error: return "xmark.octagon.fill"
+        case .info: return "info.circle.fill"
         }
     }
 
@@ -15,6 +17,7 @@ enum ToastStyle {
         switch self {
         case .success: return .green
         case .error: return .red
+        case .info: return .blue
         }
     }
 }

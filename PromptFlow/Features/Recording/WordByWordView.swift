@@ -125,8 +125,8 @@ struct PlaceholderLoopView: View {
     private func recomputeChunks() {
         let phrase = String(
             localized: "recording.placeholder.phrase",
-            defaultValue: "Your script will appear here",
-            comment: "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should be 4–6 short words and read naturally when split on spaces."
+            defaultValue: "Your script will appear here when you hit record",
+            comment: "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should read naturally when split on spaces and hint that the user needs to tap record to start."
         )
         let detected = LanguageDetector.detect(phrase)
         let baseMs = ChunkTimingCalculator.orpBaseSpeedMs(sliderValue: sliderValue)

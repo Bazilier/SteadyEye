@@ -12,6 +12,7 @@ struct SettingsView: View {
 
     @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
+    @AppStorage("useBluetoothMic") private var useBluetoothMic: Bool = false
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @State private var showPaywall = false
@@ -172,6 +173,14 @@ struct SettingsView: View {
                             Text("settings.recording.autoStart", comment: "Toggle: auto-start the prompter when recording begins")
                         }
                         Text("settings.recording.autoStartFooter", comment: "Helper text below the auto-start toggle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $useBluetoothMic) {
+                            Text("settings.allowBluetoothMics", comment: "Toggle: allow Bluetooth microphones (AirPods etc.) as audio input. Off by default because BT forces 16kHz HFP audio.")
+                        }
+                        Text("settings.allowBluetoothMics.footer", comment: "Helper text below the Bluetooth mic toggle, explaining why it's off by default and that wired mics are unaffected.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

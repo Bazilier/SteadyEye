@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import AVFoundation
 import Photos
 import UIKit
@@ -7,18 +6,20 @@ import UIKit
 enum OnboardingStage {
     case priming
     case permissionExplainer
-    case launchCamera
 }
 
 struct OnboardingView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
+    /// Set true in `finishOnboarding` when camera permission was granted —
+    /// signals to ScriptListView that it should auto-present RecordingView
+    /// with the demo script as soon as the onboarding cover dismisses.
+    /// Reset to false by ScriptListView after consumption.
+    @AppStorage("pendingDemoRecording") private var pendingDemoRecording: Bool = false
     @State private var stage: OnboardingStage = .priming
     @State private var cameraGranted: Bool = false
     @State private var micGranted: Bool = false
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
+    @State private var photosGranted: Bool = false
 
-    @State private var showRecording: Bool = false
     @State private var didLogStart: Bool = false
 
     var body: some View {
@@ -28,8 +29,6 @@ struct OnboardingView: View {
                 primingView
             case .permissionExplainer:
                 explainerView
-            case .launchCamera:
-                Color.black.ignoresSafeArea()
             }
         }
         .preferredColorScheme(.dark)
@@ -43,36 +42,8 @@ struct OnboardingView: View {
             switch newStage {
             case .permissionExplainer:
                 AppAnalytics.log("onboarding_permission_explainer_shown")
-            case .launchCamera:
-                if demoScript != nil {
-                    showRecording = true
-                } else {
-                    finishOnboarding(path: "no_demo")
-                }
             case .priming:
                 break
-            }
-        }
-        .onChange(of: showRecording) { _, newValue in
-            // Fires `finishOnboarding` at the START of the inner cover's
-            // dismissal (when SwiftUI sets the binding to false), not at the
-            // end (which would be the conventional `.onDismiss:` path). This
-            // flips `hasSeenOnboarding = true` immediately, so the OUTER
-            // OnboardingView cover (bound to !hasSeenOnboarding in ContentView)
-            // begins dismissing in parallel with the inner one. Without this,
-            // the user sees ~250ms of OnboardingView's `.launchCamera` stage
-            // (a solid Color.black backdrop) during the gap between the inner
-            // cover finishing its dismiss animation and the outer cover
-            // starting its own.
-            if !newValue {
-                finishOnboarding(path: "camera_dismissed")
-            }
-        }
-        .fullScreenCover(isPresented: $showRecording) {
-            if let demo = demoScript {
-                RecordingView(script: demo)
-            } else {
-                Color.black.ignoresSafeArea()
             }
         }
     }
@@ -134,10 +105,10 @@ struct OnboardingView: View {
                 Image(systemName: "video.slash.fill")
                     .font(.system(size: 80))
                     .foregroundStyle(.white.opacity(0.5))
-                Text("Camera access needed")
+                Text("Camera & microphone access needed")
                     .font(.title.bold())
                     .foregroundStyle(.white)
-                Text("SteadyEye needs camera access to record your videos. You can enable it later in Settings if you change your mind.")
+                Text("SteadyEye needs camera and microphone access to record your videos. You can enable them later in Settings if you change your mind.")
                     .font(.body)
                     .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -214,41 +185,38 @@ struct OnboardingView: View {
         .ignoresSafeArea()
     }
 
-    // MARK: - Demo lookup (with defensive fetch fallback if @Query hasn't propagated yet)
-
-    private var demoScript: Script? {
-        if let viaQuery = scripts.first(where: { $0.isDemo }) {
-            return viaQuery
-        }
-        let descriptor = FetchDescriptor<Script>(predicate: #Predicate { $0.isDemo == true })
-        return (try? modelContext.fetch(descriptor))?.first
-    }
-
     // MARK: - Permission flow
 
     func requestPermissionsAndAdvance() async {
         let camStatus = AVCaptureDevice.authorizationStatus(for: .video)
         let micStatus = AVAudioApplication.shared.recordPermission
 
-        // Returning user: both already authorized → skip system dialogs entirely.
+        // Returning user fast path: both camera AND mic already authorized
+        // → skip the sequential resolution entirely. Photos status is not
+        // part of this gate; if photos was previously denied we still
+        // accept the cached state and don't reshow onboarding for it.
         if camStatus == .authorized && micStatus == .granted {
             cameraGranted = true
             micGranted = true
-            stage = .launchCamera
-            return
-        }
-        // Camera already denied (or restricted) → straight to explainer.
-        if camStatus == .denied || camStatus == .restricted {
-            stage = .permissionExplainer
+            let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            photosGranted = (photosStatus == .authorized || photosStatus == .limited)
+            finishOnboarding(path: "already_granted")
             return
         }
 
-        // Camera: request only if not determined; otherwise (.authorized) use cached.
+        // Camera: resolve via requestAccess only if .notDetermined; otherwise
+        // use the cached status. iOS guarantees requestAccess is a no-op
+        // (immediate callback with cached value) for non-.notDetermined
+        // statuses, but we branch explicitly so the analytics event only
+        // fires on actual prompt/answer transitions.
         let cameraWasPrompt = camStatus == .notDetermined
         let cameraResult: Bool
-        if camStatus == .authorized {
+        switch camStatus {
+        case .authorized:
             cameraResult = true
-        } else {
+        case .denied, .restricted:
+            cameraResult = false
+        case .notDetermined:
             cameraResult = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
                 AVCaptureDevice.requestAccess(for: .video) { granted in
                     cont.resume(returning: granted)
@@ -258,38 +226,34 @@ struct OnboardingView: View {
                 cameraResult ? "permissions_camera_granted" : "permissions_camera_denied",
                 params: ["was_prompt": cameraWasPrompt]
             )
+        @unknown default:
+            cameraResult = false
         }
         cameraGranted = cameraResult
 
-        if !cameraResult {
-            stage = .permissionExplainer
-            return
+        // Pre-warm AVCaptureSession in parallel with the remaining mic +
+        // photos prompts, but only if camera was actually granted. Without
+        // a grant, AVCaptureSession.startRunning fails immediately and we
+        // pay nothing.
+        if cameraResult {
+            DispatchQueue.main.async {
+                CameraManager.shared.start(position: .front)
+            }
         }
 
-        // Pre-warm AVCaptureSession while the user finishes the mic +
-        // photos permission prompts. session.startRunning() is the
-        // dominant cold-start cost (~2-3s of mediaserver IPC + format
-        // negotiation); kicking it off now means RecordingView's
-        // .onAppear hits the early-return guard inside CameraManager.start
-        // (session already running) and the live preview shows
-        // immediately rather than after a 2-3s black-screen wait.
-        // CameraManager.start dispatches the heavy work to its internal
-        // serial queue; the main-thread hop is just to keep the
-        // @Published `cameraPosition` setter on main. No cleanup needed
-        // on abandoned onboarding — the only path off this screen is
-        // through RecordingView, whose .onDisappear runs cameraManager.stop().
-        DispatchQueue.main.async {
-            CameraManager.shared.start(position: .front)
-        }
-
-        // Mic: request only if undetermined; cached states use stored value, no log.
+        // Mic: ALWAYS run, regardless of camera answer. Critical for the
+        // "user denied camera" recovery path — without this, iOS never
+        // shows a Microphone toggle in Settings → SteadyEye, leaving the
+        // user unable to grant mic later if they change their mind about
+        // camera.
         let micWasPrompt = micStatus == .undetermined
         let micResult: Bool
-        if micStatus == .granted {
+        switch micStatus {
+        case .granted:
             micResult = true
-        } else if micStatus == .denied {
+        case .denied:
             micResult = false
-        } else {
+        case .undetermined:
             micResult = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
                     cont.resume(returning: granted)
@@ -299,35 +263,70 @@ struct OnboardingView: View {
                 micResult ? "permissions_mic_granted" : "permissions_mic_denied",
                 params: ["was_prompt": micWasPrompt]
             )
+        @unknown default:
+            micResult = false
         }
         micGranted = micResult
 
-        // Photos (.addOnly): request only if not determined; cached states are
-        // a no-op. Outcome does not gate progression — onboarding continues
-        // regardless. The Save flow in VideoPreviewView later checks status
-        // (without requesting, to avoid tearing down the modal stack via the
-        // system prompt) and surfaces a Settings deep link if denied. Asking
-        // here, where no fullScreenCover is mounted above, is the only safe
-        // place to trigger the system Photos prompt.
+        // Photos (.addOnly): ALWAYS run, regardless of previous answers —
+        // same reasoning as mic. Outcome does not gate onboarding
+        // progression itself; the Save flow in VideoPreviewView later
+        // checks status (without requesting, to avoid tearing down the
+        // modal stack via the system prompt) and surfaces a Settings
+        // deep link if denied. Asking here, where no fullScreenCover is
+        // mounted above, is the only safe place to trigger the system
+        // Photos prompt.
         let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        if photosStatus == .notDetermined {
-            let photosResult = await withCheckedContinuation { (cont: CheckedContinuation<PHAuthorizationStatus, Never>) in
+        let photosResult: Bool
+        switch photosStatus {
+        case .authorized, .limited:
+            photosResult = true
+        case .denied, .restricted:
+            photosResult = false
+        case .notDetermined:
+            let phStatus = await withCheckedContinuation { (cont: CheckedContinuation<PHAuthorizationStatus, Never>) in
                 PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
                     cont.resume(returning: status)
                 }
             }
-            let granted = photosResult == .authorized || photosResult == .limited
+            photosResult = (phStatus == .authorized || phStatus == .limited)
             AppAnalytics.log(
-                granted ? "permissions_photos_granted" : "permissions_photos_denied",
+                photosResult ? "permissions_photos_granted" : "permissions_photos_denied",
                 params: ["was_prompt": true]
             )
+        @unknown default:
+            photosResult = false
+        }
+        photosGranted = photosResult
+
+        // Outcome decision happens AFTER all three permissions are resolved.
+        // Recording requires BOTH camera and mic; either one missing means
+        // the user can't get past the record button. Show explainerView so
+        // the user is told (and can recover via Settings — all three
+        // toggles now exist there because the requests above always run).
+        // Photos is intentionally NOT in the gate: recording still works
+        // without photos access; the Save → Camera Roll path surfaces a
+        // deny-toast with a Settings deep link if needed.
+        if !cameraGranted || !micGranted {
+            stage = .permissionExplainer
+            return
         }
 
-        stage = .launchCamera
+        finishOnboarding(path: "permissions_complete")
     }
 
     func finishOnboarding(path: String) {
         AppAnalytics.log("onboarding_completed", params: ["path": path])
+        // Auto-open requires BOTH camera and mic. Without mic, the demo
+        // recording would just hit RecordingView's mic-permission alert
+        // immediately on the record-button tap — so it's better UX to
+        // land the user on ScriptsList where they can re-enter the flow
+        // after fixing mic in Settings (which now has a toggle because
+        // the mic prompt always runs in this onboarding flow).
+        // Photos is intentionally NOT part of this gate — recording works
+        // without photos access; the Save → Camera Roll path surfaces a
+        // deny-toast with a Settings deep link if photos was denied.
+        pendingDemoRecording = cameraGranted && micGranted
         hasSeenOnboarding = true
     }
 }

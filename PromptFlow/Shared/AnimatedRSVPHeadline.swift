@@ -114,11 +114,28 @@ struct AnimatedRSVPHeadline: View {
     private func advance() {
         if isSettled { return }
         if let until = pausedUntil, Date() < until { return }
-        pausedUntil = nil
+
+        // End-of-cycle pause just finished — restart from word 0 directly,
+        // skipping the increment that would otherwise advance past 0. The
+        // last word was held visible during the pause; this tick swaps it
+        // out for the first word, which then displays for one tickInterval
+        // like every other word.
+        if pausedUntil != nil {
+            pausedUntil = nil
+            currentIndex = 0
+            return
+        }
+
         currentIndex += 1
         if currentIndex >= words.count {
             if loops {
-                currentIndex = 0
+                // Hold on the last word for endHoldSeconds before restarting.
+                // Holding the LAST word (instead of resetting currentIndex
+                // to 0 immediately and pausing on word 0) makes the boundary
+                // feel like a natural end-of-phrase beat — without it,
+                // the first word appears to hang for ~3× its normal duration
+                // because it absorbs both the pause AND its tickInterval.
+                currentIndex = words.count - 1
                 pausedUntil = Date().addingTimeInterval(endHoldSeconds)
             } else {
                 isSettled = true

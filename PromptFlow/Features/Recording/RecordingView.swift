@@ -2,8 +2,24 @@ import SwiftUI
 import AVFoundation
 import FirebaseAnalytics
 
+private struct GlassCircleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.interactive())
+        } else {
+            content
+                .background(Color.white.opacity(0.2))
+                .clipShape(Circle())
+        }
+    }
+}
+
 struct RecordingView: View {
     let script: Script
+    /// Bound to ContentView's tab selection — toast CTAs from the tappable
+    /// HUD indicators write `.settings` here and then dismiss this cover, so
+    /// the user lands on the Settings tab when the modal stack collapses.
+    @Binding var selectedTab: AppTab
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -12,6 +28,8 @@ struct RecordingView: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var player = ChunkPlayerEngine()
     @State private var showSavedToast = false
+    @State private var showAudioToast = false
+    @State private var showResolutionToast = false
     @State private var previewRecording: Recording?
     @State private var isProcessingRecording: Bool = false
     @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
@@ -224,6 +242,61 @@ struct RecordingView: View {
                 .animation(.interactiveSpring(), value: isTextEditMode)
             }
 
+            // 2b. Top-leading close button — visible only in the
+            // recording-ready state. Hidden during active capture so a
+            // mistap can't end a take. Sized + offset slightly tighter
+            // on SE-class devices because the centered WBW container
+            // leaves less horizontal clearance there (~47pt) than on
+            // notch/Dynamic Island layouts (~90pt).
+            //
+            // Vertical alignment: the button's center matches the WBW
+            // container's vertical midpoint, so the two read as on the
+            // same horizontal axis. Computed inside a GeometryReader
+            // because the math depends on the live `safeAreaInsets.top`
+            // (used by `CutoutLayoutConfig.current` to derive the
+            // collapsed-pill height inside the WBW container block).
+            if !cameraManager.isRecording {
+                GeometryReader { geo in
+                    let cfg = CutoutLayoutConfig.current(
+                        for: DeviceDetectionService.shared.cutoutType,
+                        screenWidth: geo.size.width,
+                        safeAreaTop: geo.safeAreaInsets.top
+                    )
+                    let isCameraOffset = cfg.isCameraOffset
+                    let closeBtnSize: CGFloat = isCameraOffset ? 42 : 32
+                    let closeBtnLeading: CGFloat = isCameraOffset ? 12 : 8
+
+                    // Mirror block 2's container-height derivation so the
+                    // close button center stays glued to the container's
+                    // vertical midpoint regardless of device class.
+                    let safeTop = geo.safeAreaInsets.top
+                    let collapsedHeight = max(1, safeTop - cfg.topPadding)
+                    let wbwContentHeight: CGFloat = fontSize + 4 + 10
+                    let containerHeight = collapsedHeight + wbwContentHeight
+                    let containerVerticalCenter = cfg.topPadding + (containerHeight / 2)
+                    let closeBtnTopPadding = max(0, containerVerticalCenter - (closeBtnSize / 2))
+
+                    VStack {
+                        HStack {
+                            Button { dismiss() } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: closeBtnSize, height: closeBtnSize)
+                                    .modifier(GlassCircleModifier())
+                                    .clipShape(Circle())
+                            }
+                            .padding(.leading, closeBtnLeading)
+                            .padding(.top, closeBtnTopPadding)
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                    .ignoresSafeArea(edges: .top)
+                }
+                .transition(.opacity)
+            }
+
             // 3. Controls — always visible
             VStack {
                 Spacer()
@@ -365,6 +438,44 @@ struct RecordingView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        .toast(
+            isPresented: $showAudioToast,
+            message: String(
+                localized: "hud.changeInSettings",
+                defaultValue: "Change in Settings",
+                comment: "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Paired with an Open Settings CTA."
+            ),
+            style: .info,
+            duration: 5,
+            actionLabel: String(
+                localized: "recording.hud.openSettings",
+                defaultValue: "Open Settings",
+                comment: "Button label inside the recording-HUD discovery toasts (audio + resolution) that switches the app to the Settings tab. Distinct from the compact 'Settings' label in toast.openSettings, which opens iOS Settings, not the app's Settings tab."
+            ),
+            action: {
+                selectedTab = .settings
+                dismiss()
+            }
+        )
+        .toast(
+            isPresented: $showResolutionToast,
+            message: String(
+                localized: "hud.changeInSettings",
+                defaultValue: "Change in Settings",
+                comment: "Same key as the audio-toast message; reused here for the resolution toast since the imperative is identical."
+            ),
+            style: .info,
+            duration: 5,
+            actionLabel: String(
+                localized: "recording.hud.openSettings",
+                defaultValue: "Open Settings",
+                comment: "Same key as the audio-toast action; reused here for the resolution toast since the action is identical (open the app's Settings tab)."
+            ),
+            action: {
+                selectedTab = .settings
+                dismiss()
+            }
+        )
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
@@ -575,12 +686,6 @@ struct RecordingView: View {
         VStack(spacing: 16) {
             if !cameraManager.isRecording {
                 HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 4)
-                    }
                     Spacer()
                     Button {
                         withAnimation(.spring(duration: 0.25)) {
@@ -596,20 +701,37 @@ struct RecordingView: View {
                 .padding(.horizontal, 20)
             }
 
-            // Audio source + video quality indicators
+            // Audio source + video quality indicators. Both are tappable
+            // discovery affordances: the audio side opens an "audio source
+            // can be changed in Settings" toast with an Open Settings CTA;
+            // the resolution side does the same for video quality. The
+            // indicators were previously decorative-only — users reached
+            // for them and nothing happened.
             HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
-                    Text(cameraManager.audioSourceName)
-                        .font(.caption2)
+                Button {
+                    showAudioToast = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 10))
+                        Text(cameraManager.audioSourceName)
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
                 }
+                .buttonStyle(.plain)
                 Text("·")
                     .font(.caption2)
-                Text("\(videoResolution == "4k" && subscriptionManager.canRecord4K ? "4K" : "1080p") · \(videoFPS)fps")
-                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.5))
+                Button {
+                    showResolutionToast = true
+                } label: {
+                    Text("\(videoResolution == "4k" && subscriptionManager.canRecord4K ? "4K" : "1080p") · \(videoFPS)fps")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
             }
-            .foregroundStyle(.white.opacity(0.5))
 
             // Camera settings panel
             if showCameraSettings {

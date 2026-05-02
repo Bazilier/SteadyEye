@@ -23,6 +23,12 @@ enum EditorMode: Identifiable {
 }
 
 struct ScriptListView: View {
+    /// Plumbed down to RecordingView so the HUD's tappable mic/resolution
+    /// indicators can switch the host TabView to the Settings tab from inside
+    /// the fullScreenCover. Owned by ContentView. Mirrors the existing
+    /// RecordingsView pattern.
+    @Binding var selectedTab: AppTab
+
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
@@ -33,6 +39,20 @@ struct ScriptListView: View {
     @State private var showBulkImport = false
     @State private var showPaywall = false
     @State private var paywallSource: String = ""
+    /// Set true by `OnboardingView.finishOnboarding` when camera permission
+    /// was granted. Consumed by either `.onChange(of: hasSeenOnboarding)`
+    /// (the primary trigger — fires when the onboarding cover starts
+    /// dismissing) or `.onAppear` (defensive backup for cold launches where
+    /// the flag persisted across a kill mid-flow). Both consumers reset
+    /// pendingDemoRecording to false BEFORE setting `scriptToRecord`, so
+    /// they're idempotent and don't fight each other.
+    @AppStorage("pendingDemoRecording") private var pendingDemoRecording: Bool = false
+    /// Observed (not written) here. The flip false → true happens inside
+    /// `OnboardingView.finishOnboarding`; ScriptsList watches that flip
+    /// to drive the demo auto-open. `.onAppear` doesn't fire reliably
+    /// when a fullScreenCover dismisses on top of an already-mounted view,
+    /// so direct binding observation is the load-bearing trigger.
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -79,7 +99,7 @@ struct ScriptListView: View {
                 ScriptEditorView(script: mode.script)
             }
             .fullScreenCover(item: $scriptToRecord) { script in
-                RecordingView(script: script)
+                RecordingView(script: script, selectedTab: $selectedTab)
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView()
@@ -93,6 +113,36 @@ struct ScriptListView: View {
             #if DEBUG
             print("📋 ScriptsList .onAppear at \(CFAbsoluteTimeGetCurrent())")
             #endif
+            // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
+            // reliably fire when a fullScreenCover dismisses on top of an
+            // already-mounted view, so the primary trigger lives in the
+            // `.onChange(of: hasSeenOnboarding)` handler below. This block
+            // covers the cold-launch edge case where the flag persisted
+            // across a kill mid-flow (rare but possible).
+            if pendingDemoRecording {
+                pendingDemoRecording = false
+                if let demo = scripts.first(where: { $0.isDemo }) {
+                    scriptToRecord = demo
+                }
+            }
+        }
+        .onChange(of: hasSeenOnboarding) { _, newValue in
+            // Primary auto-open trigger: fires the moment onboarding
+            // completes (`finishOnboarding` flips the AppStorage value to
+            // true, after having already set pendingDemoRecording). The
+            // outer onboarding cover's dismiss animation runs in parallel
+            // with the inner cover's present animation, so by the time
+            // the user sees ScriptsList revealed, RecordingView is already
+            // sliding up on top of it.
+            if newValue && pendingDemoRecording {
+                pendingDemoRecording = false
+                if let demo = scripts.first(where: { $0.isDemo }) {
+                    #if DEBUG
+                    print("📋 Auto-opening demo recording after onboarding")
+                    #endif
+                    scriptToRecord = demo
+                }
+            }
         }
     }
 
