@@ -14,21 +14,46 @@ struct SteadyEyeApp: App {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
 
     init() {
+        // iOS doesn't auto-create the Application Support directory; SwiftData
+        // tries to write its store there on first container init and the OS
+        // rejects the path with errno=2 (no such file or directory) until
+        // CoreData's recovery dance creates it. The recovery succeeds but
+        // floods the console with errors and adds latency to every cold
+        // launch. Creating the directory upfront avoids the round-trip.
+        Self.ensureApplicationSupportDirectoryExists()
         cleanUpTempRecordings()
 
         #if !DEV
+        // Sync: Crashlytics needs Firebase active before any pre-frame
+        // crash so reports are captured.
         FirebaseApp.configure()
-        if let apiKey = SecretsManager.revenueCatAPIKey(), !apiKey.isEmpty {
-            Purchases.configure(withAPIKey: apiKey)
-            Purchases.shared.attribution.enableAdServicesAttributionTokenCollection()
 
-            if let firebaseAppInstanceID = Analytics.appInstanceID() {
-                Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
+        // Defer non-critical SDK init to ~500ms after first frame. RC's
+        // CustomerInfo and Meta's app-activation event don't need to be
+        // available before the user sees the first screen — paywall isn't
+        // shown until after the first recording, and SKAdNetwork's
+        // attribution window is much longer than 500ms. Keychain reads
+        // inside Purchases.configure can stutter if run synchronously
+        // during launch; deferring keeps the launch frame snappy.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let apiKey = SecretsManager.revenueCatAPIKey(), !apiKey.isEmpty {
+                Purchases.configure(withAPIKey: apiKey)
+                Purchases.shared.attribution.enableAdServicesAttributionTokenCollection()
+
+                if let firebaseAppInstanceID = Analytics.appInstanceID() {
+                    Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
+                }
             }
+            MetaAnalytics.logAppActivation()
         }
-        MetaAnalytics.logAppActivation()
         #endif
 
+        // Sync: existing call sites in SubscriptionManager already guard
+        // on `Purchases.isConfigured` so a free-tier check before Purchases
+        // is configured returns the cached `devSubscriptionOverride` /
+        // `lastKnownSubscribedReal` rather than crashing. The
+        // customerInfoStream listener attaches lazily once Purchases
+        // finishes configure.
         SubscriptionManager.shared.configure()
     }
 
@@ -110,6 +135,29 @@ struct SteadyEyeApp: App {
             try? context.save()
         }
         UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Idempotent: creates `Library/Application Support/` if missing. iOS
+    /// doesn't ship with this directory by default, so SwiftData's first
+    /// container init throws errno=2, triggers a CoreData recovery cycle,
+    /// and emits a wall of error spam to the console even when recovery
+    /// succeeds. Called from `init()` before the WindowGroup builds, so
+    /// the path exists by the time `prepareApp()`'s `ModelContainer(...)`
+    /// call runs on a background task.
+    private static func ensureApplicationSupportDirectoryExists() {
+        let fileManager = FileManager.default
+        guard let appSupportURL = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else { return }
+
+        if !fileManager.fileExists(atPath: appSupportURL.path) {
+            try? fileManager.createDirectory(
+                at: appSupportURL,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+        }
     }
 
     /// Remove the default SwiftData store and its SQLite WAL companions.

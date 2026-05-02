@@ -53,9 +53,22 @@ struct OnboardingView: View {
                 break
             }
         }
-        .fullScreenCover(isPresented: $showRecording, onDismiss: {
-            finishOnboarding(path: "camera_dismissed")
-        }) {
+        .onChange(of: showRecording) { _, newValue in
+            // Fires `finishOnboarding` at the START of the inner cover's
+            // dismissal (when SwiftUI sets the binding to false), not at the
+            // end (which would be the conventional `.onDismiss:` path). This
+            // flips `hasSeenOnboarding = true` immediately, so the OUTER
+            // OnboardingView cover (bound to !hasSeenOnboarding in ContentView)
+            // begins dismissing in parallel with the inner one. Without this,
+            // the user sees ~250ms of OnboardingView's `.launchCamera` stage
+            // (a solid Color.black backdrop) during the gap between the inner
+            // cover finishing its dismiss animation and the outer cover
+            // starting its own.
+            if !newValue {
+                finishOnboarding(path: "camera_dismissed")
+            }
+        }
+        .fullScreenCover(isPresented: $showRecording) {
             if let demo = demoScript {
                 RecordingView(script: demo)
             } else {
@@ -251,6 +264,22 @@ struct OnboardingView: View {
         if !cameraResult {
             stage = .permissionExplainer
             return
+        }
+
+        // Pre-warm AVCaptureSession while the user finishes the mic +
+        // photos permission prompts. session.startRunning() is the
+        // dominant cold-start cost (~2-3s of mediaserver IPC + format
+        // negotiation); kicking it off now means RecordingView's
+        // .onAppear hits the early-return guard inside CameraManager.start
+        // (session already running) and the live preview shows
+        // immediately rather than after a 2-3s black-screen wait.
+        // CameraManager.start dispatches the heavy work to its internal
+        // serial queue; the main-thread hop is just to keep the
+        // @Published `cameraPosition` setter on main. No cleanup needed
+        // on abandoned onboarding — the only path off this screen is
+        // through RecordingView, whose .onDisappear runs cameraManager.stop().
+        DispatchQueue.main.async {
+            CameraManager.shared.start(position: .front)
         }
 
         // Mic: request only if undetermined; cached states use stored value, no log.

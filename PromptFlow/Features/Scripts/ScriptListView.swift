@@ -89,6 +89,11 @@ struct ScriptListView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            #if DEBUG
+            print("📋 ScriptsList .onAppear at \(CFAbsoluteTimeGetCurrent())")
+            #endif
+        }
     }
 
     // MARK: - Subviews
