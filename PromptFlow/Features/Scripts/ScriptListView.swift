@@ -213,6 +213,10 @@ struct ScriptListView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    AppAnalytics.log("script_tapped", params: [
+                        "script_source": script.isDemo ? "demo" : "user",
+                        "script_length_words": script.content.split(separator: " ").count
+                    ])
                     scriptToRecord = script
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -270,17 +274,19 @@ struct ScriptRowView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
-            HStack(spacing: 12) {
-                Label {
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Image(systemName: "text.word.spacing")
                     Text(String(
                         localized: "script.wordCount",
                         defaultValue: "\(script.wordCount) words",
                         comment: "Word count display in script row and editor stats bar"
                     ))
-                } icon: {
-                    Image(systemName: "text.word.spacing")
                 }
-                Label(script.estimatedReadTimeFormatted, systemImage: "clock")
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                    Text(script.estimatedReadTimeFormatted)
+                }
             }
             .font(.caption)
             .foregroundStyle(.tertiary)

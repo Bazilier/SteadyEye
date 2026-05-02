@@ -290,7 +290,7 @@ struct RecordingsView: View {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
         PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: recording.fileURL)
-        } completionHandler: { success, _ in
+        } completionHandler: { success, error in
             DispatchQueue.main.async {
                 if success {
                     AppAnalytics.log("recording_exported_to_camera_roll", params: [
@@ -302,6 +302,13 @@ struct RecordingsView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                         withAnimation { showSavedToast = false }
                     }
+                } else {
+                    AppAnalytics.log("recording_export_failed", params: [
+                        "duration_sec": Int(recording.duration.rounded()),
+                        "had_watermark": recording.hasWatermark,
+                        "via": "context_menu",
+                        "error_reason": error?.localizedDescription ?? "unknown"
+                    ])
                 }
             }
         }

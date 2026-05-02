@@ -1,6 +1,6 @@
 import SwiftUI
 import AVFoundation
-import FirebaseAnalytics
+import UserNotifications
 
 private struct GlassCircleModifier: ViewModifier {
     func body(content: Content) -> some View {
@@ -39,6 +39,12 @@ struct RecordingView: View {
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
     @State private var showFirstRecordingPaywall: Bool = false
     @AppStorage("postFirstRecordingPaywallShown") private var postFirstRecordingPaywallShown: Bool = false
+    /// One-shot guard for the notification soft-ask sheet. Flipped true
+    /// the first time we present the soft ask after the post-first-recording
+    /// paywall dismisses. Persisted so the sheet never re-appears across
+    /// launches even if the user dismissed it without granting permission.
+    @AppStorage("notificationSoftAskShown") private var notificationSoftAskShown: Bool = false
+    @State private var showNotificationSoftAsk: Bool = false
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -85,10 +91,21 @@ struct RecordingView: View {
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
 
-            // 1b. Dim overlay during recording
+            // 1b. Dim overlay during recording. Also active during the
+            // 3-2-1 countdown so the dim is already at full alpha by
+            // the time the countdown overlay (which has its own 0.5
+            // backdrop) is removed — without this, the user saw a
+            // dim → undim → dim flicker on the countdown→recording
+            // handoff because the recording-dim's 0.3s ramp lagged
+            // the countdown overlay's instant unmount. The flag
+            // pair (`isCountingDown` false → `isRecording` true) is
+            // mutated synchronously in startCountdown's timer
+            // callback, so SwiftUI coalesces both state changes into
+            // a single render and the opacity never momentarily
+            // computes to 0 on the boundary.
             if dimDuringRecording {
                 Color.black
-                    .opacity(cameraManager.isRecording ? 0.4 : 0)
+                    .opacity((isCountingDown || cameraManager.isRecording) ? 0.4 : 0)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
@@ -513,7 +530,29 @@ struct RecordingView: View {
             })
         }
         .fullScreenCover(isPresented: $showFirstRecordingPaywall) {
-            PaywallView(source: "firstRecording")
+            PaywallView(source: "first_recording")
+        }
+        // Soft-ask the user for notification permission as the
+        // post-first-recording paywall closes. Once-per-install (gated
+        // by `notificationSoftAskShown`), and only when iOS hasn't yet
+        // recorded a decision (`.notDetermined`). Using
+        // `.onChange(of: showFirstRecordingPaywall)` avoids the
+        // two-modal-at-once collision a direct call inside the preview
+        // dismiss handler would cause.
+        .onChange(of: showFirstRecordingPaywall) { _, isShown in
+            guard !isShown, !notificationSoftAskShown else { return }
+            Task { @MainActor in
+                let settings = await UNUserNotificationCenter.current().notificationSettings()
+                if settings.authorizationStatus == .notDetermined {
+                    notificationSoftAskShown = true
+                    showNotificationSoftAsk = true
+                }
+            }
+        }
+        .sheet(isPresented: $showNotificationSoftAsk) {
+            SoftAskNotificationView {
+                Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
+            }
         }
         .alert(
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
@@ -928,10 +967,10 @@ struct RecordingView: View {
                     hasCompletedFirstRecording = true
                     #if !DEV
                     MetaAnalytics.logFirstRecordingCompleted()
-                    Analytics.logEvent("first_recording_completed", parameters: [
+                    #endif
+                    AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())
                     ])
-                    #endif
                 }
                 previewRecording = recording
             case .failure:

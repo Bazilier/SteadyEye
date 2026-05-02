@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = 114690072F936C6500CAC8C6 /* FacebookCore */; };
+		1146939D2FA6063B00CAC8C6 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1146939C2FA6063B00CAC8C6 /* FirebaseCrashlytics */; };
 		116FE5382F6EFA540094999F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 116FE5372F6EFA540094999F /* RevenueCat */; };
 		117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 117704112F912F15001E40FC /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
@@ -67,6 +68,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */,
+				1146939D2FA6063B00CAC8C6 /* FirebaseCrashlytics in Frameworks */,
 				114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */,
 				116FE5382F6EFA540094999F /* RevenueCat in Frameworks */,
 			);
@@ -75,12 +77,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1146939B2FA6063B00CAC8C6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		1195F1352F5ADD78003B4DD2 = {
 			isa = PBXGroup;
 			children = (
 				116FE5F82F73C2410094999F /* PromptFlow.xctestplan */,
 				1195F1402F5ADD78003B4DD2 /* PromptFlow */,
 				116FE5E62F73BDBB0094999F /* PromptFlowTests */,
+				1146939B2FA6063B00CAC8C6 /* Frameworks */,
 				1195F13F2F5ADD78003B4DD2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -140,6 +150,7 @@
 				116FE5372F6EFA540094999F /* RevenueCat */,
 				117704112F912F15001E40FC /* FirebaseAnalytics */,
 				114690072F936C6500CAC8C6 /* FacebookCore */,
+				1146939C2FA6063B00CAC8C6 /* FirebaseCrashlytics */,
 			);
 			productName = PromptFlow;
 			productReference = 1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */;
@@ -402,6 +413,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PromptFlow/PromptFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = NB4UJ8958V;
@@ -444,6 +456,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PromptFlow/PromptFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = NB4UJ8958V;
@@ -543,6 +556,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 114690062F936C6500CAC8C6 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
 			productName = FacebookCore;
+		};
+		1146939C2FA6063B00CAC8C6 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
 		};
 		116FE5372F6EFA540094999F /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -2,6 +2,7 @@ import AVFoundation
 import UIKit
 import SwiftUI
 import Combine
+import FirebaseCrashlytics
 
 final class CameraManager: NSObject, ObservableObject {
     static let shared = CameraManager()
@@ -478,6 +479,9 @@ final class CameraManager: NSObject, ObservableObject {
                         defaultValue: "Recording error: \(error.localizedDescription)",
                         comment: "Recording session error with system-localized error description."
                     )
+                    #if !DEV
+                    Crashlytics.crashlytics().record(error: error)
+                    #endif
                 }
             }
         }

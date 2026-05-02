@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import UserNotifications
 
 struct SettingsView: View {
     @Query private var settingsArray: [AppSettings]
@@ -21,6 +22,11 @@ struct SettingsView: View {
     @State private var isRestoring = false
     @State private var restoreSucceeded = false
     @State private var showRestoreAlert = false
+
+    #if DEV
+    @State private var devNotificationStatus: String = "loading…"
+    @State private var devPendingCount: Int = 0
+    #endif
 
     private var restoreResultTitle: String {
         restoreSucceeded
@@ -70,11 +76,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // First section: Upgrade-to-Pro entry point. Hidden for Pro
-                // users so Settings starts directly from the videoQuality
-                // section in that case.
-                if !subscriptionManager.isSubscribed {
-                    Section {
+                // First section: Upgrade entry point + Redeem code.
+                // For free users: shows Upgrade row above Redeem code row.
+                // For Pro users: Upgrade row is hidden; Redeem code remains
+                // visible (Pro users may still hold an offer or transfer
+                // code to redeem against their existing entitlement).
+                Section {
+                    if !subscriptionManager.isSubscribed {
                         Button(action: {
                             showUpgradePaywall = true
                         }) {
@@ -110,6 +118,23 @@ struct SettingsView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                    }
+                    Button {
+                        Task {
+                            await SubscriptionManager.shared.presentCodeRedemption()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "ticket")
+                                .foregroundStyle(.tint)
+                            Text(String(
+                                localized: "settings.subscription.redeem_code",
+                                defaultValue: "Redeem code",
+                                comment: "Settings row that presents Apple's offer-code redemption sheet for App Store offer codes (e.g., promotional, win-back, transfer codes)."
+                            ))
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
                     }
                 }
 
@@ -247,6 +272,86 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+
+                Section("Notifications (DEV)") {
+                    HStack {
+                        Text("Push status")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(devNotificationStatus)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.tint)
+                    }
+                    HStack {
+                        Text("Pending push count")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(devPendingCount)")
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.tint)
+                    }
+                    Button("Request push permission") {
+                        Task {
+                            await NotificationScheduler.shared.requestPermissionIfNeeded()
+                            await refreshDevDiagnostics()
+                        }
+                    }
+                    Divider()
+                    Button("Fire trial_started in 5s") {
+                        Task {
+                            await NotificationScheduler.shared.schedule(.trialStarted, in: 5)
+                            await refreshDevDiagnostics()
+                        }
+                    }
+                    Button("Fire trial_day_5 in 5s") {
+                        Task {
+                            await NotificationScheduler.shared.schedule(.trialDay5, in: 5)
+                            await refreshDevDiagnostics()
+                        }
+                    }
+                    Button("Fire trial_ending_24h in 5s") {
+                        Task {
+                            await NotificationScheduler.shared.schedule(.trialEnding24h, in: 5)
+                            await refreshDevDiagnostics()
+                        }
+                    }
+                    Button("Fire inactive_3_days in 5s") {
+                        Task {
+                            await NotificationScheduler.shared.schedule(.inactive3Days, in: 5)
+                            await refreshDevDiagnostics()
+                        }
+                    }
+                    Divider()
+                    Button("Cancel all pending notifications") {
+                        NotificationScheduler.shared.cancelAll()
+                        Task { await refreshDevDiagnostics() }
+                    }
+                    .foregroundStyle(.red)
+                    Button("Reset soft ask flag") {
+                        UserDefaults.standard.set(false, forKey: "notificationSoftAskShown")
+                    }
+                }
+                .onAppear {
+                    Task { await refreshDevDiagnostics() }
+                }
+
+                Section("Offer Engine (DEV)") {
+                    HStack {
+                        Text("Discount 50 state")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(OfferEngine.shared.devStateString(for: .discount50AfterFirstDismiss))
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.tint)
+                    }
+                    Button("Force start discount_50") {
+                        OfferEngine.shared.devForceStart(.discount50AfterFirstDismiss)
+                    }
+                    Button("Reset all offer state") {
+                        OfferEngine.shared.resetAllOfferState()
+                    }
+                    .foregroundStyle(.red)
+                }
                 #endif
 
                 Section {
@@ -378,4 +483,33 @@ struct SettingsView: View {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
+
+    #if DEV
+    @MainActor
+    private func refreshDevNotificationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        devNotificationStatus = {
+            switch settings.authorizationStatus {
+            case .notDetermined: return "notDetermined"
+            case .denied: return "denied"
+            case .authorized: return "authorized"
+            case .provisional: return "provisional"
+            case .ephemeral: return "ephemeral"
+            @unknown default: return "unknown"
+            }
+        }()
+    }
+
+    @MainActor
+    private func refreshDevPendingCount() async {
+        let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+        devPendingCount = pending.count
+    }
+
+    @MainActor
+    private func refreshDevDiagnostics() async {
+        await refreshDevNotificationStatus()
+        await refreshDevPendingCount()
+    }
+    #endif
 }

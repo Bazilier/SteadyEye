@@ -3,14 +3,18 @@ import UIKit
 import CoreImage
 
 /// Builds the SteadyEye watermark overlay (a translucent dark pill with
-/// app icon + "SteadyEye" text, anchored bottom-right) and rasterizes it
-/// to a CIImage for compositing onto each captured video frame at
-/// recording time. Used by `RealtimeWatermarkComposer`.
+/// app icon + "SteadyEye" text, anchored bottom-center inside the
+/// TikTok/Reels safe zone) and rasterizes it to a CIImage for
+/// compositing onto each captured video frame at recording time. Used
+/// by `RealtimeWatermarkComposer`.
 ///
-/// Visual identity is shared with the previous post-process pipeline: pill
-/// geometry, scale-with-resolution behavior, icon asset, font, and color
-/// values are unchanged so existing screenshots and Pro-pitch creative
-/// remain accurate.
+/// Visual identity is shared with the previous post-process pipeline:
+/// pill geometry, scale-with-resolution behavior, icon asset, font, and
+/// color values are unchanged. Position + size were retuned for vertical
+/// social posting — the right column (likes/share/profile, ~15% width)
+/// and bottom strip (caption/username, ~18-20% height) of TikTok and
+/// Instagram Reels overlay the burned-in watermark in the previous
+/// bottom-right placement.
 enum WatermarkRenderer {
     private static let watermarkText = "SteadyEye"
 
@@ -61,9 +65,10 @@ enum WatermarkRenderer {
         return CIImage(cgImage: cgImage)
     }
 
-    /// Constructs the watermark layer tree: a dark translucent pill anchored
-    /// bottom-right, containing the SteadyEye icon and "SteadyEye" text.
-    /// All dimensions scale with the render's short side so the watermark
+    /// Constructs the watermark layer tree: a dark translucent pill
+    /// anchored bottom-center inside the TikTok/Reels safe zone,
+    /// containing the SteadyEye icon and "SteadyEye" text. All
+    /// dimensions scale with the render's short side so the watermark
     /// looks consistent at 1080p and 4K. Sublayer y values are measured
     /// from the pill's bottom; the caller drives the global flip via
     /// isGeometryFlipped on the returned root.
@@ -72,15 +77,25 @@ enum WatermarkRenderer {
         parentLayer.frame = CGRect(origin: .zero, size: renderSize)
 
         // At a 400px short side the values match the unscaled spec; at
-        // 1080p (short side ≥ 1080) the pill is ≈80-100pt tall in render
-        // coords.
+        // 1080p the pill is ≈100-125pt tall in render coords
+        // (1.15× the original sizing — readable at arm's length on
+        // social posts without dominating the frame).
         let baseDimension = min(renderSize.width, renderSize.height)
-        let scale = baseDimension / 400
+        let scale = (baseDimension / 400) * 1.15
         let iconSize: CGFloat = 24 * scale
         let horizontalPadding: CGFloat = 12 * scale
         let iconTextGap: CGFloat = 8 * scale
         let verticalPadding: CGFloat = 8 * scale
-        let bottomRightMargin: CGFloat = 24 * scale
+        // Vertical center as fraction-from-bottom (geometry-flipped
+        // coords). 0.14 sits the pill above the TikTok/Reels caption
+        // strip (~18-20%) but visibly low in the frame so it doesn't
+        // compete with the recorded subject. Tweak in 0.01 increments
+        // if Apple/Meta change their UI layouts.
+        let socialSafeYRatio: CGFloat = 0.14
+        // Soft fade on the icon + text so the watermark reads as
+        // "burned in but unobtrusive" rather than a solid sticker.
+        // Pill background already uses 45% black alpha.
+        let contentOpacity: Float = 0.85
 
         let font = UIFont.systemFont(ofSize: 18 * scale, weight: .semibold)
         let measured = (watermarkText as NSString).size(withAttributes: [.font: font])
@@ -102,8 +117,8 @@ enum WatermarkRenderer {
         pillLayer.cornerRadius = pillHeight / 2
         pillLayer.masksToBounds = true
         pillLayer.frame = CGRect(
-            x: renderSize.width - pillWidth - bottomRightMargin,
-            y: bottomRightMargin,
+            x: (renderSize.width - pillWidth) / 2,
+            y: socialSafeYRatio * renderSize.height - pillHeight / 2,
             width: pillWidth,
             height: pillHeight
         )
@@ -122,6 +137,7 @@ enum WatermarkRenderer {
                 width: iconSize,
                 height: iconSize
             )
+            iconLayer.opacity = contentOpacity
             pillLayer.addSublayer(iconLayer)
             contentX += iconSize + iconTextGap
         }
@@ -143,6 +159,7 @@ enum WatermarkRenderer {
             width: textWidth,
             height: textHeight
         )
+        textLayer.opacity = contentOpacity
         pillLayer.addSublayer(textLayer)
 
         parentLayer.addSublayer(pillLayer)

@@ -28,19 +28,33 @@ struct ToastView: View {
     let onDismiss: () -> Void
     let actionLabel: String?
     let action: (() -> Void)?
+    /// Fires when the user taps anywhere on the toast body (excluding
+    /// the trailing dismiss X and the optional action button, which
+    /// keep their own tap targets). Doesn't auto-dismiss the toast —
+    /// the timer drives that independently — so a tap can hand off to
+    /// another app without cutting the toast short or leaving it stuck.
+    let tapAction: (() -> Void)?
+    /// When true, shows a small `chevron.right` between the message and
+    /// the spacer to hint that the toast is tappable. Color matches the
+    /// message text. Visual-only — does not affect hit-testing.
+    let showsChevron: Bool
 
     init(
         message: String,
         style: ToastStyle,
         onDismiss: @escaping () -> Void,
         actionLabel: String? = nil,
-        action: (() -> Void)? = nil
+        action: (() -> Void)? = nil,
+        tapAction: (() -> Void)? = nil,
+        showsChevron: Bool = false
     ) {
         self.message = message
         self.style = style
         self.onDismiss = onDismiss
         self.actionLabel = actionLabel
         self.action = action
+        self.tapAction = tapAction
+        self.showsChevron = showsChevron
     }
 
     var body: some View {
@@ -53,6 +67,12 @@ struct ToastView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white)
                 .lineLimit(2)
+
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
+            }
 
             Spacer(minLength: 8)
 
@@ -83,6 +103,8 @@ struct ToastView: View {
         )
         .padding(.horizontal, 24)
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+        .contentShape(Rectangle())
+        .onTapGesture { tapAction?() }
     }
 }
 
@@ -94,6 +116,8 @@ struct ToastModifier: ViewModifier {
     let duration: TimeInterval
     let actionLabel: String?
     let action: (() -> Void)?
+    let tapAction: (() -> Void)?
+    let showsChevron: Bool
 
     func body(content: Content) -> some View {
         content
@@ -109,7 +133,9 @@ struct ToastModifier: ViewModifier {
                                 handler()
                                 withAnimation { isPresented = false }
                             }
-                        }
+                        },
+                        tapAction: tapAction,
+                        showsChevron: showsChevron
                     )
                     .padding(.bottom, 100)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -130,7 +156,9 @@ extension View {
         style: ToastStyle,
         duration: TimeInterval = 2.5,
         actionLabel: String? = nil,
-        action: (() -> Void)? = nil
+        action: (() -> Void)? = nil,
+        tapAction: (() -> Void)? = nil,
+        showsChevron: Bool = false
     ) -> some View {
         modifier(ToastModifier(
             isPresented: isPresented,
@@ -138,7 +166,9 @@ extension View {
             style: style,
             duration: duration,
             actionLabel: actionLabel,
-            action: action
+            action: action,
+            tapAction: tapAction,
+            showsChevron: showsChevron
         ))
     }
 }

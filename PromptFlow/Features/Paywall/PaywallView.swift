@@ -1,6 +1,5 @@
 import SwiftUI
 import RevenueCat
-import FirebaseAnalytics
 
 enum PaywallPlan: String, CaseIterable, Identifiable {
     case monthly, annual, lifetime
@@ -32,6 +31,13 @@ enum PaywallPlan: String, CaseIterable, Identifiable {
 
 struct PaywallView: View {
     let source: String
+    /// Optional RC offering identifier. Explicit override — when set,
+    /// packages resolve from the named offering directly, bypassing
+    /// OfferEngine. When `nil` (default for all current call sites),
+    /// OfferEngine decides which offering to use based on user state
+    /// (active discount window, etc.), falling back to `offerings.current`
+    /// if no offer is active.
+    var offeringId: String? = nil
     var onPurchaseSuccess: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -45,12 +51,31 @@ struct PaywallView: View {
     @State private var restoreResultMessage: String? = nil
     @State private var restoreSucceeded: Bool = false
     @State private var showRestoreAlert: Bool = false
+    /// Explicit synchronous marker that a purchase succeeded inside this
+    /// PaywallView's lifetime. Used by `.onDisappear` to gate OfferEngine's
+    /// dismiss-without-purchase signal — `SubscriptionManager.isSubscribed`
+    /// can lag the dismiss by one runloop tick because RC's
+    /// customerInfoStream is async, which would otherwise let
+    /// `paywallDismissedWithoutPurchase` fire for a user who just bought.
+    @State private var didPurchaseSuccessfully: Bool = false
 
     // MARK: - Packages from offerings
 
-    private var annualPackage: Package? { manager.offerings?.current?.annual }
-    private var monthlyPackage: Package? { manager.offerings?.current?.monthly }
-    private var lifetimePackage: Package? { manager.offerings?.current?.lifetime }
+    private var resolvedOffering: Offering? {
+        // Explicit override wins. Otherwise consult OfferEngine, which
+        // returns a non-nil offering id only when an offer is active
+        // for this user (e.g. discount_50 window). When OfferEngine
+        // returns nil, `manager.offering(for: nil)` falls back to
+        // `offerings.current` — matching pre-Phase-3 behavior.
+        if let explicit = offeringId {
+            return manager.offering(for: explicit)
+        }
+        let engineId = OfferEngine.shared.resolveOfferingId(source: source)
+        return manager.offering(for: engineId)
+    }
+    private var annualPackage: Package? { resolvedOffering?.annual }
+    private var monthlyPackage: Package? { resolvedOffering?.monthly }
+    private var lifetimePackage: Package? { resolvedOffering?.lifetime }
 
     private func package(for plan: PaywallPlan) -> Package? {
         switch plan {
@@ -132,21 +157,27 @@ struct PaywallView: View {
             // 1-hour cross-source cooldown. Writing in DEV too so the cooldown
             // can be tested without flipping build configs.
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastAnyPaywallShownAt")
-            #if !DEV
-            let trialAvailable = manager.offerings?.current?.annual?.storeProduct.introductoryDiscount != nil
-            Analytics.logEvent("paywall_shown", parameters: [
+            let trialAvailable = resolvedOffering?.annual?.storeProduct.introductoryDiscount != nil
+            AppAnalytics.log("paywall_shown", params: [
                 "source": source,
                 "trial_available": trialAvailable
             ])
-            #endif
         }
         .onDisappear {
-            #if !DEV
-            Analytics.logEvent("paywall_dismissed", parameters: [
+            AppAnalytics.log("paywall_dismissed", params: [
                 "source": source,
                 "purchased": SubscriptionManager.shared.isSubscribed
             ])
-            #endif
+            // Notify OfferEngine on dismiss-without-purchase so it can
+            // start the discount window on first dismiss. Skip when the
+            // user just purchased — `purchaseCompleted` handles that.
+            // Reads the local `didPurchaseSuccessfully` flag rather than
+            // `manager.isSubscribed` because the latter lags by one runloop
+            // tick (customerInfoStream is async), which would otherwise
+            // false-fire `offer_started` for a converted user.
+            if !didPurchaseSuccessfully {
+                OfferEngine.shared.paywallDismissedWithoutPurchase(source: source)
+            }
         }
     }
 
@@ -651,12 +682,10 @@ struct PaywallView: View {
         }
         errorMessage = nil
         let planName = plan.rawValue
-        #if !DEV
-        Analytics.logEvent("purchase_initiated", parameters: [
+        AppAnalytics.log("purchase_initiated", params: [
             "plan": planName,
             "source": source
         ])
-        #endif
         Task {
             let outcome = await manager.purchase(pkg)
             switch outcome {
@@ -666,6 +695,7 @@ struct PaywallView: View {
                     "source": source,
                     "was_trial": isTrial
                 ])
+                didPurchaseSuccessfully = true
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:

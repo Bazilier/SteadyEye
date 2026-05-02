@@ -1,6 +1,6 @@
 import SwiftUI
 import SwiftData
-import FirebaseAnalytics
+import FirebaseCrashlytics
 
 struct ScriptEditorView: View {
     @Environment(\.modelContext) private var modelContext
@@ -265,17 +265,15 @@ struct ScriptEditorView: View {
             }
             if !didLogOpen {
                 didLogOpen = true
-                #if !DEV
                 let source: String
                 if let script {
                     source = script.isDemo ? "demo" : "user"
                 } else {
                     source = "new"
                 }
-                Analytics.logEvent("script_opened", parameters: [
+                AppAnalytics.log("script_opened", params: [
                     "source": source
                 ])
-                #endif
             }
             if !hasSeenEditorTip {
                 showEditorTip = true
@@ -419,9 +417,7 @@ struct ScriptEditorView: View {
             let newScript = Script(title: finalTitle, content: trimmedContent)
             modelContext.insert(newScript)
             if !hasSavedFirstScript {
-                #if !DEV
-                Analytics.logEvent("first_script_saved", parameters: nil)
-                #endif
+                AppAnalytics.log("first_script_saved")
                 hasSavedFirstScript = true
             }
         }
@@ -469,6 +465,9 @@ struct ScriptEditorView: View {
                     "error_reason": reason,
                     "duration_ms": Int(Date().timeIntervalSince(startTime) * 1000)
                 ])
+                #if !DEV
+                Crashlytics.crashlytics().record(error: error)
+                #endif
                 optimizeError = String(
                     localized: "scripts.editor.error.formatFailed",
                     defaultValue: "Could not format script. Check connection.",

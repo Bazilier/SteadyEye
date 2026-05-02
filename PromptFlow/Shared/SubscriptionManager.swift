@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import RevenueCat
+import FirebaseAnalytics
 
 enum PurchaseOutcome {
     case succeeded(isTrial: Bool)
@@ -28,6 +29,20 @@ final class SubscriptionManager: ObservableObject {
     @Published var isTrialActive: Bool = false
     @Published var offerings: Offerings?
     @Published var isLoading: Bool = false
+
+    /// Internal change-detection flag for the customerInfoStream listener.
+    /// Compared against the latest customerInfo's trial state on each tick
+    /// to detect free→trial and trial→ended transitions, which drive the
+    /// trial-related local notifications. Initialized after the first
+    /// `checkAccess()` so the listener doesn't false-fire on launch.
+    private var lastObservedTrialState: Bool = false
+
+    /// Same change-detection pattern as `lastObservedTrialState` but for
+    /// the entitlement-active flag. Used to call `OfferEngine.purchaseCompleted`
+    /// on the free→subscribed transition (catches purchases via restore,
+    /// family sharing, or any path that doesn't go through `purchase(_:)`
+    /// directly). Initialized in `checkAccess()` to prevent false-fire.
+    private var lastObservedSubscriptionState: Bool = false
 
     /// DEV-only escape hatch for testing freemium gating without buying or
     /// cancelling a sandbox subscription. Values: "off", "free", "subscribed".
@@ -131,6 +146,27 @@ final class SubscriptionManager: ObservableObject {
 
     private init() {}
 
+    // MARK: - Analytics user property
+
+    /// Sets Firebase's `subscription_state` user property to one of
+    /// `free` / `trial` / `subscribed`. Once set, the property attaches
+    /// to every subsequent event automatically, so any analytics query
+    /// can pivot by sub state without joining a separate user table.
+    /// Called from configure-time first resolution (`checkAccess`),
+    /// every customerInfoStream tick, and the restore-success path.
+    /// No-op in DEV (matches AppAnalytics.log gating).
+    private func updateAnalyticsSubscriptionState() {
+        #if !DEV
+        let state: String
+        if isSubscribed {
+            state = isTrialActive ? "trial" : "subscribed"
+        } else {
+            state = "free"
+        }
+        Analytics.setUserProperty(state, forName: "subscription_state")
+        #endif
+    }
+
     // MARK: - Configuration
 
     func configure() {
@@ -161,6 +197,41 @@ final class SubscriptionManager: ObservableObject {
                 let entitlement = customerInfo.entitlements[Self.entitlementID]
                 self.isSubscribedReal = entitlement?.isActive == true
                 self.isTrialActive = entitlement?.periodType == .trial
+                self.updateAnalyticsSubscriptionState()
+
+                // Trial-state edge detection. `lastObservedTrialState`
+                // is seeded by checkAccess on launch so the very first
+                // tick here reflects a real change, not the initial read.
+                let nowInTrial = entitlement?.periodType == .trial
+                let wasInTrial = self.lastObservedTrialState
+                self.lastObservedTrialState = nowInTrial
+
+                if !wasInTrial && nowInTrial {
+                    // free/none → trial
+                    Task { @MainActor in
+                        await NotificationScheduler.shared.schedule(.trialStarted, in: 60)
+                        await NotificationScheduler.shared.schedule(.trialDay5, in: 5 * 24 * 3600)
+                        await NotificationScheduler.shared.schedule(.trialEnding24h, in: 6 * 24 * 3600)
+                    }
+                } else if wasInTrial && !nowInTrial {
+                    // trial → ended (cancelled or converted to paid)
+                    NotificationScheduler.shared.cancel([.trialStarted, .trialDay5, .trialEnding24h])
+                }
+
+                // Subscription-state edge detection — catches purchases
+                // that don't flow through `purchase(_:)` (restore,
+                // family share, intro-offer auto-grant). Marks any
+                // currently-active offer as converted.
+                let nowSubscribed = entitlement?.isActive == true
+                let wasSubscribed = self.lastObservedSubscriptionState
+                self.lastObservedSubscriptionState = nowSubscribed
+
+                if !wasSubscribed && nowSubscribed {
+                    OfferEngine.shared.purchaseCompleted(
+                        source: "customer_info_stream",
+                        offeringIdPurchasedFrom: nil
+                    )
+                }
             }
         }
         #endif
@@ -182,10 +253,40 @@ final class SubscriptionManager: ObservableObject {
             let entitlement = info.entitlements[Self.entitlementID]
             isSubscribedReal = entitlement?.isActive == true
             isTrialActive = entitlement?.periodType == .trial
+            // Seed change-detection so the customerInfoStream listener
+            // doesn't false-fire its trial→started or free→subscribed
+            // branches on the first tick (which echoes the values we
+            // just read here).
+            lastObservedTrialState = isTrialActive
+            lastObservedSubscriptionState = isSubscribedReal
+            updateAnalyticsSubscriptionState()
         } catch {
             // Keep current state on error
         }
         #endif
+    }
+
+    /// Re-arms the "we miss you" inactivity push to fire 3 days from now.
+    /// Called from the App-level scenePhase observer on every `.active`
+    /// and `.background` transition, so the timer effectively resets to
+    /// "3 days of true inactivity from the last session boundary." Pro
+    /// users skip — they don't need a reactivation push.
+    @MainActor
+    func rescheduleInactiveReminder() async {
+        NotificationScheduler.shared.cancel(.inactive3Days)
+        guard !isSubscribed else { return }
+        await NotificationScheduler.shared.schedule(.inactive3Days, in: 3 * 24 * 3600)
+    }
+
+    /// Returns the offering with the given identifier, or `nil` if not
+    /// present. Falls back to `offerings.current` when `id` is `nil`, so
+    /// PaywallView callers that don't pass an `offeringId` keep their
+    /// existing default-offering behavior. Also falls back to current
+    /// when an unknown identifier is passed — degrades gracefully if a
+    /// future offering is referenced before the RC dashboard adds it.
+    func offering(for id: String?) -> Offering? {
+        guard let id else { return offerings?.current }
+        return offerings?[id] ?? offerings?.current
     }
 
     @MainActor
@@ -260,8 +361,10 @@ final class SubscriptionManager: ObservableObject {
         // DEV builds never call Purchases.configure(); nothing to restore.
         return false
         #else
+        AppAnalytics.log("restore_attempted")
         guard Purchases.isConfigured else {
             print("⚠️ restorePurchases called before Purchases.configure")
+            AppAnalytics.log("restore_failed", params: ["error_reason": "not_configured"])
             return false
         }
         isLoading = true
@@ -270,9 +373,46 @@ final class SubscriptionManager: ObservableObject {
             let info = try await Purchases.shared.restorePurchases()
             let entitlement = info.entitlements[Self.entitlementID]
             isSubscribedReal = entitlement?.isActive == true
+            isTrialActive = entitlement?.periodType == .trial
+            AppAnalytics.log("restore_succeeded", params: [
+                "had_active_entitlement": isSubscribedReal
+            ])
+            updateAnalyticsSubscriptionState()
             return isSubscribedReal
         } catch {
+            AppAnalytics.log("restore_failed", params: [
+                "error_reason": error.localizedDescription
+            ])
             return false
+        }
+        #endif
+    }
+
+    /// Presents Apple's offer-code redemption sheet. Successful redemption
+    /// updates `customerInfo` automatically via the `customerInfoStream`
+    /// listener — there is no synchronous success signal to surface here,
+    /// so we only log the open and any error from sheet presentation. A
+    /// `redemption_succeeded` event would double-count with the existing
+    /// `subscription_state` user-property flip and could fire spuriously
+    /// when the user dismissed the sheet without redeeming.
+    @MainActor
+    func presentCodeRedemption() async {
+        AppAnalytics.log("offer_code_redemption_opened")
+        #if DEV
+        return
+        #else
+        guard Purchases.isConfigured else {
+            AppAnalytics.log("offer_code_redemption_failed", params: [
+                "error_reason": "not_configured"
+            ])
+            return
+        }
+        do {
+            try await Purchases.shared.presentCodeRedemptionSheet()
+        } catch {
+            AppAnalytics.log("offer_code_redemption_failed", params: [
+                "error_reason": String(describing: type(of: error))
+            ])
         }
         #endif
     }

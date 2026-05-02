@@ -4,6 +4,7 @@ import AVKit
 import AVFoundation
 import Photos
 import UIKit
+import FirebaseCrashlytics
 
 struct VideoPreviewView: View {
     let recording: Recording
@@ -19,6 +20,10 @@ struct VideoPreviewView: View {
     @State private var showSaveSuccess = false
     @State private var showPhotosDeniedToast = false
     @State private var isSavingToCameraRoll = false
+    /// Placeholder localIdentifier captured during the PHPhotoLibrary
+    /// performChanges block. Drives the save-success toast's tap-to-open
+    /// deep link into the Photos app at the just-saved asset.
+    @State private var savedAssetLocalIdentifier: String?
     @State private var isPlaying = true
     @State private var videoSize: CGSize = CGSize(width: 9, height: 16)
 
@@ -125,7 +130,9 @@ struct VideoPreviewView: View {
                 defaultValue: "Saved to Camera Roll",
                 comment: "Toast shown after the recording is successfully saved to the Photos library."
             ),
-            style: .success
+            style: .success,
+            tapAction: openSavedAssetInPhotos,
+            showsChevron: true
         )
         .toast(
             isPresented: $showSaveError,
@@ -334,9 +341,17 @@ struct VideoPreviewView: View {
             return
         }
         isSavingToCameraRoll = true
+        // Capture the new asset's localIdentifier inside the change
+        // block so the success toast can deep-link straight into
+        // Photos.app at the saved video. PhotoKit serializes the
+        // change block before firing the completion handler, so
+        // `capturedAssetID` is already populated by the time we read
+        // it on main.
+        var capturedAssetID: String?
         PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: recording.fileURL)
-        } completionHandler: { success, _ in
+            let request = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: recording.fileURL)
+            capturedAssetID = request?.placeholderForCreatedAsset?.localIdentifier
+        } completionHandler: { success, error in
             DispatchQueue.main.async {
                 isSavingToCameraRoll = false
                 if success {
@@ -346,10 +361,46 @@ struct VideoPreviewView: View {
                         "via": "preview"
                     ])
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    savedAssetLocalIdentifier = capturedAssetID
                     showSaveSuccess = true
                 } else {
+                    AppAnalytics.log("recording_export_failed", params: [
+                        "duration_sec": Int(recording.duration.rounded()),
+                        "had_watermark": recording.hasWatermark,
+                        "via": "preview",
+                        "error_reason": error?.localizedDescription ?? "unknown"
+                    ])
+                    #if !DEV
+                    if let error {
+                        Crashlytics.crashlytics().record(error: error)
+                    }
+                    #endif
                     showSaveError = true
                 }
+            }
+        }
+    }
+
+    /// Deep-links into the Photos app at the just-saved asset using
+    /// the `photos-redirect://asset/<UUID>` scheme. The `localIdentifier`
+    /// returned by PhotoKit looks like `<UUID>/L0/001`; the deep link
+    /// only accepts the UUID prefix, so we strip the suffix before
+    /// constructing the URL. Falls back to plain `photos-redirect://`
+    /// (Photos at last-viewed location, typically the just-saved video)
+    /// if the asset-specific link doesn't resolve, or if we never
+    /// captured a localIdentifier.
+    private func openSavedAssetInPhotos() {
+        let target: URL? = {
+            if let identifier = savedAssetLocalIdentifier {
+                let cleanID = identifier.components(separatedBy: "/").first ?? identifier
+                return URL(string: "photos-redirect://asset/\(cleanID)")
+            }
+            return URL(string: "photos-redirect://")
+        }()
+        guard let url = target else { return }
+        UIApplication.shared.open(url) { success in
+            if !success, let fallback = URL(string: "photos-redirect://") {
+                UIApplication.shared.open(fallback)
             }
         }
     }

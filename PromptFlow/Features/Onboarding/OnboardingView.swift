@@ -129,6 +129,11 @@ struct OnboardingView: View {
                 }
                 .padding(.horizontal, 24)
                 Button("Skip for now") {
+                    AppAnalytics.log("onboarding_skip_for_now_tapped", params: [
+                        "camera_granted": cameraGranted,
+                        "mic_granted": micGranted,
+                        "photos_granted": photosGranted
+                    ])
                     finishOnboarding(path: "skipped_after_denied")
                 }
                 .foregroundStyle(.white.opacity(0.7))
