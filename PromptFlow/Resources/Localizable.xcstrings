@@ -3366,18 +3366,6 @@
     "Reset Tips" : {
 
     },
-    "script.aiDailyCaption" : {
-      "comment" : "Footer in the editor stats bar telling free users they get one AI optimization per calendar day.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Free: 1 optimization per day"
-          }
-        }
-      }
-    },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
       "extractionState" : "extracted_with_value",
@@ -3386,6 +3374,36 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%lld optimizations left today"
+          }
+        }
+      }
+    },
+    "script.charCount" : {
+      "comment" : "Character count display in the editor stats bar. %1$@ is the current character count, %2$@ is the maximum (currently 5000). Both are pre-formatted via Int.formatted() so they appear with locale-appropriate digit grouping (e.g. '5,000' in en, '5 000' in es-419/pt-BR/ru). The trailing word is an abbreviation of 'characters' — short to fit alongside the word count on a stacked two-row layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ chars"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ carac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ carac"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ симв"
           }
         }
       }
@@ -3762,6 +3780,36 @@
         }
       }
     },
+    "scripts.editor.demo.title" : {
+      "comment" : "Mock title pre-filled into the script editor's title field during the editor demo flow (the same first-run path that pre-fills DemoEditorBefore.<lang>.txt into the content area). Read-only until the user taps Optimize, then editable. Short marketing-style title that hints at the demo content's topic.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 tips that grew my account"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 tips que hicieron crecer mi cuenta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 dicas que fizeram minha conta crescer"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 совета, которые подняли мой аккаунт"
+          }
+        }
+      }
+    },
     "scripts.editor.discardAlert.discard" : {
       "comment" : "Destructive button on the discard-changes alert in the script editor.",
       "extractionState" : "manual",
@@ -3878,6 +3926,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не удалось обработать скрипт. Проверь соединение."
+          }
+        }
+      }
+    },
+    "scripts.editor.freeIndicator" : {
+      "comment" : "Compact free-tier optimization indicator shown on the trailing side of the editor stats bar. Replaces the longer 'Free: 1 optimization per day' (`script.aiDailyCaption`, kept in catalog as legacy). Format: 'Free: 1 / day' — short colon-separated phrase.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free: 1 / day"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis: 1 / día"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grátis: 1 / dia"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатно: 1 / день"
           }
         }
       }
@@ -4206,6 +4284,108 @@
         }
       }
     },
+    "scripts.import.demo.script1.title" : {
+      "comment" : "Title of the first hardcoded mock script inserted at the end of the bulk-import demo. Short label used as the Script row title in the Scripts list. Title-Case in English.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Why Your Videos Look Robotic"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por qué tus videos se ven robóticos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por que seus vídeos parecem robóticos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Почему твои видео выглядят роботоподобно"
+          }
+        }
+      }
+    },
+    "scripts.import.demo.script2.title" : {
+      "comment" : "Title of the second hardcoded mock script inserted at the end of the bulk-import demo. Short label used as the Script row title in the Scripts list. Title-Case in English.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The One-Take Trick"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El truco de la toma única"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O truque da tomada única"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Трюк одного дубля"
+          }
+        }
+      }
+    },
+    "scripts.import.demo.script3.title" : {
+      "comment" : "Title of the third hardcoded mock script inserted at the end of the bulk-import demo. Short label used as the Script row title in the Scripts list. Title-Case in English. The literal '100' stays as digits across all locales.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What I Learned from 100 Reels"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que aprendí de 100 Reels"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que aprendi com 100 Reels"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что я понял за 100 рилсов"
+          }
+        }
+      }
+    },
+    "scripts.import.demo.text" : {
+      "comment" : "Pre-filled mock text loaded into the bulk-import editor when the user opens it for the first time. Mimics what a creator would paste from a notes app — three short Reel ideas separated by numbered headings. Shown only in the demo onboarding pass; the real (Pro) flow opens with an empty editor and the user pastes their own document.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reel ideas this week\n\n1. Why your videos look robotic\nYou read off-camera. Viewers see your eyes drift away. Trust drops. Cut to side-by-side: eye contact vs not. Hook: stop looking like a robot. End: your eyes belong on the lens.\n\n2. The one-take trick\nMemorizing scripts wastes hours. Three takes minimum. Then editing. Show clock. Show stack of failed takes. Then SteadyEye. One take. Done.\n\n3. What I learned from 100 Reels\nMost creators record five takes or more. Pro creators record one. The difference: they don't memorize. They use prompters. But not the scrolling kind."
+          }
+        }
+      }
+    },
     "scripts.import.error.noScripts" : {
       "comment" : "Error shown when the AI splitter returns no scripts from the pasted document.",
       "extractionState" : "manual",
@@ -4262,6 +4442,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не удалось обработать текст. Проверь соединение."
+          }
+        }
+      }
+    },
+    "scripts.import.explainer.body" : {
+      "comment" : "Body of the bulk-import explainer overlay describing what AI splitting does to the pasted text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste a document with multiple scripts and AI will split it into separate scripts. Each one gets optimized for reading aloud."
+          }
+        }
+      }
+    },
+    "scripts.import.explainer.button" : {
+      "comment" : "Primary button on the bulk-import explainer overlay that dismisses the overlay and reveals the pre-filled editor underneath.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        }
+      }
+    },
+    "scripts.import.explainer.title" : {
+      "comment" : "Title of the bulk-import explainer overlay shown the first time a user opens the bulk import sheet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Multiple Scripts"
           }
         }
       }
@@ -4562,6 +4778,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Оптимизируем скрипт %1$lld из %2$lld…"
+          }
+        }
+      }
+    },
+    "scripts.recording.tip.body" : {
+      "comment" : "Body text for the first-run tip overlay shown on the recording screen, explaining the long-press-and-drag gesture for vertical text positioning. Shown once per install when a non-demo script is opened in RecordingView.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long-press the text and drag up or down to align it with your camera lens. The closer to the lens, the more natural your eye contact."
           }
         }
       }

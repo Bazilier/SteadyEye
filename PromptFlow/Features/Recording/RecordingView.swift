@@ -39,12 +39,14 @@ struct RecordingView: View {
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
     @State private var showFirstRecordingPaywall: Bool = false
     @AppStorage("postFirstRecordingPaywallShown") private var postFirstRecordingPaywallShown: Bool = false
-    /// One-shot guard for the notification soft-ask sheet. Flipped true
-    /// the first time we present the soft ask after the post-first-recording
-    /// paywall dismisses. Persisted so the sheet never re-appears across
-    /// launches even if the user dismissed it without granting permission.
-    @AppStorage("notificationSoftAskShown") private var notificationSoftAskShown: Bool = false
-    @State private var showNotificationSoftAsk: Bool = false
+    /// First-run explainer for the long-press-and-drag gesture that
+    /// repositions the prompter text vertically against the camera lens.
+    /// One-shot per install. Suppressed for demo-script mounts (which
+    /// covers the post-onboarding auto-open path — `pendingDemoRecording`
+    /// is consumed in ScriptListView before this view mounts, so
+    /// `script.isDemo` is the only signal that survives down here).
+    @AppStorage("hasSeenCameraExplainer") private var hasSeenCameraExplainer: Bool = false
+    @State private var showCameraExplainer: Bool = false
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -532,28 +534,6 @@ struct RecordingView: View {
         .fullScreenCover(isPresented: $showFirstRecordingPaywall) {
             PaywallView(source: "first_recording")
         }
-        // Soft-ask the user for notification permission as the
-        // post-first-recording paywall closes. Once-per-install (gated
-        // by `notificationSoftAskShown`), and only when iOS hasn't yet
-        // recorded a decision (`.notDetermined`). Using
-        // `.onChange(of: showFirstRecordingPaywall)` avoids the
-        // two-modal-at-once collision a direct call inside the preview
-        // dismiss handler would cause.
-        .onChange(of: showFirstRecordingPaywall) { _, isShown in
-            guard !isShown, !notificationSoftAskShown else { return }
-            Task { @MainActor in
-                let settings = await UNUserNotificationCenter.current().notificationSettings()
-                if settings.authorizationStatus == .notDetermined {
-                    notificationSoftAskShown = true
-                    showNotificationSoftAsk = true
-                }
-            }
-        }
-        .sheet(isPresented: $showNotificationSoftAsk) {
-            SoftAskNotificationView {
-                Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
-            }
-        }
         .alert(
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
             isPresented: .constant(cameraManager.errorMessage != nil)
@@ -578,6 +558,37 @@ struct RecordingView: View {
             Button(String(localized: "common.cancel", defaultValue: "Cancel"), role: .cancel) { }
         } message: {
             Text("recording.mic_alert.body", comment: "Body of the alert shown when the user taps record but mic permission is denied")
+        }
+        .overlay {
+            if showCameraExplainer {
+                ExplainerOverlay(
+                    isPresented: $showCameraExplainer,
+                    icon: "hand.point.up.left",
+                    title: "common.tip.title",
+                    message: "scripts.recording.tip.body",
+                    buttonLabel: "common.tip.gotIt",
+                    onDismiss: { hasSeenCameraExplainer = true }
+                )
+            }
+        }
+        .onAppear {
+            // Consume the transient onboarding-auto-open signal set by
+            // ScriptListView's two auto-open paths. One-shot: cleared
+            // on first read so any subsequent RecordingView mount —
+            // including a manual demo-script replay — correctly
+            // triggers the explainer.
+            let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
+            if wasOnboardingAuto {
+                UserDefaults.standard.set(false, forKey: "nextRecordingIsOnboardingAuto")
+            }
+            // Gate on cameraAuthStatus so the tip doesn't overlay the
+            // permission empty state when the user hasn't granted
+            // camera access yet.
+            guard cameraAuthStatus == .authorized,
+                  !wasOnboardingAuto,
+                  !hasSeenCameraExplainer
+            else { return }
+            showCameraExplainer = true
         }
     }
 

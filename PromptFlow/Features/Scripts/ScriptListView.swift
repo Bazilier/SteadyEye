@@ -39,6 +39,17 @@ struct ScriptListView: View {
     @State private var showBulkImport = false
     @State private var showPaywall = false
     @State private var paywallSource: String = ""
+    /// Captured at tap time and passed into BulkImportView so the
+    /// `bulk_import_opened` analytics event can split funnels by entry
+    /// surface. Both the toolbar `doc.on.doc` button and the empty-state
+    /// button route through `handleBulkImportTap(entryPoint:)` below.
+    @State private var bulkImportEntryPoint: String = "toolbar"
+    /// One-shot flag flipped to true only after a successful demo
+    /// completes (3 mock scripts inserted). Drives the decision tree in
+    /// `handleBulkImportTap`: first tap shows the demo regardless of
+    /// subscription; subsequent taps route Pro users to the real flow
+    /// and free users to the post-demo paywall.
+    @AppStorage("hasSeenBulkImportDemo") private var hasSeenBulkImportDemo: Bool = false
     /// Set true by `OnboardingView.finishOnboarding` when camera permission
     /// was granted. Consumed by either `.onChange(of: hasSeenOnboarding)`
     /// (the primary trigger — fires when the onboarding cover starts
@@ -53,6 +64,20 @@ struct ScriptListView: View {
     /// when a fullScreenCover dismisses on top of an already-mounted view,
     /// so direct binding observation is the load-bearing trigger.
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
+
+    /// Counts post-onboarding cold starts. Bumped to 1 by the
+    /// `.onChange(of: hasSeenOnboarding)` handler below when onboarding
+    /// completes (so the onboarding session itself counts as session 1).
+    /// Bumped on every subsequent cold start by `SteadyEyeApp.init()`.
+    /// Read in `.onAppear` to drive the notification soft-ask trigger.
+    @AppStorage("coldStartCountAfterOnboarding") private var coldStartCountAfterOnboarding: Int = 0
+    /// One-shot guard. Flipped true the first time the soft-ask sheet
+    /// is presented under the new (post-cold-start) trigger. Decoupled
+    /// from the legacy `notificationSoftAskShown` key so existing
+    /// users who saw the previous post-paywall trigger get one more
+    /// chance under the better timing.
+    @AppStorage("hasShownNotificationSoftAsk") private var hasShownNotificationSoftAsk: Bool = false
+    @State private var showNotificationSoftAsk: Bool = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -89,6 +114,13 @@ struct ScriptListView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        handleBulkImportTap(entryPoint: "toolbar")
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
                         editorMode = .new
                     } label: {
                         Image(systemName: "plus")
@@ -102,17 +134,47 @@ struct ScriptListView: View {
                 RecordingView(script: script, selectedTab: $selectedTab)
             }
             .sheet(isPresented: $showBulkImport) {
-                BulkImportView()
+                BulkImportView(entryPoint: bulkImportEntryPoint)
             }
             .fullScreenCover(isPresented: $showPaywall) {
                 PaywallView(source: paywallSource)
             }
         }
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showNotificationSoftAsk) {
+            SoftAskNotificationView {
+                Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
+            }
+        }
         .onAppear {
             #if DEBUG
             print("📋 ScriptsList .onAppear at \(CFAbsoluteTimeGetCurrent())")
             #endif
+            // Notification soft-ask trigger. Fires on the SECOND
+            // post-onboarding cold start (counter == 2): the first being
+            // the onboarding session itself, the second being the next
+            // launch after the user kills and reopens. Gates: onboarding
+            // complete, not yet shown under the new key, and the system
+            // hasn't already received an authorization decision through
+            // some other path. The 0.5s delay avoids modal-collision
+            // with the post-onboarding auto-open's fullScreenCover, the
+            // demo-completion paywall, or any other cold-start
+            // navigation that may still be settling.
+            if hasSeenOnboarding,
+               !hasShownNotificationSoftAsk,
+               coldStartCountAfterOnboarding >= 2 {
+                let countAtTrigger = coldStartCountAfterOnboarding
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    let settings = await UNUserNotificationCenter.current().notificationSettings()
+                    guard settings.authorizationStatus == .notDetermined else { return }
+                    hasShownNotificationSoftAsk = true
+                    showNotificationSoftAsk = true
+                    AppAnalytics.log("soft_ask_shown", params: [
+                        "cold_start_count": countAtTrigger
+                    ])
+                }
+            }
             // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
             // reliably fire when a fullScreenCover dismisses on top of an
             // already-mounted view, so the primary trigger lives in the
@@ -122,6 +184,15 @@ struct ScriptListView: View {
             if pendingDemoRecording {
                 pendingDemoRecording = false
                 if let demo = scripts.first(where: { $0.isDemo }) {
+                    // Transient signal consumed by RecordingView's
+                    // .onAppear to suppress the camera explainer for
+                    // exactly this one auto-open mount. Without this
+                    // flag, RecordingView would have to use
+                    // `script.isDemo` as a proxy, which would also
+                    // suppress the explainer on later manual demo-script
+                    // opens (wrong — only the onboarding auto-open
+                    // should be silent).
+                    UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
                     scriptToRecord = demo
                 }
             }
@@ -140,8 +211,16 @@ struct ScriptListView: View {
                     #if DEBUG
                     print("📋 Auto-opening demo recording after onboarding")
                     #endif
+                    UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
                     scriptToRecord = demo
                 }
+            }
+            // Mark the onboarding session itself as cold-start "1" so
+            // the next true cold start observed by SteadyEyeApp.init()
+            // bumps to 2 and trips the notification soft-ask. Idempotent:
+            // only flips when the counter is still at the install default.
+            if newValue && coldStartCountAfterOnboarding == 0 {
+                coldStartCountAfterOnboarding = 1
             }
         }
     }
@@ -175,12 +254,7 @@ struct ScriptListView: View {
             .tint(.orange)
 
             Button {
-                if SubscriptionManager.shared.canBulkImport {
-                    showBulkImport = true
-                } else {
-                    paywallSource = "import_gate_empty"
-                    showPaywall = true
-                }
+                handleBulkImportTap(entryPoint: "empty_state")
             } label: {
                 Label {
                     Text("scripts.import.title", comment: "Import Multiple Scripts button label")
@@ -231,23 +305,6 @@ struct ScriptListView: View {
                     }
                 }
             }
-
-            Button {
-                if SubscriptionManager.shared.canBulkImport {
-                    showBulkImport = true
-                } else {
-                    paywallSource = "import_gate_list"
-                    showPaywall = true
-                }
-            } label: {
-                Label {
-                    Text("scripts.import.title", comment: "Import Multiple Scripts button label")
-                } icon: {
-                    Image(systemName: "doc.on.doc")
-                }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
         }
         .listStyle(.insetGrouped)
     }
@@ -256,6 +313,30 @@ struct ScriptListView: View {
 
     private func deleteScript(_ script: Script) {
         modelContext.delete(script)
+    }
+
+    /// Decision tree shared by every "Import Multiple Scripts" entry
+    /// point (toolbar `doc.on.doc` button and empty-state button).
+    /// First tap (no completed demo): present BulkImportView in demo
+    /// mode regardless of subscription. After a successful demo, free
+    /// users see the paywall directly; Pro users get the real import
+    /// flow. The paywall source differentiates by entry point so the
+    /// funnel can attribute conversions correctly.
+    private func handleBulkImportTap(entryPoint: String) {
+        if !hasSeenBulkImportDemo {
+            bulkImportEntryPoint = entryPoint
+            showBulkImport = true
+            return
+        }
+        if !subscriptionManager.canBulkImport {
+            paywallSource = entryPoint == "toolbar"
+                ? "import_gate_post_demo"
+                : "import_gate_empty"
+            showPaywall = true
+            return
+        }
+        bulkImportEntryPoint = entryPoint
+        showBulkImport = true
     }
 }
 

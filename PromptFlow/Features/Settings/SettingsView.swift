@@ -328,7 +328,15 @@ struct SettingsView: View {
                     }
                     .foregroundStyle(.red)
                     Button("Reset soft ask flag") {
+                        // Legacy key from the prior post-paywall trigger;
+                        // cleared for completeness so DEV resets are
+                        // truly clean.
                         UserDefaults.standard.set(false, forKey: "notificationSoftAskShown")
+                        // Active gate for the cold-start trigger.
+                        UserDefaults.standard.set(false, forKey: "hasShownNotificationSoftAsk")
+                        // Reset counter so the next cold start observed
+                        // by SteadyEyeApp.init() bumps to 1 again.
+                        UserDefaults.standard.set(0, forKey: "coldStartCountAfterOnboarding")
                     }
                 }
                 .onAppear {

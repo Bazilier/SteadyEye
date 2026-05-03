@@ -24,6 +24,18 @@ struct SteadyEyeApp: App {
         Self.ensureApplicationSupportDirectoryExists()
         cleanUpTempRecordings()
 
+        // Cold-start counter for the notification soft-ask gate. App.init
+        // runs exactly once per process launch (not on background→active
+        // resumes), so this is the canonical "cold start" signal — the
+        // user's spec equivalent of `applicationDidFinishLaunching`. We
+        // only bump after onboarding has finished; the onboarding session
+        // itself is bumped to 1 by ScriptListView when it observes the
+        // `hasSeenOnboarding` false→true transition.
+        if UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+            let prev = UserDefaults.standard.integer(forKey: "coldStartCountAfterOnboarding")
+            UserDefaults.standard.set(prev + 1, forKey: "coldStartCountAfterOnboarding")
+        }
+
         #if !DEV
         // Sync: Crashlytics needs Firebase active before any pre-frame
         // crash so reports are captured.

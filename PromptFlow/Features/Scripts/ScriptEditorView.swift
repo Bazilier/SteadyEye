@@ -27,12 +27,42 @@ struct ScriptEditorView: View {
     @State private var didLogOpen = false
     @AppStorage("hasSavedFirstScript") private var hasSavedFirstScript = false
     @FocusState private var contentFocused: Bool
+    @FocusState private var titleFocused: Bool
+
+    /// Editor demo gate. False until the user completes the demo at
+    /// least once (either via the fake-optimize finish or by saving
+    /// the demo content as a script).
+    @AppStorage("hasSeenEditorDemo") private var hasSeenEditorDemo: Bool = false
+    /// Set true on .onAppear when this open is a fresh, eligible demo
+    /// run (new script + flag still false). Used in performSave for
+    /// editor_demo_saved analytics, in the Optimize button to route
+    /// to the fake pipeline, and in .onDisappear to detect cancellation.
+    @State private var isDemoMode: Bool = false
+    /// Drives the spinner state on the Optimize button while the fake
+    /// pipeline is in-flight. Distinct from `isOptimizing` (real path)
+    /// so the disabled/spinner conditions can union cleanly.
+    @State private var isFakeOptimizing: Bool = false
+    /// True only during the read-only window of the demo — between the
+    /// first .onAppear that pre-fills "Before" content and the moment
+    /// the fake-optimize finishes swapping in "After". While locked:
+    /// title field, content editor, paste accessory, and Save button
+    /// are all disabled so the user can't edit the mock. Cancel and
+    /// Optimize stay active. Flips false at the end of
+    /// `fakeOptimizeForDemo` to unlock for normal editing of the
+    /// optimized text.
+    @State private var isDemoLocked: Bool = false
 
     private let maxChars = 5000
 
     private var isNew: Bool { script == nil }
 
     private var hasChanges: Bool {
+        // While the demo is locked, the prefilled "Before" text isn't
+        // a user change — it's seed data the user can't even modify.
+        // Treat it as "no changes" so Cancel dismisses immediately
+        // without firing the discard-changes alert. Once the demo
+        // unlocks (post-Optimize), normal dirty-tracking resumes.
+        if isDemoLocked { return false }
         guard let script else { return !title.isEmpty || !content.isEmpty }
         return title != script.title || content != script.content
     }
@@ -69,6 +99,8 @@ struct ScriptEditorView: View {
                     .padding(.horizontal)
                     .padding(.top, 16)
                     .padding(.bottom, 8)
+                    .focused($titleFocused)
+                    .disabled(isDemoLocked)
 
                 Divider()
 
@@ -77,11 +109,17 @@ struct ScriptEditorView: View {
                     .font(.body)
                     .padding(.horizontal, 12)
                     .focused($contentFocused)
+                    .disabled(isDemoLocked)
 
                 Divider()
 
                 // Stats bar
                 statsBar
+
+                // Large bottom CTA. Always visible — both demo and
+                // normal flows. Visual style matches BulkImportView's
+                // Import & Optimize button.
+                optimizeCTA
             }
             .navigationTitle(Text(
                 isNew ? "scripts.new" : "scripts.editor.title.edit",
@@ -107,15 +145,17 @@ struct ScriptEditorView: View {
                         Text("common.save", comment: "Save button in script editor toolbar")
                     }
                     .bold()
-                    .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isDemoLocked || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                ToolbarItem(placement: .keyboard) {
-                    Button {
-                        pasteFromClipboard()
-                    } label: {
-                        Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
+                if !isDemoLocked {
+                    ToolbarItem(placement: .keyboard) {
+                        Button {
+                            pasteFromClipboard()
+                        } label: {
+                            Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
+                        }
+                        .font(.caption)
                     }
-                    .font(.caption)
                 }
             }
             .alert(
@@ -261,7 +301,27 @@ struct ScriptEditorView: View {
                 title = script.title
                 content = script.content
             } else {
-                contentFocused = true
+                // New-script open. Pre-fill demo "Before" content on
+                // the first eligible mount; otherwise leave the editor
+                // blank as before.
+                if !hasSeenEditorDemo {
+                    isDemoMode = true
+                    isDemoLocked = true
+                    content = DemoContent.load("DemoEditorBefore", subdirectory: "EditorDemo")
+                    title = String(
+                        localized: "scripts.editor.demo.title",
+                        comment: "Mock title pre-filled into the editor's title field during the demo flow. Read-only until the user taps Optimize, then editable."
+                    )
+                    AppAnalytics.log("editor_demo_shown")
+                }
+                // Only auto-focus the editor (raises the keyboard)
+                // when the first-run tip won't show. Otherwise the
+                // explainer overlay would render on top of a
+                // half-screen layout. Focus is deferred to the
+                // explainer's onDismiss in that case.
+                if hasSeenEditorTip {
+                    contentFocused = true
+                }
             }
             if !didLogOpen {
                 didLogOpen = true
@@ -279,17 +339,40 @@ struct ScriptEditorView: View {
                 showEditorTip = true
             }
         }
-        .alert(
-            Text("common.tip.title", comment: "First-run tip alert title in editor"),
-            isPresented: $showEditorTip
-        ) {
-            Button {
-                hasSeenEditorTip = true
-            } label: {
-                Text("common.tip.gotIt", comment: "Got it button dismissing the editor tip")
+        .onDisappear {
+            // Funnel signal: any editor close while still in demo mode
+            // (i.e. before the user tapped Optimize OR Save) counts as
+            // a cancelled demo. Both Optimize-completion and Save flip
+            // `hasSeenEditorDemo` to true, so successful end-states
+            // short-circuit this branch.
+            if isDemoMode && !hasSeenEditorDemo {
+                AppAnalytics.log("editor_demo_cancelled")
             }
-        } message: {
-            Text("scripts.editor.tip.body", comment: "Editor first-run tip body — references the Optimize button and the // pause-marker syntax")
+        }
+        .overlay {
+            if showEditorTip {
+                ExplainerOverlay(
+                    isPresented: $showEditorTip,
+                    icon: "lightbulb",
+                    title: "common.tip.title",
+                    message: "scripts.editor.tip.body",
+                    buttonLabel: "common.tip.gotIt",
+                    onDismiss: {
+                        hasSeenEditorTip = true
+                        // Focus the editor on the next runloop tick so
+                        // SwiftUI's overlay-unmount commit doesn't
+                        // collide with the focus state change. New
+                        // scripts (no `script`) are the only opens
+                        // that benefit; existing-script edits don't
+                        // auto-focus content in either branch.
+                        if isNew {
+                            Task { @MainActor in
+                                contentFocused = true
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -323,9 +406,9 @@ struct ScriptEditorView: View {
             }
         } else {
             Text(String(
-                localized: "script.aiDailyCaption",
-                defaultValue: "Free: 1 optimization per day",
-                comment: "Footer in the editor stats bar telling free users they get one AI optimization per calendar day."
+                localized: "scripts.editor.freeIndicator",
+                defaultValue: "Free: 1 / day",
+                comment: "Compact free-tier optimization indicator on the trailing side of the editor stats bar. Vertically centered against the two-row counters VStack."
             ))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -333,62 +416,94 @@ struct ScriptEditorView: View {
     }
 
     private var statsBar: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 20) {
-                Label {
-                    if subscriptionManager.isSubscribed {
-                        Text(String(
-                            localized: "script.wordCount",
-                            defaultValue: "\(wordCount) words",
-                            comment: "Word count display in the editor stats bar"
-                        ))
-                    } else {
-                        Text(String(
-                            localized: "script.wordCountLimited",
-                            defaultValue: "\(wordCount) / 50 words",
-                            comment: "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap."
-                        ))
-                            .foregroundStyle(wordCountColor)
-                    }
-                } icon: {
-                    Image(systemName: "text.word.spacing")
+        HStack(spacing: 8) {
+            Image(systemName: "text.word.spacing")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                if subscriptionManager.isSubscribed {
+                    Text(String(
+                        localized: "script.wordCount",
+                        defaultValue: "\(wordCount) words",
+                        comment: "Word count display in the editor stats bar"
+                    ))
+                } else {
+                    Text(String(
+                        localized: "script.wordCountLimited",
+                        defaultValue: "\(wordCount) / 50 words",
+                        comment: "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap."
+                    ))
+                        .foregroundStyle(wordCountColor)
                 }
-                Text("\(content.count.formatted()) / \(maxChars.formatted())")
+                Text(String(
+                    localized: "script.charCount",
+                    defaultValue: "\(content.count.formatted()) / \(maxChars.formatted()) chars",
+                    comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
+                ))
                     .foregroundStyle(charCountColor)
-                Spacer()
-                Button {
-                    if !subscriptionManager.canOptimizeToday {
-                        if subscriptionManager.isSubscribed {
-                            showProDailyLimitAlert = true
-                        } else {
-                            paywallSource = "ai_optimize"
-                            showPaywall = true
-                        }
-                    } else {
-                        optimizeForReading()
-                    }
-                } label: {
-                    if isOptimizing {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Label {
-                            Text("scripts.editor.optimize", comment: "Optimize button label in editor stats bar")
-                        } icon: {
-                            Image(systemName: "wand.and.stars")
-                        }
-                            .foregroundStyle(.orange)
-                    }
-                }
-                .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
             }
+            Spacer()
             aiOptimizeCaption
-                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
         .padding(.horizontal)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Optimize CTA
+
+    /// Large bottom-of-editor primary action. Visual style mirrors
+    /// BulkImportView's "Import & Optimize" button so the two demo
+    /// flows share a CTA family. Tap behavior is unchanged from the
+    /// previous in-stats-bar small button: demo path → fake pipeline,
+    /// real path → free-tier cap / Pro daily limit / paywall / real
+    /// AnthropicService call.
+    @ViewBuilder
+    private var optimizeCTA: some View {
+        Button {
+            if isDemoMode {
+                fakeOptimizeForDemo()
+                return
+            }
+            if !subscriptionManager.canOptimizeToday {
+                if subscriptionManager.isSubscribed {
+                    showProDailyLimitAlert = true
+                } else {
+                    paywallSource = "ai_optimize"
+                    showPaywall = true
+                }
+            } else {
+                optimizeForReading()
+            }
+        } label: {
+            // Keep both states in the layout via opacity-only swap so
+            // the button's intrinsic frame stays anchored to the
+            // larger Label state. Switching the rendered subtree
+            // (`if/else`) caused the button to shrink ~6-8pt when the
+            // spinner showed, because ProgressView(.small) has a
+            // smaller intrinsic height than Label(text+icon). ZStack
+            // takes the size of its largest child (the Label), so the
+            // bordered background never recomputes mid-tap.
+            ZStack {
+                Label {
+                    Text("scripts.editor.optimize", comment: "Optimize button label — large bottom CTA in the editor. Reused for both the real Anthropic-call flow and the demo's fake-optimize flow.")
+                } icon: {
+                    Image(systemName: "wand.and.stars")
+                }
+                .opacity((isOptimizing || isFakeOptimizing) ? 0 : 1)
+
+                ProgressView()
+                    .controlSize(.small)
+                    .opacity((isOptimizing || isFakeOptimizing) ? 1 : 0)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.orange)
+        .disabled(isOptimizing || isFakeOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
+        .padding(.horizontal)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Actions
@@ -420,8 +535,49 @@ struct ScriptEditorView: View {
                 AppAnalytics.log("first_script_saved")
                 hasSavedFirstScript = true
             }
+            // Saving while still in demo mode counts as completing
+            // the demo (the user kept the content, even if they
+            // skipped the fake-optimize step). Flip the gate so the
+            // demo doesn't re-pre-fill on the next "+" tap, and
+            // suppress the .onDisappear cancelled-funnel event.
+            if isDemoMode {
+                hasSeenEditorDemo = true
+                AppAnalytics.log("editor_demo_saved")
+            }
         }
         dismiss()
+    }
+
+    /// Demo-mode replacement for `optimizeForReading()`. Runs a fixed
+    /// ~1.8s sleep matching the typical real-call latency, then swaps
+    /// the editor's content with the localized "After" text. No
+    /// network call, no rate-limit accounting, doesn't decrement the
+    /// free-tier 3-lifetime AI counter.
+    private func fakeOptimizeForDemo() {
+        AppAnalytics.log("editor_demo_optimize_tapped")
+        isFakeOptimizing = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            content = DemoContent.load("DemoEditorAfter", subdirectory: "EditorDemo")
+            isFakeOptimizing = false
+            // Lift the read-only lock so the user can edit the
+            // optimized text, name it, and save it. `isDemoMode`
+            // stays true so performSave still flips
+            // `hasSeenEditorDemo` and logs `editor_demo_saved`.
+            isDemoLocked = false
+            // Mark demo seen BEFORE any subsequent dismiss so the
+            // .onDisappear handler doesn't false-fire the cancelled
+            // event for users who completed Optimize then closed
+            // without saving.
+            hasSeenEditorDemo = true
+            AppAnalytics.log("editor_demo_completed")
+            // Intentionally NOT setting `titleFocused = true` here —
+            // the user just tapped Optimize and is reading the result,
+            // not ready to type. Tapping the title or content fields
+            // afterward raises the keyboard via standard SwiftUI focus
+            // tracking. The `@FocusState`/`.focused(...)` plumbing
+            // remains so future code can target focus deliberately.
+        }
     }
 
     private func optimizeForReading() {
