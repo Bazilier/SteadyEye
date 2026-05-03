@@ -22,15 +22,13 @@ final class OfferEngine {
     /// 2. If `discount50AfterFirstDismiss` is active (timer running and
     ///    not used), return its `revenueCatOfferingId`.
     /// 3. Otherwise return nil (default offering).
+    ///
+    /// Parked 2026-05-03: discount_50 is now the RC Current offering, so
+    /// timer-based selection is unused. Always returns nil to delegate
+    /// selection to `offerings.current`. The rest of the engine (timer
+    /// state, used flags) is left intact in case we revive timer-based
+    /// activation for a future winback or re-engagement offer.
     func resolveOfferingId(source: String) -> String? {
-        // Defensive: Pro users shouldn't see paywalls at all.
-        if SubscriptionManager.shared.isSubscribed { return nil }
-
-        let offer = OfferDefinition.discount50AfterFirstDismiss
-        if isOfferActive(offer) {
-            return offer.revenueCatOfferingId
-        }
-
         return nil
     }
 

@@ -62,16 +62,20 @@ struct PaywallView: View {
     // MARK: - Packages from offerings
 
     private var resolvedOffering: Offering? {
-        // Explicit override wins. Otherwise consult OfferEngine, which
-        // returns a non-nil offering id only when an offer is active
-        // for this user (e.g. discount_50 window). When OfferEngine
-        // returns nil, `manager.offering(for: nil)` falls back to
-        // `offerings.current` — matching pre-Phase-3 behavior.
-        if let explicit = offeringId {
-            return manager.offering(for: explicit)
-        }
-        let engineId = OfferEngine.shared.resolveOfferingId(source: source)
-        return manager.offering(for: engineId)
+        // Hardcoded to "discount_50" for this build. Reasoning:
+        // We are doing a soft rollout — the RC Current offering remains
+        // "default" so the existing prod build (which reads .current)
+        // keeps showing the 7-day trial flow to existing users. New
+        // builds (this one) explicitly request discount_50, displaying
+        // the intro-discount pricing UX. This avoids any RC dashboard
+        // flip and lets old/new builds coexist cleanly.
+        //
+        // If discount_50 is unavailable for any reason, fall back to
+        // .current so the paywall still has something to render (rather
+        // than going blank). The caller can still override via
+        // `offeringId` when needed (e.g. for A/B tests).
+        if let explicit = offeringId { return manager.offering(for: explicit) }
+        return manager.offering(for: "discount_50") ?? manager.offering(for: nil)
     }
     private var annualPackage: Package? { resolvedOffering?.annual }
     private var monthlyPackage: Package? { resolvedOffering?.monthly }
@@ -83,6 +87,103 @@ struct PaywallView: View {
         case .annual: return annualPackage
         case .lifetime: return lifetimePackage
         }
+    }
+
+    // MARK: - Intro pricing helper
+
+    /// Two-line label for plan rows when the underlying StoreProduct has an
+    /// active intro offer (intro discount or free trial). Primary is the
+    /// intro price + period; secondary is the post-intro recurring price.
+    private struct IntroPriceDisplay {
+        let primary: String
+        let secondary: String
+        let savingsPercent: Int
+    }
+
+    /// Returns nil when the product has no `introductoryDiscount` (user is
+    /// either ineligible or the product carries no intro at all). The plan
+    /// row falls back to `priceText(for:)` in that case.
+    private func introDisplay(for product: StoreProduct) -> IntroPriceDisplay? {
+        guard let intro = product.introductoryDiscount,
+              let basePeriod = product.subscriptionPeriod
+        else { return nil }
+        let totalUnits = intro.subscriptionPeriod.value * intro.numberOfPeriods
+        let primary = formatIntroPrimary(
+            price: intro.localizedPriceString,
+            unit: intro.subscriptionPeriod.unit,
+            totalUnits: totalUnits
+        )
+        let secondary = formatIntroSecondary(
+            price: product.localizedPriceString,
+            unit: basePeriod.unit
+        )
+        let base = (product.price as NSDecimalNumber).doubleValue
+        let disc = (intro.price as NSDecimalNumber).doubleValue
+        let pct = base > 0 ? Int(((base - disc) / base) * 100) : 0
+        return IntroPriceDisplay(primary: primary, secondary: secondary, savingsPercent: pct)
+    }
+
+    private func formatIntroPrimary(price: String, unit: SubscriptionPeriod.Unit, totalUnits: Int) -> String {
+        if totalUnits == 1 {
+            switch unit {
+            case .day:   return String(localized: "paywall.intro.firstDay",   defaultValue: "\(price) first day",   comment: "Paywall plan row primary line shown when an intro discount lasts one day. %@ is the localized intro price.")
+            case .week:  return String(localized: "paywall.intro.firstWeek",  defaultValue: "\(price) first week",  comment: "Paywall plan row primary line shown when an intro discount lasts one week. %@ is the localized intro price.")
+            case .month: return String(localized: "paywall.intro.firstMonth", defaultValue: "\(price) first month", comment: "Paywall plan row primary line shown when an intro discount lasts one month. %@ is the localized intro price.")
+            case .year:  return String(localized: "paywall.intro.firstYear",  defaultValue: "\(price) first year",  comment: "Paywall plan row primary line shown when an intro discount lasts one year. %@ is the localized intro price.")
+            @unknown default: return price
+            }
+        }
+        switch unit {
+        case .day:   return String(localized: "paywall.intro.firstDays",   defaultValue: "\(price) for first \(totalUnits) days",   comment: "Paywall plan row primary line for a multi-day intro discount. %1$@ is the price; %2$lld is the day count.")
+        case .week:  return String(localized: "paywall.intro.firstWeeks",  defaultValue: "\(price) for first \(totalUnits) weeks",  comment: "Paywall plan row primary line for a multi-week intro discount. %1$@ is the price; %2$lld is the week count.")
+        case .month: return String(localized: "paywall.intro.firstMonths", defaultValue: "\(price) for first \(totalUnits) months", comment: "Paywall plan row primary line for a multi-month intro discount. %1$@ is the price; %2$lld is the month count.")
+        case .year:  return String(localized: "paywall.intro.firstYears",  defaultValue: "\(price) for first \(totalUnits) years",  comment: "Paywall plan row primary line for a multi-year intro discount. %1$@ is the price; %2$lld is the year count.")
+        @unknown default: return price
+        }
+    }
+
+    private func formatIntroSecondary(price: String, unit: SubscriptionPeriod.Unit) -> String {
+        switch unit {
+        case .day:   return String(localized: "paywall.intro.thenPerDay",   defaultValue: "then \(price)/day",   comment: "Paywall plan row secondary line shown beneath an intro price, indicating the regular daily price after intro ends. %@ is the localized recurring price.")
+        case .week:  return String(localized: "paywall.intro.thenPerWeek",  defaultValue: "then \(price)/week",  comment: "Paywall plan row secondary line shown beneath an intro price, indicating the regular weekly price after intro ends. %@ is the localized recurring price.")
+        case .month: return String(localized: "paywall.intro.thenPerMonth", defaultValue: "then \(price)/month", comment: "Paywall plan row secondary line shown beneath an intro price, indicating the regular monthly price after intro ends. %@ is the localized recurring price.")
+        case .year:  return String(localized: "paywall.intro.thenPerYear",  defaultValue: "then \(price)/year",  comment: "Paywall plan row secondary line shown beneath an intro price, indicating the regular annual price after intro ends. %@ is the localized recurring price.")
+        @unknown default: return price
+        }
+    }
+
+    /// Highest intro savings percentage across the visible subscription
+    /// packages (monthly + annual). Used by the hero subtitle and any
+    /// other top-level "X% OFF" copy. Returns nil when no package has an
+    /// active intro — in that case the subtitle should fall back to a
+    /// non-percentage variant.
+    private var maxSavingsPercent: Int? {
+        let percents: [Int] = [monthlyPackage, annualPackage]
+            .compactMap { $0?.storeProduct }
+            .compactMap { introDisplay(for: $0)?.savingsPercent }
+            .filter { $0 > 0 }
+        return percents.max()
+    }
+
+    /// Hero subtitle copy. When at least one visible package has an
+    /// intro discount, surface the actual saved percentage — Apple's
+    /// regional StoreKit pricing tiers don't always produce the
+    /// nominally-targeted percent. Falls back to a percent-free
+    /// variant when no visible plan has an active intro (e.g. user
+    /// already used the intro for this subscription group).
+    private var heroSubtitleText: String {
+        if let pct = maxSavingsPercent, pct >= 1 {
+            return String(
+                localized: "paywall.v2.subtitle.specialOfferPercent",
+                defaultValue: "Special offer — \(pct)% off",
+                comment: "Paywall v2 hero subtitle shown directly under the SteadyEye headline when at least one visible plan has an active intro discount. %lld is the integer percent saved (computed dynamically from the largest savings across visible plans, e.g. 50). Apple's regional StoreKit pricing tiers mean the percent is not fixed."
+            )
+        }
+        return String(
+            localized: "paywall.v2.subtitle.getFullAccess",
+            defaultValue: "Get full access",
+            comment: "Paywall v2 hero subtitle fallback shown when no visible plan has an active intro discount (e.g. user already used the intro for this subscription group). Neutral, honest copy that does not claim an offer the user is not eligible for."
+        )
     }
 
     private func priceText(for plan: PaywallPlan) -> String {
@@ -286,11 +387,7 @@ struct PaywallView: View {
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
 
-            Text(String(
-                localized: "paywall.v2.subheadline",
-                defaultValue: "Start trial for free",
-                comment: "Paywall v2 hero subheadline shown directly under the SteadyEye headline."
-            ))
+            Text(heroSubtitleText)
                 .font(.title2)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
@@ -513,24 +610,18 @@ struct PaywallView: View {
 
     // MARK: - Sticky bottom sheet
 
-    /// CTA copy switches to "Start free trial" when annual is selected
-    /// (the trial-eligible plan) and falls back to "Continue" for monthly /
-    /// lifetime. SwiftUI re-renders the button automatically when
-    /// `selectedPlan` changes — no onChange handler needed.
+    /// Universal CTA copy. Previously branched to "Start free trial" when
+    /// annual was selected, but the discount_50 offering carries an intro
+    /// *discount* — not a free trial — so a single "Continue" label is now
+    /// correct for every plan. The unused `paywall.v2.startFreeTrial`
+    /// localization key is intentionally retained in the strings catalog
+    /// in case a free-trial offering is reintroduced.
     private var continueButtonLabel: String {
-        if selectedPlan == .annual {
-            return String(
-                localized: "paywall.v2.startFreeTrial",
-                defaultValue: "Start free trial",
-                comment: "Paywall v2 CTA label shown when annual plan is selected (trial-eligible)."
-            )
-        } else {
-            return String(
-                localized: "paywall.v2.continueButton",
-                defaultValue: "Continue",
-                comment: "Paywall v2 CTA label shown when monthly or lifetime plan is selected."
-            )
-        }
+        String(
+            localized: "paywall.v2.continueButton",
+            defaultValue: "Continue",
+            comment: "Paywall v2 CTA label. Shown for all plans regardless of selection — there is no plan-specific copy variant."
+        )
     }
 
     private var bottomSheet: some View {
@@ -609,7 +700,10 @@ struct PaywallView: View {
     }
 
     private func planRow(plan: PaywallPlan) -> some View {
-        let price = priceText(for: plan)
+        let pkg = package(for: plan)
+        let intro = pkg.flatMap { introDisplay(for: $0.storeProduct) }
+        let basePrice = priceText(for: plan)
+        let displayPrice = intro?.primary ?? basePrice
         let isSelected = selectedPlan == plan
         return Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -623,32 +717,28 @@ struct PaywallView: View {
                             .font(.body)
                             .bold()
                             .foregroundColor(.white)
-                        if plan == .annual {
+                        if let intro, intro.savingsPercent >= 30 {
                             Text(String(
-                                localized: "paywall.v2.bestValue",
-                                defaultValue: "Best Value",
-                                comment: "Paywall v2 static badge marking the recommended plan. Shown on the annual row regardless of which plan is currently selected."
+                                localized: "paywall.intro.savingsBadge",
+                                defaultValue: "\(intro.savingsPercent)% OFF",
+                                comment: "Compact badge displayed next to a paywall plan title when the active intro discount saves the user 30% or more on the first period. %lld is the integer percent saved (e.g. 50)."
                             ))
                                 .font(.caption2).bold()
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Color.orange)
+                                .background(Color.green)
                                 .foregroundColor(.black)
                                 .clipShape(Capsule())
                         }
                     }
-                    if plan == .annual {
-                        Text(String(
-                            localized: "paywall.v2.collapsed.trialCaption",
-                            defaultValue: "7 days free, then \(price)",
-                            comment: "Caption on the annual row reminding users of the free-trial offer. %@ is the localized annual price including period suffix (e.g. '$49.99 / year'). Apple's StoreKit sheet handles actual eligibility — this string is shown unconditionally."
-                        ))
+                    if let intro {
+                        Text(intro.secondary)
                             .font(.footnote)
                             .foregroundColor(.secondary)
                     }
                 }
                 Spacer()
-                Text(price)
+                Text(displayPrice)
                     .font(.body)
                     .foregroundColor(.white)
             }
