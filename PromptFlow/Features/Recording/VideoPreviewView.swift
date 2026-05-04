@@ -13,8 +13,7 @@ struct VideoPreviewView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
-    @State private var player: AVPlayer?
-    @State private var loopObserver: NSObjectProtocol?
+    @StateObject private var playback = PlaybackController()
     @State private var showDeleteConfirmation = false
     @State private var showSaveError = false
     @State private var showSaveSuccess = false
@@ -24,7 +23,6 @@ struct VideoPreviewView: View {
     /// performChanges block. Drives the save-success toast's tap-to-open
     /// deep link into the Photos app at the just-saved asset.
     @State private var savedAssetLocalIdentifier: String?
-    @State private var isPlaying = true
     @State private var videoSize: CGSize = CGSize(width: 9, height: 16)
 
     var body: some View {
@@ -41,11 +39,11 @@ struct VideoPreviewView: View {
             // letterbox margins fall through to the background. The paused-
             // state play glyph is overlaid on the aspect-ratio'd view so it
             // tracks the video's center, not the screen's.
-            if let player {
+            if let player = playback.player {
                 CustomVideoPlayer(player: player)
                     .aspectRatio(videoSize.width / videoSize.height, contentMode: .fit)
                     .overlay {
-                        if !isPlaying {
+                        if !playback.isPlaying && !playback.isScrubbing {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 56))
                                 .foregroundColor(.white.opacity(0.85))
@@ -54,7 +52,7 @@ struct VideoPreviewView: View {
                         }
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture { togglePlayPause() }
+                    .onTapGesture { playback.togglePlayPause() }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, 64)
                     .padding(.bottom, 78)
@@ -84,11 +82,16 @@ struct VideoPreviewView: View {
             .ignoresSafeArea(edges: .bottom)
             .allowsHitTesting(false)
 
-            // Floating overlay: top bar + Spacer + save CTA. Stays inside the
-            // safe area so chevron/trash and the orange button aren't clipped.
+            // Floating overlay: top bar + Spacer + scrubber row + save CTA.
+            // Stays inside the safe area so chevron/trash, the scrubber
+            // thumb, and the orange button aren't clipped. The scrubber
+            // row sits in this bottom chrome layer (NOT over the video
+            // surface), so its DragGesture doesn't conflict with the
+            // video's onTapGesture.
             VStack(spacing: 0) {
                 topBar
                 Spacer()
+                scrubberRow
                 saveButton
             }
         }
@@ -240,14 +243,14 @@ struct VideoPreviewView: View {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else {
             return
         }
-        let avPlayer = AVPlayer(url: recording.fileURL)
-        self.player = avPlayer
+        playback.setup(url: recording.fileURL, initialDuration: recording.duration)
 
         // Load the video track's natural size + preferred transform so the
         // container can size to the actual aspect ratio. Falls back silently
         // to the 9:16 default if any step fails. The MainActor write checks
         // that the player is still set, so a late completion after dismiss
         // won't clobber the next presentation's state.
+        guard let avPlayer = playback.player else { return }
         Task {
             guard let item = avPlayer.currentItem else { return }
             do {
@@ -262,7 +265,7 @@ struct VideoPreviewView: View {
                 )
                 guard displayedSize.width > 0, displayedSize.height > 0 else { return }
                 await MainActor.run {
-                    if self.player != nil {
+                    if self.playback.player != nil {
                         self.videoSize = displayedSize
                     }
                 }
@@ -270,37 +273,48 @@ struct VideoPreviewView: View {
                 // Silently fall back to the 9:16 default.
             }
         }
-
-        loopObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: avPlayer.currentItem,
-            queue: .main
-        ) { _ in
-            avPlayer.seek(to: .zero)
-            avPlayer.play()
-        }
-
-        avPlayer.play()
-        isPlaying = true
     }
 
     private func teardownPlayer() {
-        if let loopObserver {
-            NotificationCenter.default.removeObserver(loopObserver)
-        }
-        loopObserver = nil
-        player?.pause()
-        player = nil
+        playback.teardown()
     }
 
-    private func togglePlayPause() {
-        guard let player else { return }
-        if player.timeControlStatus == .playing {
-            player.pause()
-            isPlaying = false
+    // MARK: - Scrubber row
+
+    /// Compact playback chrome: current-time label, draggable
+    /// scrubber, total-duration label. Sits in the bottom overlay
+    /// VStack between the Spacer and the Save CTA — not over the
+    /// video surface — so its DragGesture doesn't conflict with the
+    /// video's onTapGesture (separate Z-stack layers).
+    private var scrubberRow: some View {
+        HStack(spacing: 12) {
+            Text(Self.formatTime(playback.currentTime))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.white)
+                .frame(width: 44, alignment: .leading)
+            ScrubberView(playback: playback)
+            Text(Self.formatTime(playback.duration))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.white)
+                .frame(width: 44, alignment: .trailing)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+
+    /// Formats `seconds` as `M:SS` (or `MM:SS` when total length is
+    /// ≥ 10 minutes). Negative values clamp to 0; fractional seconds
+    /// are floored.
+    private static func formatTime(_ seconds: Double) -> String {
+        let safe = max(0, seconds)
+        let total = Int(safe)
+        let m = total / 60
+        let s = total % 60
+        if m >= 10 {
+            return String(format: "%02d:%02d", m, s)
         } else {
-            player.play()
-            isPlaying = true
+            return String(format: "%d:%02d", m, s)
         }
     }
 
@@ -415,6 +429,69 @@ struct VideoPreviewView: View {
         teardownPlayer()
         RecordingPersistence.delete(recording, modelContext: modelContext)
         onDismiss()
+    }
+}
+
+// MARK: - Custom scrubber
+
+/// Drag-to-seek scrubber. The track and filled portion are simple
+/// capsules; the thumb is centered on the leading edge of the filled
+/// portion (so its center tracks the playhead). While the user is
+/// actively dragging, the thumb position is driven from a local
+/// `scrubTime` so it follows the finger without waiting for AVPlayer
+/// to confirm each seek; otherwise it follows `playback.currentTime`
+/// from the periodic time observer.
+///
+/// `DragGesture(minimumDistance: 0)` doubles as tap-to-seek: a single
+/// tap fires `.onChanged` once at the touch point (jumping the thumb)
+/// and immediately `.onEnded`.
+private struct ScrubberView: View {
+    @ObservedObject var playback: PlaybackController
+    @State private var scrubTime: Double = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            // Avoid divide-by-zero on the very first frame before
+            // duration is seeded; playback always sets a real
+            // `initialDuration` before the View binds, so this is a
+            // belt-and-suspenders default.
+            let denom = max(playback.duration, 0.001)
+            let displayTime = playback.isScrubbing ? scrubTime : playback.currentTime
+            let progress = min(1, max(0, displayTime / denom))
+            let filledWidth = width * progress
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.25))
+                    .frame(height: 3)
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: filledWidth, height: 3)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 14, height: 14)
+                    .shadow(color: .black.opacity(0.3), radius: 2)
+                    .offset(x: filledWidth - 7)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !playback.isScrubbing {
+                            playback.beginScrubbing()
+                        }
+                        let raw = (value.location.x / width) * playback.duration
+                        let clamped = max(0, min(playback.duration, raw))
+                        scrubTime = clamped
+                        playback.scrub(to: clamped)
+                    }
+                    .onEnded { _ in
+                        playback.endScrubbing()
+                    }
+            )
+        }
+        .frame(height: 14)
     }
 }
 
