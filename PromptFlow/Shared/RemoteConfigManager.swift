@@ -40,12 +40,14 @@ final class RemoteConfigManager {
     //          → app shows "Look confident on camera" (en),
     //            "Pareça confiante na câmera" (pt-BR), etc.
     //
-    // Non-text RC values (`offering_id`, `default_plan`,
-    // `experiment_*`) and templates that need parametric substitution
-    // (`subtitle_*` — embedded `{pct}` placeholder) are stored as
-    // raw strings without the `_key` suffix. Subtitle localization
-    // happens via per-locale Firebase Console conditions on those
-    // raw values.
+    // The `paywall_subtitle_*` parameters follow the same convention:
+    // their values are catalog keys, resolved by `PaywallConfig` via
+    // `NSLocalizedString`. Anyone overriding these in Firebase Console
+    // must enter a catalog key (e.g. `paywall.v2.subtitle.getFullAccess`),
+    // NOT translated prose — translations live in `Localizable.xcstrings`.
+    //
+    // Non-text RC values (`offering_id`, `default_plan`, `experiment_*`)
+    // are stored as raw strings without the `_key` suffix.
 
     /// Defaults dict — single source of truth. Seeded into Firebase
     /// RC by `setDefaults()`, AND used directly by DEV builds (and
@@ -53,8 +55,8 @@ final class RemoteConfigManager {
     private let defaults: [String: String] = [
         "paywall_offering_id":       "discount_50",
         "paywall_headline_key":      "paywall.v2.headline.getFullAccess",
-        "paywall_subtitle_with_pct": "Special offer — {pct}% off",
-        "paywall_subtitle_no_pct":   "Get full access",
+        "paywall_subtitle_with_pct": "paywall.v2.subtitle.specialOfferWithPct",
+        "paywall_subtitle_no_pct":   "paywall.v2.subtitle.getFullAccess",
         "paywall_cta_key":           "paywall.v2.cta.continue",
         "paywall_default_plan":      "annual",
         "experiment_paywall_v1":     "control",

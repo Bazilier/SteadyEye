@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var isRestoring = false
     @State private var restoreSucceeded = false
     @State private var showRestoreAlert = false
+    @State private var showChat = false
 
     #if DEV
     @State private var devNotificationStatus: String = "loading…"
@@ -76,6 +77,44 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button {
+                        showChat = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "message.fill")
+                                .foregroundStyle(.tint)
+                                .font(.system(size: 22))
+                                .frame(width: 30, alignment: .center)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(
+                                    localized: "settings.chat.title",
+                                    defaultValue: "Chat with Kirill",
+                                    comment: "Title of the Settings row that opens the in-app chat with the founder."
+                                ))
+                                    .font(.body.weight(.semibold))
+                                    .foregroundColor(.primary)
+                                Text(String(
+                                    localized: "settings.chat.subtitle",
+                                    defaultValue: "Founder of SteadyEye · I read every message",
+                                    comment: "Subtitle on the Settings → Chat row. 'SteadyEye' is the brand name and must not be translated."
+                                ))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary.opacity(0.6))
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 // First section: Upgrade entry point + Redeem code.
                 // For free users: shows Upgrade row above Redeem code row.
                 // For Pro users: Upgrade row is hidden; Redeem code remains
@@ -438,6 +477,9 @@ struct SettingsView: View {
             }
             .fullScreenCover(isPresented: $showUpgradePaywall) {
                 PaywallView(source: "settings_upgrade_row")
+            }
+            .sheet(isPresented: $showChat) {
+                ChatView()
             }
             .alert(restoreResultTitle, isPresented: $showRestoreAlert) {
                 Button("common.ok", role: .cancel) {}

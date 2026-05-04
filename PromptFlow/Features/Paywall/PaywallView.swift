@@ -173,12 +173,13 @@ struct PaywallView: View {
     /// already used the intro for this subscription group).
     private var heroSubtitleText: String {
         if let pct = maxSavingsPercent, pct >= 1 {
-            // Template comes from Remote Config — server-side
-            // conditions deliver the correct per-locale phrasing.
-            // Default `Special offer — {pct}% off` is matched by
-            // `RemoteConfigManager.defaults`.
-            return PaywallConfig.subtitleWithPct
-                .replacingOccurrences(of: "{pct}", with: "\(pct)")
+            // Template is a localized format string with a `%lld`
+            // placeholder for the integer percent (and `%%` for the
+            // literal percent sign). Resolved by `subtitleWithPct`
+            // through Remote Config → catalog key → `NSLocalizedString`,
+            // then formatted here against the runtime `pct` value.
+            let template = PaywallConfig.subtitleWithPct
+            return String(format: template, pct)
         }
         return PaywallConfig.subtitleNoPct
     }

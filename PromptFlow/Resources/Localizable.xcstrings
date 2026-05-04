@@ -435,6 +435,246 @@
     "Cancel all pending notifications" : {
 
     },
+    "chat.empty" : {
+      "comment" : "Empty-state hint shown in the chat when there are no messages yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a conversation"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia una conversación"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece uma conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начните разговор"
+          }
+        }
+      }
+    },
+    "chat.error.network" : {
+      "comment" : "Banner shown in chat when the network request to fetch messages fails.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection issue. Pull to refresh."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema de conexión. Desliza para actualizar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problema de conexão. Puxe para atualizar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проблема с подключением. Потяните, чтобы обновить."
+          }
+        }
+      }
+    },
+    "chat.error.send_failed" : {
+      "comment" : "Banner shown in chat when sending a message fails. The user can tap to retry.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to send. Tap to retry."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error al enviar. Toca para reintentar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao enviar. Toque para tentar de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось отправить. Нажмите, чтобы повторить."
+          }
+        }
+      }
+    },
+    "chat.header.subtitle" : {
+      "comment" : "Subtitle in the chat header, under the founder's name. 'SteadyEye' is the brand name and must not be translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Founder of SteadyEye"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fundador de SteadyEye"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fundador do SteadyEye"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создатель SteadyEye"
+          }
+        }
+      }
+    },
+    "chat.header.title" : {
+      "comment" : "Title in the chat header — the founder's name. 'Cyril' is a proper noun. In Russian it is rendered as 'Кирилл'.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cyril"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cyril"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cyril"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кирилл"
+          }
+        }
+      }
+    },
+    "chat.input.placeholder" : {
+      "comment" : "Placeholder text inside the chat input field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type a message..."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe un mensaje..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite uma mensagem..."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Напишите сообщение..."
+          }
+        }
+      }
+    },
+    "chat.input.send" : {
+      "comment" : "Accessibility label for the chat send button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отправить"
+          }
+        }
+      }
+    },
+    "chat.welcome" : {
+      "comment" : "Pinned welcome message at the top of the chat from the founder. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi 👋 I'm Cyril. I built SteadyEye. Message me directly — I read every message."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hola 👋 Soy Cyril. Construí SteadyEye. Escríbeme directamente — leo cada mensaje."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oi 👋 Eu sou o Cyril. Construí o SteadyEye. Me escreva direto — leio cada mensagem."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye. Пиши мне напрямую — я читаю каждое сообщение."
+          }
+        }
+      }
+    },
     "common.cancel" : {
       "comment" : "Generic Cancel button used in alerts and toolbars.",
       "extractionState" : "manual",
@@ -767,7 +1007,33 @@
     },
     "Continue" : {
       "comment" : "A button label that says \"Continue\".",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить"
+          }
+        }
+      }
     },
     "Debug" : {
 
@@ -1167,7 +1433,33 @@
     },
     "Open Settings" : {
       "comment" : "A button label that opens the user's device settings.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir configuración"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir configurações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть настройки"
+          }
+        }
+      }
     },
     "paywall.button.buyLifetime" : {
       "comment" : "Subscribe button label when the lifetime plan is selected.",
@@ -1538,17 +1830,112 @@
             "state" : "new",
             "value" : "%@ first day"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primer día"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primeiro dia"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ первый день"
+          }
         }
       }
     },
     "paywall.intro.firstDays" : {
       "comment" : "Paywall plan row primary line for a multi-day intro discount. %1$@ is the price; %2$lld is the day count.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ for first %2$lld days"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld days"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por el primer %2$lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por los primeros %2$lld días"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelo primeiro %2$lld dia"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelos primeiros %2$lld dias"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld дня"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld дней"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первый %2$lld день"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld дней"
+                }
+              }
+            }
           }
         }
       }
@@ -1562,17 +1949,112 @@
             "state" : "new",
             "value" : "%@ first month"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primer mes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primeiro mês"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ первый месяц"
+          }
         }
       }
     },
     "paywall.intro.firstMonths" : {
       "comment" : "Paywall plan row primary line for a multi-month intro discount. %1$@ is the price; %2$lld is the month count.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ for first %2$lld months"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld month"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld months"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por el primer %2$lld mes"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por los primeros %2$lld meses"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelo primeiro %2$lld mês"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelos primeiros %2$lld meses"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld месяца"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld месяцев"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первый %2$lld месяц"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld месяцев"
+                }
+              }
+            }
           }
         }
       }
@@ -1586,17 +2068,112 @@
             "state" : "new",
             "value" : "%@ first week"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primera semana"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primeira semana"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ первая неделя"
+          }
         }
       }
     },
     "paywall.intro.firstWeeks" : {
       "comment" : "Paywall plan row primary line for a multi-week intro discount. %1$@ is the price; %2$lld is the week count.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ for first %2$lld weeks"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld weeks"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por la primera %2$lld semana"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por las primeras %2$lld semanas"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pela primeira %2$lld semana"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelas primeiras %2$lld semanas"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld недели"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld недель"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первую %2$lld неделю"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld недель"
+                }
+              }
+            }
           }
         }
       }
@@ -1610,17 +2187,112 @@
             "state" : "new",
             "value" : "%@ first year"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primer año"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ primeiro ano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ первый год"
+          }
         }
       }
     },
     "paywall.intro.firstYears" : {
       "comment" : "Paywall plan row primary line for a multi-year intro discount. %1$@ is the price; %2$lld is the year count.",
-      "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ for first %2$lld years"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld year"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "new",
+                  "value" : "%1$@ for first %2$lld years"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por el primer %2$lld año"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ por los primeros %2$lld años"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelo primeiro %2$lld ano"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ pelos primeiros %2$lld anos"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld года"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld лет"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первый %2$lld год"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ за первые %2$lld лет"
+                }
+              }
+            }
           }
         }
       }
@@ -1634,6 +2306,24 @@
             "state" : "new",
             "value" : "%lld%% OFF"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% DCTO."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% OFF"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "СКИДКА %lld%%"
+          }
         }
       }
     },
@@ -1645,6 +2335,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "then %@/day"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "luego %@/día"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "depois %@/dia"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "затем %@/день"
           }
         }
       }
@@ -1658,6 +2366,24 @@
             "state" : "new",
             "value" : "then %@/month"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "luego %@/mes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "depois %@/mês"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "затем %@/мес."
+          }
         }
       }
     },
@@ -1670,6 +2396,24 @@
             "state" : "new",
             "value" : "then %@/week"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "luego %@/semana"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "depois %@/semana"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "затем %@/нед."
+          }
         }
       }
     },
@@ -1681,6 +2425,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "then %@/year"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "luego %@/año"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "depois %@/ano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "затем %@/год"
           }
         }
       }
@@ -2084,6 +2846,24 @@
             "state" : "new",
             "value" : "All Plans"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos los planes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos os planos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Все планы"
+          }
         }
       }
     },
@@ -2186,6 +2966,24 @@
             "state" : "new",
             "value" : "Dismiss"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть"
+          }
         }
       }
     },
@@ -2197,6 +2995,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Dismiss paywall and continue with free tier"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar el muro de pago y continuar con la versión gratuita"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechar o paywall e continuar com a versão grátis"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть и продолжить с бесплатной версией"
           }
         }
       }
@@ -2210,6 +3026,24 @@
             "state" : "new",
             "value" : "4K recording"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabación en 4K"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravação em 4K"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись в 4K"
+          }
         }
       }
     },
@@ -2221,6 +3055,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Cinematic quality for important shoots"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calidad cinematográfica para grabaciones importantes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualidade cinematográfica para gravações importantes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кинокачество для важных съёмок"
           }
         }
       }
@@ -2234,6 +3086,24 @@
             "state" : "new",
             "value" : "No watermark on recordings"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin marca de agua"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem marca d'água"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без водяного знака"
+          }
         }
       }
     },
@@ -2245,6 +3115,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Share videos without 'Made with SteadyEye'"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparte videos sin la marca 'Made with SteadyEye'"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhe vídeos sem 'Made with SteadyEye'"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Делитесь видео без надписи «Made with SteadyEye»"
           }
         }
       }
@@ -2258,6 +3146,24 @@
             "state" : "new",
             "value" : "Steadicam stabilization"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estabilización Steadicam"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estabilização Steadicam"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стабилизация Steadicam"
+          }
         }
       }
     },
@@ -2269,6 +3175,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Smooth video while moving or walking"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video estable al moverte o caminar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vídeo estável em movimento ou caminhando"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Плавное видео в движении и на ходу"
           }
         }
       }
@@ -2282,6 +3206,24 @@
             "state" : "new",
             "value" : "AI optimization for every script"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optimización con IA para cada guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otimização com IA para cada roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI-оптимизация любого скрипта"
+          }
         }
       }
     },
@@ -2293,6 +3235,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Optimize every script you write"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optimiza cada guion que escribes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otimize cada roteiro que você escreve"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оптимизируйте каждый скрипт, который пишете"
           }
         }
       }
@@ -2474,6 +3434,24 @@
             "state" : "new",
             "value" : "Not interested?"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿No te interesa?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não tem interesse?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не интересно?"
+          }
         }
       }
     },
@@ -2485,6 +3463,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Annual"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Годовая"
           }
         }
       }
@@ -2498,6 +3494,24 @@
             "state" : "new",
             "value" : "Lifetime"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De por vida"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitalício"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Навсегда"
+          }
         }
       }
     },
@@ -2509,6 +3523,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Monthly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensal"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Месячная"
           }
         }
       }
@@ -2522,6 +3554,24 @@
             "state" : "new",
             "value" : "%@ one-time"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pago único"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pagamento único"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ единоразово"
+          }
         }
       }
     },
@@ -2533,6 +3583,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%@ / month"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / mes"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / mês"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / мес."
           }
         }
       }
@@ -2546,6 +3614,24 @@
             "state" : "new",
             "value" : "%@ / year"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / año"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / ano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / год"
+          }
         }
       }
     },
@@ -2557,6 +3643,114 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Show Less"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar menos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar menos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свернуть"
+          }
+        }
+      }
+    },
+    "paywall.v2.subtitle.getFullAccess" : {
+      "comment" : "Paywall hero subtitle shown beneath the headline when no visible package has an active intro discount. Resolved as a String Catalog key delivered via Remote Config (default key matches this entry).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get full access"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acceso completo a todas las funciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acesso completo a todos os recursos"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ ко всем функциям"
+          }
+        }
+      }
+    },
+    "paywall.v2.subtitle.specialOffer" : {
+      "comment" : "Paywall hero subtitle shown beneath the headline when at least one visible package has an active intro discount. Resolved as a String Catalog key delivered via Remote Config (default key matches this entry).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Special offer"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oferta especial"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oferta especial"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Специальное предложение"
+          }
+        }
+      }
+    },
+    "paywall.v2.subtitle.specialOfferWithPct" : {
+      "comment" : "Paywall hero subtitle shown beneath the headline when at least one visible package has an active intro discount. %lld is the integer percent saved (computed at runtime from RevenueCat prices); %% renders as a literal percent sign.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Special offer — %lld%% off"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oferta especial — %lld%% de descuento"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oferta especial — %lld%% de desconto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Специальное предложение — скидка %lld%%"
           }
         }
       }
@@ -2902,7 +4096,33 @@
     },
     "Read your script. Look natural." : {
       "comment" : "A description of how to use SteadyEye to read scripts.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read your script. Look natural."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lee tu guion. Mira natural."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leia o roteiro. Pareça natural."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Читайте сценарий. Выглядите естественно."
+          }
+        }
+      }
     },
     "recording.error.title" : {
       "comment" : "Title of the alert shown when the camera reports an error during recording.",
@@ -3183,6 +4403,24 @@
             "state" : "new",
             "value" : "Saving recording…"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardando grabación…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvando gravação…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохраняем запись…"
+          }
         }
       }
     },
@@ -3225,6 +4463,24 @@
             "state" : "new",
             "value" : "Delete"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить"
+          }
         }
       }
     },
@@ -3236,6 +4492,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Save to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar en la galería"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar na galeria"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить в галерею"
           }
         }
       }
@@ -3249,6 +4523,24 @@
             "state" : "new",
             "value" : "Share"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поделиться"
+          }
         }
       }
     },
@@ -3260,6 +4552,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Recording"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabación"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись"
           }
         }
       }
@@ -3273,6 +4583,24 @@
             "state" : "new",
             "value" : "Delete"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить"
+          }
         }
       }
     },
@@ -3284,6 +4612,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "This action cannot be undone."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta acción no se puede deshacer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta ação não pode ser desfeita."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это действие нельзя отменить."
           }
         }
       }
@@ -3297,6 +4643,24 @@
             "state" : "new",
             "value" : "Delete recording?"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar grabación?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir gravação?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить запись?"
+          }
         }
       }
     },
@@ -3308,6 +4672,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Pick a script and hit record to make your first video."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige un guion y toca grabar para hacer tu primer video."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha um roteiro e toque em gravar para fazer seu primeiro vídeo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбери скрипт и нажми запись, чтобы снять первое видео."
           }
         }
       }
@@ -3321,6 +4703,24 @@
             "state" : "new",
             "value" : "Go to Scripts"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir a guiones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir para roteiros"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "К скриптам"
+          }
         }
       }
     },
@@ -3332,6 +4732,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "No recordings yet"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay grabaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não há gravações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записей пока нет"
           }
         }
       }
@@ -3345,6 +4763,24 @@
             "state" : "new",
             "value" : "Delete"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить"
+          }
         }
       }
     },
@@ -3356,6 +4792,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "The video file couldn't be found. Remove this recording from your library?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontró el archivo de video. ¿Quitar esta grabación de tu biblioteca?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não encontramos o arquivo de vídeo. Remover esta gravação da biblioteca?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видеофайл не найден. Удалить эту запись из библиотеки?"
           }
         }
       }
@@ -3369,6 +4823,24 @@
             "state" : "new",
             "value" : "This recording is no longer available"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta grabación ya no está disponible"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta gravação não está mais disponível"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта запись больше недоступна"
+          }
         }
       }
     },
@@ -3380,6 +4852,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Back"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назад"
           }
         }
       }
@@ -3393,6 +4883,24 @@
             "state" : "new",
             "value" : "Delete recording"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar grabación"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить запись"
+          }
         }
       }
     },
@@ -3404,6 +4912,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Save to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar en la galería"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar na galeria"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить в галерею"
           }
         }
       }
@@ -3477,6 +5003,24 @@
             "state" : "translated",
             "value" : "Recordings"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Записи"
+          }
         }
       }
     },
@@ -3488,6 +5032,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Saved to Camera Roll"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardado en la galería"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvo na galeria"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранено в галерею"
           }
         }
       }
@@ -3518,6 +5080,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%lld optimizations left today"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te quedan %lld optimizaciones hoy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restam %lld otimizações hoje"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осталось оптимизаций сегодня: %lld"
           }
         }
       }
@@ -3891,6 +5471,24 @@
             "state" : "new",
             "value" : "%lld / 50 words"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / 50 palabras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / 50 palavras"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / 50 слов"
+          }
         }
       }
     },
@@ -4173,6 +5771,24 @@
             "state" : "new",
             "value" : "Pasted text is %lld words. Free version supports up to 50. Use first 50 words or upgrade?"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El texto pegado tiene %lld palabras. La versión gratis admite hasta 50. ¿Usar las primeras 50 palabras o actualizar?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O texto colado tem %lld palavras. A versão grátis aceita até 50. Usar as primeiras 50 ou atualizar?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Во вставленном тексте %lld слов. В бесплатной версии — до 50. Использовать первые 50 или обновить план?"
+          }
         }
       }
     },
@@ -4185,6 +5801,24 @@
             "state" : "new",
             "value" : "Pasted text too long"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Texto pegado muy largo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Texto colado muito longo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст слишком длинный"
+          }
         }
       }
     },
@@ -4196,6 +5830,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Use first 50 words"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar las primeras 50 palabras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar as primeiras 50 palavras"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Взять первые 50 слов"
           }
         }
       }
@@ -4299,6 +5951,24 @@
             "state" : "new",
             "value" : "Your script is %lld words. Free version supports up to 50 words. Trim to 50 words or upgrade for unlimited length."
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion tiene %lld palabras. La versión gratis admite hasta 50. ¿Recortar a 50 o actualizar para tamaño ilimitado?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro tem %lld palavras. A versão grátis aceita até 50. Cortar para 50 ou atualizar para tamanho ilimitado?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В скрипте %lld слов. Бесплатная версия — до 50. Сократить до 50 или обновить план для безлимита?"
+          }
         }
       }
     },
@@ -4310,6 +5980,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Script too long"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guion muy largo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roteiro muito longo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрипт слишком длинный"
           }
         }
       }
@@ -4323,6 +6011,24 @@
             "state" : "new",
             "value" : "Trim to 50 words"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recortar a 50"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cortar para 50"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сократить до 50 слов"
+          }
         }
       }
     },
@@ -4334,6 +6040,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Upgrade"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить"
           }
         }
       }
@@ -4599,6 +6323,24 @@
             "state" : "translated",
             "value" : "Paste a document with multiple scripts and AI will split it into separate scripts. Each one gets optimized for reading aloud."
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega un documento con varios guiones y la IA los separará en guiones individuales. Cada uno queda optimizado para leer en voz alta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole um documento com vários roteiros e a IA vai separá-los em roteiros individuais. Cada um fica otimizado para leitura em voz alta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставь документ с несколькими скриптами — AI разделит его на отдельные. Каждый оптимизируется для чтения вслух."
+          }
         }
       }
     },
@@ -4611,6 +6353,24 @@
             "state" : "translated",
             "value" : "Got it"
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendido"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entendi"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Понятно"
+          }
         }
       }
     },
@@ -4622,6 +6382,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import Multiple Scripts"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa varios guiones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importe vários roteiros"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Импорт нескольких скриптов"
           }
         }
       }
@@ -4935,6 +6713,24 @@
             "state" : "translated",
             "value" : "Long-press the text and drag up or down to align it with your camera lens. The closer to the lens, the more natural your eye contact."
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén presionado el texto y arrástralo arriba o abajo para alinearlo con el lente de tu cámara. Cuanto más cerca del lente, más natural será tu contacto visual."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pressione o texto e arraste para cima ou para baixo para alinhar com a lente da câmera. Quanto mais perto da lente, mais natural fica o contato visual."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зажми текст и перетащи вверх или вниз, чтобы выровнять его под объективом камеры. Чем ближе к объективу, тем естественнее зрительный контакт."
+          }
         }
       }
     },
@@ -5144,6 +6940,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Подсвечивать якорную букву"
+          }
+        }
+      }
+    },
+    "settings.chat.subtitle" : {
+      "comment" : "Subtitle on the Settings → Chat row, under the title. 'SteadyEye' is the brand name and must not be translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Founder of SteadyEye · I read every message"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fundador de SteadyEye · Leo cada mensaje"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fundador do SteadyEye · Leio cada mensagem"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создатель SteadyEye · Читаю каждое сообщение"
+          }
+        }
+      }
+    },
+    "settings.chat.title" : {
+      "comment" : "Title of the Settings row that opens the in-app chat with the founder. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat with Cyril"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chatea con Cyril"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converse com Cyril"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чат с Кириллом"
           }
         }
       }
@@ -6020,7 +7876,33 @@
     },
     "Skip for now" : {
       "comment" : "A button that lets a user skip the onboarding process if they don't want to grant camera permissions right now.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip for now"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir por ahora"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pular por agora"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить"
+          }
+        }
+      }
     },
     "SteadyEye needs camera and microphone access to record your videos. You can enable them later in Settings if you change your mind." : {
       "comment" : "Body text on the onboarding permission-explainer screen. Pairs with the 'Camera & microphone access needed' heading. Shown when either camera or mic (or both) were denied — the explainer guides the user to Settings to flip whichever toggle is missing.",
@@ -6054,7 +7936,33 @@
     },
     "SteadyEye shows your text right under the camera lens — so your eyes never leave the camera." : {
       "comment" : "A description of how SteadyEye works.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye shows your text right under the camera lens — so your eyes never leave the camera."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye muestra tu texto justo debajo del lente — así tus ojos nunca dejan la cámara."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O SteadyEye mostra seu texto bem abaixo da lente — assim seus olhos nunca saem da câmera."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye показывает текст прямо под объективом камеры — чтобы вы не отрывали взгляд от камеры."
+          }
+        }
+      }
     },
     "Subscription Override" : {
 

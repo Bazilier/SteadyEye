@@ -172,6 +172,12 @@
             "state" : "translated",
             "value" : "Permita que o SteadyEye veja quais anúncios trazem novos criadores ao app. Seus dados permanecem anônimos."
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это поможет показывать тебе более релевантную рекламу."
+          }
         }
       }
     }

@@ -28,19 +28,27 @@ enum PaywallConfig {
         return NSLocalizedString(resolvedKey, comment: "Paywall headline (variant via Remote Config)")
     }
 
-    /// Subtitle template used when at least one visible package has
-    /// an active intro discount. Contains the literal `{pct}`
-    /// placeholder which the view substitutes with the integer
-    /// percent saved (e.g. `Special offer — 50% off`).
+    /// Subtitle copy used when at least one visible package has an
+    /// active intro discount. Remote Config delivers a String Catalog
+    /// KEY (e.g. `"paywall.v2.subtitle.specialOffer"`); we resolve it
+    /// via `NSLocalizedString` so the user sees their language. Falls
+    /// back to the default key if RC returned empty.
     static var subtitleWithPct: String {
-        RemoteConfigManager.shared.string("paywall_subtitle_with_pct")
+        let key = RemoteConfigManager.shared.string("paywall_subtitle_with_pct")
+        let resolvedKey = key.isEmpty ? "paywall.v2.subtitle.specialOffer" : key
+        return NSLocalizedString(resolvedKey, comment: "Paywall subtitle when an intro discount is active (variant via Remote Config)")
     }
 
     /// Subtitle copy used when no visible package has an intro
     /// discount (returning subscriber, intro-eligible-once-per-group
-    /// rule already consumed).
+    /// rule already consumed). Remote Config delivers a String Catalog
+    /// KEY (e.g. `"paywall.v2.subtitle.getFullAccess"`); we resolve it
+    /// via `NSLocalizedString` so the user sees their language. Falls
+    /// back to the default key if RC returned empty.
     static var subtitleNoPct: String {
-        RemoteConfigManager.shared.string("paywall_subtitle_no_pct")
+        let key = RemoteConfigManager.shared.string("paywall_subtitle_no_pct")
+        let resolvedKey = key.isEmpty ? "paywall.v2.subtitle.getFullAccess" : key
+        return NSLocalizedString(resolvedKey, comment: "Paywall subtitle when no intro discount is active (variant via Remote Config)")
     }
 
     /// Primary CTA button label. Remote Config delivers a String
