@@ -117,9 +117,20 @@ struct SteadyEyeApp: App {
             // app was backgrounded — without this, isSubscribedReal would
             // stay stale until the next cold launch. Belt-and-suspenders with
             // the customerInfoStream listener inside SubscriptionManager.
+            //
+            // Same rationale for Remote Config: iOS keeps the app process
+            // alive for many hours, so a warm foreground transition never
+            // re-runs SteadyEyeApp.init's one-shot fetch. Without the
+            // activation-time fetch below, RC values published in Firebase
+            // Console only reach users after a true cold launch (which
+            // normally requires the OS terminating the app or a manual
+            // reinstall). Production minimumFetchInterval (3600s) throttles
+            // duplicate fetches; DEBUG builds use 0 for instant pickup.
             if newPhase == .active {
                 Task { await SubscriptionManager.shared.checkAccess() }
                 Task { await SubscriptionManager.shared.rescheduleInactiveReminder() }
+                Task { await RemoteConfigManager.shared.fetchAndActivate() }
+                Task { await ChatBackgroundFetcher.fetchInBackground() }
                 consumePendingDeepLink()
             } else if newPhase == .background {
                 Task { await SubscriptionManager.shared.rescheduleInactiveReminder() }

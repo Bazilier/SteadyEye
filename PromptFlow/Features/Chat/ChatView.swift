@@ -10,8 +10,6 @@ struct ChatView: View {
     @State private var inputText: String = ""
     @State private var isSending: Bool = false
     @State private var pollTask: Task<Void, Never>? = nil
-    @State private var sendErrorIds: Set<Int> = []
-    @State private var bannerError: String? = nil
     @State private var nextLocalId: Int = -1
 
     private static let pollInterval: UInt64 = 10 * 1_000_000_000
@@ -54,6 +52,7 @@ struct ChatView: View {
         .onDisappear {
             stopPolling()
             ChatStorage.save(messages)
+            ChatBadgeState.shared.markAllRead()
         }
     }
 
@@ -77,17 +76,11 @@ struct ChatView: View {
                     ForEach(messages) { message in
                         ChatBubbleView(
                             message: message,
-                            hasError: sendErrorIds.contains(message.id)
+                            onRetry: message.sendStatus == .failed
+                                ? { Task { await retry(messageId: message.id) } }
+                                : nil
                         )
                         .id(message.id)
-                    }
-
-                    if let bannerError {
-                        Text(bannerError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 6)
                     }
 
                     Color.clear.frame(height: 1).id("bottom")
@@ -149,7 +142,11 @@ struct ChatView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .resizable()
                         .frame(width: 32, height: 32)
-                        .foregroundStyle(canSend ? Color.accentColor : Color.secondary.opacity(0.5))
+                        // Color.orange literal — matches the inbound bubble
+                        // (ChatBubbleView). Color.accentColor doesn't work
+                        // here because sheets don't inherit the TabView's
+                        // .tint(.orange), so it would render system blue.
+                        .foregroundStyle(canSend ? Color.orange : Color.secondary.opacity(0.5))
                 }
             }
             .disabled(!canSend || isSending)
@@ -178,27 +175,55 @@ struct ChatView: View {
 
         inputText = ""
         isSending = true
-        bannerError = nil
 
         AppAnalytics.log("chat_message_sent", params: ["text_length": text.count])
 
         let recordingsCount = allRecordings.count
         do {
             _ = try await ChatService.sendMessage(text: text, recordingsCount: recordingsCount)
-            sendErrorIds.remove(localId)
             await fetchAndMerge(removingLocalId: localId)
         } catch {
-            sendErrorIds.insert(localId)
-            bannerError = String(
-                localized: "chat.error.send_failed",
-                defaultValue: "Failed to send. Tap to retry.",
-                comment: "Banner shown when a message fails to send"
-            )
+            markFailed(messageId: localId)
             AppAnalytics.log("chat_message_send_failed", params: [
                 "error_reason": Self.reason(for: error)
             ])
+            AppAnalytics.log("chat_message_failed_displayed", params: [
+                "text_length": text.count
+            ])
         }
         isSending = false
+    }
+
+    /// Re-attempt a previously-failed inbound send. Flips status to `.sending`
+    /// while the request is in flight, then back to `.failed` if it errors out
+    /// again. On success the next fetch swaps the optimistic local row for the
+    /// canonical server one (same path as a fresh send).
+    private func retry(messageId: Int) async {
+        guard let idx = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        let text = messages[idx].text
+
+        AppAnalytics.log("chat_message_retry_tapped", params: ["original_status": "failed"])
+
+        messages[idx].sendStatus = .sending
+        ChatStorage.save(messages)
+
+        let recordingsCount = allRecordings.count
+        do {
+            _ = try await ChatService.sendMessage(text: text, recordingsCount: recordingsCount)
+            AppAnalytics.log("chat_message_retry_succeeded")
+            await fetchAndMerge(removingLocalId: messageId)
+        } catch {
+            markFailed(messageId: messageId)
+            AppAnalytics.log("chat_message_retry_failed", params: [
+                "error_reason": Self.reason(for: error)
+            ])
+        }
+    }
+
+    private func markFailed(messageId: Int) {
+        guard let idx = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        messages[idx].sendStatus = .failed
+        ChatStorage.save(messages)
     }
 
     private func fetchAndMerge(removingLocalId: Int? = nil) async {
@@ -218,7 +243,7 @@ struct ChatView: View {
             let newCount = merged.count - messages.filter { !$0.isLocal }.count
             messages = merged
             ChatStorage.save(messages)
-            bannerError = nil
+                ChatBadgeState.shared.recalculate()
 
             if newCount > 0 {
                 AppAnalytics.log("chat_replies_fetched", params: ["new_count": newCount])

@@ -6,10 +6,24 @@ struct ChatMessage: Codable, Identifiable, Equatable {
         case outbound
     }
 
+    /// Delivery state for inbound (user → founder) optimistic sends.
+    /// Outbound (founder → user) messages always carry `.sent` since
+    /// the user's device never originates them locally.
+    enum SendStatus: String, Codable {
+        case sending
+        case sent
+        case failed
+    }
+
     let id: Int
     let text: String
     let direction: Direction
     let createdAt: Date
+    var sendStatus: SendStatus
+
+    private enum CodingKeys: String, CodingKey {
+        case id, text, direction, createdAt, sendStatus
+    }
 
     init?(rawJSON: [String: Any]) {
         guard let id = rawJSON["id"] as? Int,
@@ -33,6 +47,7 @@ struct ChatMessage: Codable, Identifiable, Equatable {
         self.text = text
         self.direction = direction
         self.createdAt = createdAt
+        self.sendStatus = .sent
     }
 
     /// Optimistic local insert, before the backend assigns a real id. Negative
@@ -43,6 +58,19 @@ struct ChatMessage: Codable, Identifiable, Equatable {
         self.text = text
         self.direction = .inbound
         self.createdAt = Date()
+        self.sendStatus = .sending
+    }
+
+    /// Custom decode for backward compatibility with on-device caches written
+    /// before `sendStatus` existed — those rows decode with `.sent` so older
+    /// confirmed messages don't suddenly look pending.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        direction = try c.decode(Direction.self, forKey: .direction)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        sendStatus = try c.decodeIfPresent(SendStatus.self, forKey: .sendStatus) ?? .sent
     }
 
     var isLocal: Bool { id < 0 }

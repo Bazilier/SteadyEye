@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var restoreSucceeded = false
     @State private var showRestoreAlert = false
     @State private var showChat = false
+    @StateObject private var chatBadgeState = ChatBadgeState.shared
 
     #if DEV
     @State private var devNotificationStatus: String = "loading…"
@@ -77,42 +78,53 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Button {
-                        showChat = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "message.fill")
-                                .foregroundStyle(.tint)
-                                .font(.system(size: 22))
-                                .frame(width: 30, alignment: .center)
+                if ExperimentManager.shared.isChatAvailable {
+                    Section {
+                        Button {
+                            showChat = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "message.fill")
+                                    .foregroundStyle(.tint)
+                                    .font(.system(size: 22))
+                                    .frame(width: 30, alignment: .center)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(
-                                    localized: "settings.chat.title",
-                                    defaultValue: "Chat with Kirill",
-                                    comment: "Title of the Settings row that opens the in-app chat with the founder."
-                                ))
-                                    .font(.body.weight(.semibold))
-                                    .foregroundColor(.primary)
-                                Text(String(
-                                    localized: "settings.chat.subtitle",
-                                    defaultValue: "Founder of SteadyEye · I read every message",
-                                    comment: "Subtitle on the Settings → Chat row. 'SteadyEye' is the brand name and must not be translated."
-                                ))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(
+                                        localized: "settings.chat.title",
+                                        defaultValue: "Chat with Kirill",
+                                        comment: "Title of the Settings row that opens the in-app chat with the founder."
+                                    ))
+                                        .font(.body.weight(.semibold))
+                                        .foregroundColor(.primary)
+                                    Text(String(
+                                        localized: "settings.chat.subtitle",
+                                        defaultValue: "Founder of SteadyEye · I read every message",
+                                        comment: "Subtitle on the Settings → Chat row. 'SteadyEye' is the brand name and must not be translated."
+                                    ))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                if chatBadgeState.unreadCount > 0 {
+                                    Text(verbatim: "\(chatBadgeState.unreadCount)")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                        .frame(minWidth: 22, minHeight: 22)
+                                        .padding(.horizontal, 6)
+                                        .background(Capsule().fill(Color.red))
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary.opacity(0.6))
+                                    .font(.system(size: 14, weight: .semibold))
                             }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary.opacity(0.6))
-                                .font(.system(size: 14, weight: .semibold))
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
 
                 // First section: Upgrade entry point + Redeem code.

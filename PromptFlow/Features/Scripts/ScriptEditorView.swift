@@ -419,27 +419,24 @@ struct ScriptEditorView: View {
         HStack(spacing: 8) {
             Image(systemName: "text.word.spacing")
                 .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                if subscriptionManager.isSubscribed {
-                    Text(String(
-                        localized: "script.wordCount",
-                        defaultValue: "\(wordCount) words",
-                        comment: "Word count display in the editor stats bar"
-                    ))
-                } else {
-                    Text(String(
-                        localized: "script.wordCountLimited",
-                        defaultValue: "\(wordCount) / 50 words",
-                        comment: "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap."
-                    ))
-                        .foregroundStyle(wordCountColor)
-                }
+            // Show the limit that actually applies to this user — never both.
+            // Free users have a 50-word cap; paid users have a 5000-char cap.
+            // Surfacing the other tier's limit was confusing and leaked premium
+            // info to free users.
+            if subscriptionManager.isSubscribed {
                 Text(String(
                     localized: "script.charCount",
                     defaultValue: "\(content.count.formatted()) / \(maxChars.formatted()) chars",
                     comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
                 ))
                     .foregroundStyle(charCountColor)
+            } else {
+                Text(String(
+                    localized: "script.wordCountLimited",
+                    defaultValue: "\(wordCount) / 50 words",
+                    comment: "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap."
+                ))
+                    .foregroundStyle(wordCountColor)
             }
             Spacer()
             aiOptimizeCaption

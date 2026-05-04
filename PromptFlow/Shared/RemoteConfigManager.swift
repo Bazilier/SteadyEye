@@ -60,6 +60,7 @@ final class RemoteConfigManager {
         "paywall_cta_key":           "paywall.v2.cta.continue",
         "paywall_default_plan":      "annual",
         "experiment_paywall_v1":     "control",
+        "chat_enabled_for":          "all",
     ]
 
     #if !DEV
@@ -100,6 +101,17 @@ final class RemoteConfigManager {
         #if !DEV
         do {
             _ = try await remoteConfig.fetchAndActivate()
+            // Developer diagnostic: dump every known key with its currently
+            // active value so it's obvious what the server delivered (or
+            // what fell through to defaults). Iterates `defaults` so the
+            // list stays exhaustive without extra wiring when new keys are
+            // added. Visible in TestFlight / App Store builds via
+            // Console.app over USB so we can verify what's actually live
+            // on real devices.
+            let dump = defaults.keys.sorted().map { key in
+                "  \(key) = \(remoteConfig.configValue(forKey: key).stringValue)"
+            }.joined(separator: "\n")
+            print("[RemoteConfig] activated:\n\(dump)")
         } catch {
             // No-op. Defaults / last-fetched values remain in effect.
         }

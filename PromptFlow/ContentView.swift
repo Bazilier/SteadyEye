@@ -19,6 +19,7 @@ struct ContentView: View {
     /// re-fire when a fullScreenCover dismisses on top of it; without this,
     /// every paywall dismissal would re-evaluate the trigger.
     @State private var didCheckColdStartPaywallThisLaunch = false
+    @StateObject private var chatBadgeState = ChatBadgeState.shared
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -54,6 +55,7 @@ struct ContentView: View {
                         Image(systemName: "gearshape.fill")
                     }
                 }
+                .badge(chatBadgeState.unreadCount)
                 .tag(AppTab.settings)
         }
         .preferredColorScheme(.dark)

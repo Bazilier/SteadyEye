@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import AVFoundation
 import UserNotifications
 
@@ -983,6 +984,12 @@ struct RecordingView: View {
                         "duration_sec": Int(duration.rounded())
                     ])
                 }
+                // Native App Store review prompt — fires only on the user's
+                // 3rd lifetime save AND when ≥1 day past install AND ≥120 days
+                // since the last prompt. iOS additionally throttles real
+                // renders to 3 times per Apple ID per year.
+                let totalRecordings = (try? modelContext.fetchCount(FetchDescriptor<Recording>())) ?? 0
+                ReviewPromptManager.handleRecordingSaved(recordingsCount: totalRecordings)
                 previewRecording = recording
             case .failure:
                 // Auto-save failed entirely (file move error, generator error,

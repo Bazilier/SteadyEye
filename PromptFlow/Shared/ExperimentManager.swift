@@ -24,6 +24,11 @@ final class ExperimentManager {
     static let shared = ExperimentManager()
     private init() {}
 
+    /// Once-per-process latch for the `chat_gated_unavailable`
+    /// analytics event. Avoids spamming the funnel with a row for
+    /// every Settings render while the gate is closed.
+    private var hasLoggedChatGatedThisSession = false
+
     /// Returns the variant the user is locked into. First call for a
     /// given experiment performs assignment + persistence + analytics
     /// user-property write; subsequent calls are pure reads.
@@ -43,6 +48,45 @@ final class ExperimentManager {
         Analytics.setUserProperty(assigned, forName: "exp_\(experiment.rawValue)")
         #endif
         return assigned
+    }
+
+    // MARK: - Chat audience policy
+    //
+    // Unlike `variant(for:)`, the chat-availability flag is NOT
+    // sticky — a user transitioning trial→paid (or paid→free) needs
+    // their gate state to follow them, so we read RC live every time.
+    // Allowed values for `chat_enabled_for`: "all", "trial_or_paid",
+    // "paid", "none". Default `"all"` is seeded in
+    // `RemoteConfigManager.defaults`.
+
+    /// Raw policy string. Useful for analytics segmentation; most
+    /// callers want `isChatAvailable` instead.
+    var chatEnabledFor: String {
+        let value = RemoteConfigManager.shared.string("chat_enabled_for")
+        return value.isEmpty ? "all" : value
+    }
+
+    /// Whether the chat surface should render for the current user.
+    /// Combines the live RC policy with `SubscriptionManager.shared`.
+    /// Unknown / future policy values fall through to `true` so a
+    /// misconfigured RC value never silently hides the feature.
+    @MainActor
+    var isChatAvailable: Bool {
+        let policy = chatEnabledFor
+        let sub = SubscriptionManager.shared
+        let available: Bool
+        switch policy {
+        case "all":            available = true
+        case "trial_or_paid":  available = sub.isSubscribed
+        case "paid":           available = sub.isSubscribed && !sub.isTrialActive
+        case "none":           available = false
+        default:               available = true
+        }
+        if !available, !hasLoggedChatGatedThisSession {
+            hasLoggedChatGatedThisSession = true
+            AppAnalytics.log("chat_gated_unavailable", params: ["policy": policy])
+        }
+        return available
     }
 }
 

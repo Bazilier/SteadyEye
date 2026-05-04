@@ -645,6 +645,66 @@
         }
       }
     },
+    "chat.status.failed" : {
+      "comment" : "Tappable caption shown under a failed outgoing chat bubble. Tapping retries the send.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed. Tap to retry."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error al enviar. Toca para reintentar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha. Toque para tentar de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не доставлено. Нажмите для повтора."
+          }
+        }
+      }
+    },
+    "chat.status.sending" : {
+      "comment" : "Caption shown under an outgoing chat bubble while the send is in flight to the backend.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending..."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando..."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando..."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отправка..."
+          }
+        }
+      }
+    },
     "chat.welcome" : {
       "comment" : "Pinned welcome message at the top of the chat from the founder. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated.",
       "extractionState" : "manual",
