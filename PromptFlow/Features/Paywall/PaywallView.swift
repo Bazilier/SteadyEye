@@ -43,7 +43,7 @@ struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var manager = SubscriptionManager.shared
 
-    @State private var selectedPlan: PaywallPlan = .annual
+    @State private var selectedPlan: PaywallPlan = PaywallConfig.defaultPlan
     @State private var errorMessage: String?
     @State private var bottomSheetHeight: CGFloat = 320
     @State private var isExpanded: Bool = false
@@ -62,20 +62,20 @@ struct PaywallView: View {
     // MARK: - Packages from offerings
 
     private var resolvedOffering: Offering? {
-        // Hardcoded to "discount_50" for this build. Reasoning:
-        // We are doing a soft rollout — the RC Current offering remains
-        // "default" so the existing prod build (which reads .current)
-        // keeps showing the 7-day trial flow to existing users. New
-        // builds (this one) explicitly request discount_50, displaying
-        // the intro-discount pricing UX. This avoids any RC dashboard
-        // flip and lets old/new builds coexist cleanly.
-        //
-        // If discount_50 is unavailable for any reason, fall back to
-        // .current so the paywall still has something to render (rather
-        // than going blank). The caller can still override via
-        // `offeringId` when needed (e.g. for A/B tests).
+        // Explicit caller override wins over both Remote Config and
+        // the experiment assignment (used by A/B test landing pages,
+        // future winback campaigns, etc.).
         if let explicit = offeringId { return manager.offering(for: explicit) }
-        return manager.offering(for: "discount_50") ?? manager.offering(for: nil)
+
+        // Experiment override: users in `paywall_v1 == "trial"` see
+        // the legacy `default` offering (7-day trial flow). All other
+        // variants — including the seeded `"control"` default — fall
+        // through to whatever `paywall_offering_id` dictates (currently
+        // `discount_50`). Variant assignment is sticky per install
+        // and gets logged to GA4 via the `paywall_shown` event below.
+        let variant = ExperimentManager.shared.variant(for: .paywallV1)
+        let chosenId: String = (variant == "trial") ? "default" : PaywallConfig.offeringId
+        return manager.offering(for: chosenId) ?? manager.offering(for: nil)
     }
     private var annualPackage: Package? { resolvedOffering?.annual }
     private var monthlyPackage: Package? { resolvedOffering?.monthly }
@@ -173,17 +173,14 @@ struct PaywallView: View {
     /// already used the intro for this subscription group).
     private var heroSubtitleText: String {
         if let pct = maxSavingsPercent, pct >= 1 {
-            return String(
-                localized: "paywall.v2.subtitle.specialOfferPercent",
-                defaultValue: "Special offer — \(pct)% off",
-                comment: "Paywall v2 hero subtitle shown directly under the SteadyEye headline when at least one visible plan has an active intro discount. %lld is the integer percent saved (computed dynamically from the largest savings across visible plans, e.g. 50). Apple's regional StoreKit pricing tiers mean the percent is not fixed."
-            )
+            // Template comes from Remote Config — server-side
+            // conditions deliver the correct per-locale phrasing.
+            // Default `Special offer — {pct}% off` is matched by
+            // `RemoteConfigManager.defaults`.
+            return PaywallConfig.subtitleWithPct
+                .replacingOccurrences(of: "{pct}", with: "\(pct)")
         }
-        return String(
-            localized: "paywall.v2.subtitle.getFullAccess",
-            defaultValue: "Get full access",
-            comment: "Paywall v2 hero subtitle fallback shown when no visible plan has an active intro discount (e.g. user already used the intro for this subscription group). Neutral, honest copy that does not claim an offer the user is not eligible for."
-        )
+        return PaywallConfig.subtitleNoPct
     }
 
     private func priceText(for plan: PaywallPlan) -> String {
@@ -261,7 +258,9 @@ struct PaywallView: View {
             let trialAvailable = resolvedOffering?.annual?.storeProduct.introductoryDiscount != nil
             AppAnalytics.log("paywall_shown", params: [
                 "source": source,
-                "trial_available": trialAvailable
+                "trial_available": trialAvailable,
+                "offering_id": resolvedOffering?.identifier ?? "default",
+                "experiment_paywall_v1": ExperimentManager.shared.variant(for: .paywallV1)
             ])
         }
         .onDisappear {
@@ -375,11 +374,7 @@ struct PaywallView: View {
 
     private var heroSection: some View {
         VStack(spacing: 12) {
-            Text(String(
-                localized: "paywall.v2.headline",
-                defaultValue: "Get full access now",
-                comment: "Paywall v2 hero headline. Marketing copy — translate naturally for each locale."
-            ))
+            Text(PaywallConfig.headline)
                 .font(.largeTitle.weight(.bold))
                 .foregroundColor(.orange)
                 .multilineTextAlignment(.center)
@@ -610,18 +605,14 @@ struct PaywallView: View {
 
     // MARK: - Sticky bottom sheet
 
-    /// Universal CTA copy. Previously branched to "Start free trial" when
-    /// annual was selected, but the discount_50 offering carries an intro
-    /// *discount* — not a free trial — so a single "Continue" label is now
-    /// correct for every plan. The unused `paywall.v2.startFreeTrial`
-    /// localization key is intentionally retained in the strings catalog
-    /// in case a free-trial offering is reintroduced.
+    /// Universal CTA copy sourced from Remote Config. Previously
+    /// branched to "Start free trial" for annual; that branch was
+    /// removed when discount_50 became the default. The label is now
+    /// the same for every plan and lives in `paywall_cta_label` so
+    /// marketing can A/B test wording without an app update. Default
+    /// `"Continue"` matches the previous hardcoded copy.
     private var continueButtonLabel: String {
-        String(
-            localized: "paywall.v2.continueButton",
-            defaultValue: "Continue",
-            comment: "Paywall v2 CTA label. Shown for all plans regardless of selection — there is no plan-specific copy variant."
-        )
+        PaywallConfig.ctaLabel
     }
 
     private var bottomSheet: some View {

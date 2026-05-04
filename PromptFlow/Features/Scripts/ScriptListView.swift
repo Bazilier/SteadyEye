@@ -147,9 +147,6 @@ struct ScriptListView: View {
             }
         }
         .onAppear {
-            #if DEBUG
-            print("📋 ScriptsList .onAppear at \(CFAbsoluteTimeGetCurrent())")
-            #endif
             // Notification soft-ask trigger. Fires on the SECOND
             // post-onboarding cold start (counter == 2): the first being
             // the onboarding session itself, the second being the next

@@ -2087,14 +2087,92 @@
         }
       }
     },
-    "paywall.v2.continueButton" : {
-      "comment" : "Paywall v2 CTA label. Shown for all plans regardless of selection — there is no plan-specific copy variant.",
-      "extractionState" : "extracted_with_value",
+    "paywall.v2.cta.continue" : {
+      "comment" : "Paywall primary CTA label. Source key for the default `paywall_cta_key` Remote Config value. Variant CTAs may be added under `paywall.v2.cta.<variant>` keys; the active key is selected per-user via Remote Config so marketing can A/B test copy without an app update.",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "Continue"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить"
+          }
+        }
+      }
+    },
+    "paywall.v2.cta.getFullAccess" : {
+      "comment" : "Paywall CTA variant — explicit unlock-everything framing. Selected per-experiment via Remote Config (`paywall_cta_key`).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get full access"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtener acceso completo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obter acesso completo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получить доступ"
+          }
+        }
+      }
+    },
+    "paywall.v2.cta.unlockSteadyEye" : {
+      "comment" : "Paywall CTA variant — branded unlock framing using the product name (untranslated across locales). Selected per-experiment via Remote Config (`paywall_cta_key`).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock SteadyEye"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear SteadyEye"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear SteadyEye"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть SteadyEye"
           }
         }
       }
@@ -2281,7 +2359,7 @@
     },
     "paywall.v2.headline" : {
       "comment" : "Paywall v2 hero headline. Marketing copy — translate naturally for each locale.",
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2293,6 +2371,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Получите полный доступ"
+          }
+        }
+      }
+    },
+    "paywall.v2.headline.getFullAccess" : {
+      "comment" : "Paywall hero headline. Source key for the default `paywall_headline_key` Remote Config value. Variant headlines may be added under `paywall.v2.headline.<variant>` keys; the active key is selected per-user via Remote Config so marketing can A/B test copy without an app update.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get full access now"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Obtén acceso completo ahora"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acesso completo agora"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получите полный доступ"
+          }
+        }
+      }
+    },
+    "paywall.v2.headline.lookConfident" : {
+      "comment" : "Paywall headline variant — emphasizes confidence on camera. Selected per-experiment via Remote Config (`paywall_headline_key`).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Look confident on camera"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luce con confianza en cámara"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pareça confiante na câmera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выглядите уверенно в кадре"
+          }
+        }
+      }
+    },
+    "paywall.v2.headline.oneTake" : {
+      "comment" : "Paywall headline variant — emphasizes the one-take recording promise. Selected per-experiment via Remote Config (`paywall_headline_key`).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record one take. Done."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Graba en una sola toma."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grave em uma só tomada."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Один дубль — и готово."
           }
         }
       }
@@ -2389,30 +2557,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Show Less"
-          }
-        }
-      }
-    },
-    "paywall.v2.subtitle.getFullAccess" : {
-      "comment" : "Paywall v2 hero subtitle fallback shown when no visible plan has an active intro discount (e.g. user already used the intro for this subscription group). Neutral, honest copy that does not claim an offer the user is not eligible for.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Get full access"
-          }
-        }
-      }
-    },
-    "paywall.v2.subtitle.specialOfferPercent" : {
-      "comment" : "Paywall v2 hero subtitle shown directly under the SteadyEye headline when at least one visible plan has an active intro discount. %lld is the integer percent saved (computed dynamically from the largest savings across visible plans, e.g. 50). Apple's regional StoreKit pricing tiers mean the percent is not fixed.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Special offer — %lld%% off"
           }
         }
       }

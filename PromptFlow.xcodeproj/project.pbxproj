@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = 114690072F936C6500CAC8C6 /* FacebookCore */; };
 		1146939D2FA6063B00CAC8C6 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 1146939C2FA6063B00CAC8C6 /* FirebaseCrashlytics */; };
+		114694062FA79DD400CAC8C6 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 114694052FA79DD400CAC8C6 /* FirebaseRemoteConfig */; };
 		116FE5382F6EFA540094999F /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 116FE5372F6EFA540094999F /* RevenueCat */; };
 		117704122F912F15001E40FC /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 117704112F912F15001E40FC /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
@@ -71,6 +72,7 @@
 				1146939D2FA6063B00CAC8C6 /* FirebaseCrashlytics in Frameworks */,
 				114690082F936C6500CAC8C6 /* FacebookCore in Frameworks */,
 				116FE5382F6EFA540094999F /* RevenueCat in Frameworks */,
+				114694062FA79DD400CAC8C6 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -151,6 +153,7 @@
 				117704112F912F15001E40FC /* FirebaseAnalytics */,
 				114690072F936C6500CAC8C6 /* FacebookCore */,
 				1146939C2FA6063B00CAC8C6 /* FirebaseCrashlytics */,
+				114694052FA79DD400CAC8C6 /* FirebaseRemoteConfig */,
 			);
 			productName = PromptFlow;
 			productReference = 1195F13E2F5ADD78003B4DD2 /* PromptFlow.app */;
@@ -415,7 +418,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = PromptFlow/PromptFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = NB4UJ8958V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -458,7 +461,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = PromptFlow/PromptFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = NB4UJ8958V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -561,6 +564,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCrashlytics;
+		};
+		114694052FA79DD400CAC8C6 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
 		};
 		116FE5372F6EFA540094999F /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;

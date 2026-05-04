@@ -59,9 +59,6 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .tint(.orange)
         .onAppear {
-            #if DEBUG
-            print("📺 ContentView .onAppear at \(CFAbsoluteTimeGetCurrent())")
-            #endif
             // Stamp install date on the very first app launch ever. Idempotent
             // — only writes when the key is unset (== 0). Read by Rule 0 in
             // shouldShowColdStartPaywall() to suppress the paywall on the

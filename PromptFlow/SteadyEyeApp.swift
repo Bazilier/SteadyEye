@@ -74,6 +74,21 @@ struct SteadyEyeApp: App {
         // SubscriptionManager.configure so any push-related logic the
         // manager schedules during configure has the delegate in place.
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+
+        // Remote Config: seed defaults synchronously so the very first
+        // paywall render resolves every key without waiting on the
+        // network, then kick off a fire-and-forget fetch. Defaults
+        // match current hardcoded production behavior — if the fetch
+        // never returns, the app behaves identically to before. Runs
+        // AFTER FirebaseApp.configure (above) and AFTER analytics is
+        // up so the first experiment-variant assignment can write its
+        // GA4 user property.
+        #if !DEV
+        RemoteConfigManager.shared.setDefaults()
+        Task {
+            await RemoteConfigManager.shared.fetchAndActivate()
+        }
+        #endif
     }
 
     var body: some Scene {
