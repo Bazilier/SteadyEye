@@ -781,10 +781,9 @@ struct PaywallView: View {
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:
-                AppAnalytics.log("purchase_failed", params: [
+                AppAnalytics.log("purchase_cancelled_by_user", params: [
                     "plan": planName,
-                    "source": source,
-                    "error_reason": "user_cancelled"
+                    "source": source
                 ])
             case .failed(let reason):
                 AppAnalytics.log("purchase_failed", params: [

@@ -156,12 +156,6 @@
         }
       }
     },
-    "%lld / 20" : {
-
-    },
-    "AI optimize used today" : {
-
-    },
     "ai.proDailyLimit.body" : {
       "comment" : "Body of the Pro AI daily-limit alert.",
       "extractionState" : "extracted_with_value",
@@ -185,12 +179,6 @@
           }
         }
       }
-    },
-    "API calls today" : {
-
-    },
-    "Build: DEV" : {
-
     },
     "Camera & microphone access needed" : {
       "comment" : "Heading on the onboarding permission-explainer screen, shown when the user denied either camera or microphone (or both) during the permission flow. Recording requires both, so the explainer asks the user to enable them in Settings.",
@@ -431,9 +419,6 @@
           }
         }
       }
-    },
-    "Cancel all pending notifications" : {
-
     },
     "chat.empty" : {
       "comment" : "Empty-state hint shown in the chat when there are no messages yet.",
@@ -1095,9 +1080,6 @@
         }
       }
     },
-    "Debug" : {
-
-    },
     "demo.script.content" : {
       "comment" : "Body text of the seeded demo script created on first launch. Plays through the WBW prompter to demonstrate the eye-contact mechanic. Translate naturally; the second-person closing invites the user to create their own script.",
       "extractionState" : "manual",
@@ -1158,30 +1140,6 @@
         }
       }
     },
-    "DEV" : {
-
-    },
-    "DEV only. Forces isSubscribed state for testing." : {
-
-    },
-    "Fire inactive_3_days in 5s" : {
-
-    },
-    "Fire trial_day_5 in 5s" : {
-
-    },
-    "Fire trial_ending_24h in 5s" : {
-
-    },
-    "Fire trial_started in 5s" : {
-
-    },
-    "Force Free" : {
-
-    },
-    "Force Subscribed" : {
-
-    },
     "hud.changeInSettings" : {
       "comment" : "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Tells the user the tapped attribute is configurable in the Settings tab. Paired with an Open Settings CTA. Kept short so it fits the HUD overlay width.",
       "extractionState" : "manual",
@@ -1211,12 +1169,6 @@
           }
         }
       }
-    },
-    "no" : {
-
-    },
-    "Notifications (DEV)" : {
-
     },
     "notifications.soft_ask.allow" : {
       "comment" : "Primary CTA on the in-app soft-ask sheet that triggers iOS's native notification permission prompt.",
@@ -1337,9 +1289,6 @@
           }
         }
       }
-    },
-    "Off (use RC)" : {
-
     },
     "onboarding.mini_wbw.script" : {
       "comment" : "Short looping phrase shown in the onboarding priming-screen MiniWBW animation. Independent of demo.script.content. Should be 8-12 short words that read naturally word-by-word.",
@@ -3815,12 +3764,6 @@
         }
       }
     },
-    "Pending push count" : {
-
-    },
-    "Preview Paywall" : {
-
-    },
     "preview.photosDenied.toast" : {
       "comment" : "Toast shown when the user tries to save but Photos access is denied or restricted. Has a 'Settings' action button.",
       "extractionState" : "manual",
@@ -3910,9 +3853,6 @@
           }
         }
       }
-    },
-    "Push status" : {
-
     },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
@@ -5113,24 +5053,6 @@
           }
         }
       }
-    },
-    "Request push permission" : {
-
-    },
-    "Reset AI Optimize Day Limit" : {
-
-    },
-    "Reset Pro AI counter" : {
-
-    },
-    "Reset Rate Limits" : {
-
-    },
-    "Reset soft ask flag" : {
-
-    },
-    "Reset Tips" : {
-
     },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
@@ -8024,9 +7946,6 @@
         }
       }
     },
-    "Subscription Override" : {
-
-    },
     "toast.openSettings" : {
       "comment" : "Compact button label that opens iOS Settings — used inside toasts where horizontal space is tight. The longer 'Open Settings' lives at common.open_settings for full-button surfaces. NOTE: lives in the toast.* namespace (not common.*) because Xcode's String Catalog symbol generator collapses common.openSettings and common.open_settings to the same Swift symbol.",
       "extractionState" : "manual",
@@ -8086,9 +8005,6 @@
           }
         }
       }
-    },
-    "yes" : {
-
     }
   },
   "version" : "1.1"

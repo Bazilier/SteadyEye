@@ -59,6 +59,18 @@ struct SteadyEyeApp: App {
             if let firebaseAppInstanceID = Analytics.appInstanceID() {
                 Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
             }
+
+            // Bridge ASA attribution from RevenueCat into Firebase user
+            // properties. The sleep gives RC's SDK time to round-trip
+            // the AdServices token to Apple on first launch (subsequent
+            // launches use the cached server-side resolution and the
+            // delay is harmless). AppAttributionService self-gates via
+            // a UserDefaults flag, so calling on every cold start is
+            // safe and idempotent.
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                await AppAttributionService.syncToFirebase()
+            }
         }
         MetaAnalytics.logAppActivation()
         #endif
