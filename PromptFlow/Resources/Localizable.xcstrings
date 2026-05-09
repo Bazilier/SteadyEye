@@ -691,31 +691,31 @@
       }
     },
     "chat.welcome" : {
-      "comment" : "Pinned welcome message at the top of the chat from the founder. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated.",
+      "comment" : "Pinned welcome message at the top of the chat from the founder. Three short paragraphs separated by blank lines. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated. The 🤘 emoji at the end is intentional.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hi 👋 I'm Cyril. I built SteadyEye. Message me directly — I read every message."
+            "value" : "Hi 👋 I'm Cyril. I built SteadyEye.\n\nMessage me directly — I read every message.\n\nI don't know anything about you — not your name, not your email, nothing. If you'd like, you can introduce yourself. Otherwise just say hi 🤘"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hola 👋 Soy Cyril. Construí SteadyEye. Escríbeme directamente — leo cada mensaje."
+            "value" : "Hola 👋 Soy Cyril. Creé SteadyEye.\n\nEscríbeme directamente — leo cada mensaje.\n\nNo sé nada de ti — ni tu nombre, ni tu correo, nada. Si quieres, puedes presentarte. Si no, solo di hola 🤘"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oi 👋 Eu sou o Cyril. Construí o SteadyEye. Me escreva direto — leio cada mensagem."
+            "value" : "Oi 👋 Sou Cyril. Criei o SteadyEye.\n\nEscreva diretamente — leio cada mensagem.\n\nNão sei nada sobre você — nem seu nome, nem seu email, nada. Se quiser, pode se apresentar. Caso contrário, é só dizer oi 🤘"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye. Пиши мне напрямую — я читаю каждое сообщение."
+            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye.\n\nНапиши мне напрямую — я читаю каждое сообщение.\n\nЯ о тебе ничего не знаю — ни имени, ни почты, ничего. Если хочешь — представься. А не хочешь — просто скажи привет 🤘"
           }
         }
       }
