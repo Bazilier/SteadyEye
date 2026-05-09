@@ -28,6 +28,19 @@ struct RecordingView: View {
     @ObservedObject private var cameraManager = CameraManager.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var player = ChunkPlayerEngine()
+    /// Follow My Voice V2 toggle. iOS 26+ feature; on older OS the
+    /// SettingsView toggle isn't shown so the value stays false.
+    @AppStorage("fmv_enabled") private var fmvEnabled: Bool = false
+    /// V2 service instance held as `AnyObject` so this file doesn't
+    /// have to be `@available(iOS 26.0, *)`-gated. Cast to
+    /// `FollowMyVoiceServiceV2` inside `#available` blocks.
+    @State private var fmvService: AnyObject? = nil
+    /// User's pre-FMV slider position. Captured at FMV start, restored
+    /// at FMV stop. While non-nil, FMV's multiplier modulates the
+    /// visible thumb position via `FMVSliderSync` while
+    /// `player.sliderValue` stays held at this baseline (so the
+    /// engine's internal `base / multiplier` math doesn't double-apply).
+    @State private var fmvBaselineSlider: Double? = nil
     @State private var showSavedToast = false
     @State private var showAudioToast = false
     @State private var showResolutionToast = false
@@ -87,309 +100,20 @@ struct RecordingView: View {
     @State private var hasStartedPlayback = false
 
     var body: some View {
+        cameraContentOrPermission
+    }
+
+    // MARK: - Camera content
+
+    /// Top-level view: either the camera ZStack (authorized) or the
+    /// permission empty-state. All lifecycle and presentation modifiers
+    /// live here so `body` stays within the type-checker's budget.
+    private var cameraContentOrPermission: some View {
         Group {
-        if cameraAuthStatus == .authorized {
-        ZStack {
-            // 1. Camera preview
-            CameraPreviewView(session: cameraManager.session)
-                .ignoresSafeArea()
-
-            // 1b. Dim overlay during recording. Also active during the
-            // 3-2-1 countdown so the dim is already at full alpha by
-            // the time the countdown overlay (which has its own 0.5
-            // backdrop) is removed — without this, the user saw a
-            // dim → undim → dim flicker on the countdown→recording
-            // handoff because the recording-dim's 0.3s ramp lagged
-            // the countdown overlay's instant unmount. The flag
-            // pair (`isCountingDown` false → `isRecording` true) is
-            // mutated synchronously in startCountdown's timer
-            // callback, so SwiftUI coalesces both state changes into
-            // a single render and the opacity never momentarily
-            // computes to 0 on the boundary.
-            if dimDuringRecording {
-                Color.black
-                    .opacity((isCountingDown || cameraManager.isRecording) ? 0.4 : 0)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
-            }
-
-            // 2. Black container expanding from top cutout area
-            GeometryReader { geo in
-                let cfg = CutoutLayoutConfig.current(
-                    for: DeviceDetectionService.shared.cutoutType,
-                    screenWidth: geo.size.width,
-                    safeAreaTop: geo.safeAreaInsets.top
-                )
-
-                let safeTop = geo.safeAreaInsets.top
-                let collapsedHeight = max(1, safeTop - cfg.topPadding)
-                let wbwContentHeight: CGFloat = fontSize + 4 + 10
-                let classicContentHeight: CGFloat = 28 * 3 + 10
-                let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
-                let expandedContentHeight = collapsedHeight + contentHeight
-                let expandedWidth = geo.size.width * 0.75
-
-                let textDisplayY: CGFloat = {
-                    let rawY = CGFloat(textVerticalOffset) + textDragY
-                    let minY: CGFloat = -15
-                    let maxY: CGFloat = 20
-                    if rawY < minY { return minY + (rawY - minY) * 0.05 }
-                    if rawY > maxY { return maxY + (rawY - maxY) * 0.05 }
-                    return rawY
-                }()
-
-                VStack(spacing: 8) {
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: cfg.topCornerRadius,
-                        bottomLeadingRadius: cfg.bottomCornerRadius,
-                        bottomTrailingRadius: cfg.bottomCornerRadius,
-                        topTrailingRadius: cfg.topCornerRadius,
-                        style: .continuous
-                    )
-                        .fill(Color.black)
-                        .frame(
-                            width: isExpanded ? expandedWidth : cfg.collapsedWidth,
-                            height: isExpanded ? expandedContentHeight : 0
-                        )
-                        .opacity(isExpanded ? 1 : 0)
-                        .overlay(alignment: .top) {
-                            if showTextContent {
-                                wordDisplay
-                                    .frame(width: expandedWidth - 32)
-                                    .padding(.top, cfg.textTopOffset)
-                                    .offset(y: textDisplayY)
-                                    .transition(.opacity.animation(.easeIn(duration: 0.15)))
-                            }
-                        }
-                        .clipped()
-                        .overlay(alignment: .topTrailing) {
-                            if isExpanded {
-                                Button {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        displayMode = isClassicMode ? "wbw" : "classic"
-                                    }
-                                } label: {
-                                    Image(systemName: isClassicMode ? "chevron.up" : "chevron.down")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                        .frame(width: 44, height: 44)
-                                }
-                            }
-                        }
-                        .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
-                        .overlay(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: cfg.topCornerRadius,
-                                bottomLeadingRadius: cfg.bottomCornerRadius,
-                                bottomTrailingRadius: cfg.bottomCornerRadius,
-                                topTrailingRadius: cfg.topCornerRadius,
-                                style: .continuous
-                            )
-                            .strokeBorder(.white.opacity(isTextEditMode ? 0.2 : 0), lineWidth: 1)
-                        )
-                        // Long press + vertical drag = text offset inside container
-                        .simultaneousGesture(
-                            isExpanded ?
-                            LongPressGesture(minimumDuration: 0.5)
-                                .sequenced(before: DragGesture())
-                                .onChanged { value in
-                                    switch value {
-                                    case .second(true, let drag):
-                                        if !isTextEditMode {
-                                            isTextEditMode = true
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        }
-                                        if let drag {
-                                            textDragY = drag.translation.height
-                                        }
-                                    default:
-                                        break
-                                    }
-                                }
-                                .onEnded { _ in
-                                    let rawY = CGFloat(textVerticalOffset) + textDragY
-                                    let clampedY = min(max(rawY, -15), 20)
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        textVerticalOffset = Double(clampedY)
-                                        textDragY = 0
-                                        isTextEditMode = false
-                                    }
-                                }
-                            : nil
-                        )
-                        // Double tap = reset text and container position
-                        .simultaneousGesture(
-                            isExpanded ?
-                            TapGesture(count: 2)
-                                .onEnded {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        textVerticalOffset = 0
-                                        textDragY = 0
-                                    }
-                                }
-                            : nil
-                        )
-
-                    // Recording timer — follows the container horizontally
-                    if cameraManager.isRecording {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(.red)
-                                .frame(width: 10, height: 10)
-                            Text(durationString(cameraManager.recordingDuration))
-                                .font(.caption.monospacedDigit().bold())
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.5), in: Capsule())
-                    }
-
-                }
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: cfg.isCameraOffset ? .topTrailing : .top
-                )
-                .padding(.trailing, cfg.isCameraOffset ? 8 : 0)
-                .padding(.top, cfg.topPadding)
-                .ignoresSafeArea(edges: .top)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
-                .animation(.interactiveSpring(), value: isDragging)
-                .animation(.interactiveSpring(), value: isTextEditMode)
-            }
-
-            // 2b. Top-leading close button — visible only in the
-            // recording-ready state. Hidden during active capture so a
-            // mistap can't end a take. Sized + offset slightly tighter
-            // on SE-class devices because the centered WBW container
-            // leaves less horizontal clearance there (~47pt) than on
-            // notch/Dynamic Island layouts (~90pt).
-            //
-            // Vertical alignment: the button's center matches the WBW
-            // container's vertical midpoint, so the two read as on the
-            // same horizontal axis. Computed inside a GeometryReader
-            // because the math depends on the live `safeAreaInsets.top`
-            // (used by `CutoutLayoutConfig.current` to derive the
-            // collapsed-pill height inside the WBW container block).
-            if !cameraManager.isRecording {
-                GeometryReader { geo in
-                    let cfg = CutoutLayoutConfig.current(
-                        for: DeviceDetectionService.shared.cutoutType,
-                        screenWidth: geo.size.width,
-                        safeAreaTop: geo.safeAreaInsets.top
-                    )
-                    let isCameraOffset = cfg.isCameraOffset
-                    let closeBtnSize: CGFloat = isCameraOffset ? 42 : 32
-                    let closeBtnLeading: CGFloat = isCameraOffset ? 12 : 8
-
-                    // Mirror block 2's container-height derivation so the
-                    // close button center stays glued to the container's
-                    // vertical midpoint regardless of device class.
-                    let safeTop = geo.safeAreaInsets.top
-                    let collapsedHeight = max(1, safeTop - cfg.topPadding)
-                    let wbwContentHeight: CGFloat = fontSize + 4 + 10
-                    let containerHeight = collapsedHeight + wbwContentHeight
-                    let containerVerticalCenter = cfg.topPadding + (containerHeight / 2)
-                    let closeBtnTopPadding = max(0, containerVerticalCenter - (closeBtnSize / 2))
-
-                    VStack {
-                        HStack {
-                            Button { dismiss() } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: closeBtnSize, height: closeBtnSize)
-                                    .modifier(GlassCircleModifier())
-                                    .clipShape(Circle())
-                            }
-                            .padding(.leading, closeBtnLeading)
-                            .padding(.top, closeBtnTopPadding)
-                            Spacer()
-                        }
-                        Spacer()
-                    }
-                    .ignoresSafeArea(edges: .top)
-                }
-                .transition(.opacity)
-            }
-
-            // 3. Controls — always visible
-            VStack {
-                Spacer()
-                controlsOverlay
-            }
-
-            // 4. Countdown
-            if isCountingDown {
-                countdownOverlay
-            }
-
-            // 5. Audio route change toast
-            if let audioToast = cameraManager.audioRouteToast {
-                VStack {
-                    Text(audioToast)
-                        .font(.caption.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.black.opacity(0.7), in: Capsule())
-                    Spacer()
-                }
-                .padding(.top, 80)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        withAnimation { cameraManager.audioRouteToast = nil }
-                    }
-                }
-            }
-
-            // 6. Toast
-            if showSavedToast {
-                VStack {
-                    Text("recording.toast.saved", comment: "Toast shown after a recording is auto-saved when the app goes to background")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(.black.opacity(0.7), in: Capsule())
-                    Spacer()
-                }
-                .padding(.top, 80)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                        withAnimation { showSavedToast = false }
-                    }
-                }
-            }
-        }
-        } else {
-            permissionEmptyState
-        }
-        }
-        .overlay {
-            if isProcessingRecording {
-                ZStack {
-                    Color.black.opacity(0.85).ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .tint(.white)
-                            .scaleEffect(1.5)
-                        Text(String(
-                            localized: "recording.processing",
-                            defaultValue: "Saving recording…",
-                            comment: "Overlay message shown while a just-finished recording is being watermarked, persisted, and indexed."
-                        ))
-                            .font(.body)
-                            .foregroundStyle(.white)
-                    }
-                }
-                .transition(.opacity)
+            if cameraAuthStatus == .authorized {
+                cameraZStack
+            } else {
+                permissionEmptyState
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isProcessingRecording)
@@ -426,6 +150,24 @@ struct RecordingView: View {
             }
         }
         .onChange(of: speedSlider) { _, newVal in
+            if let baseline = fmvBaselineSlider {
+                // FMV is driving the visible thumb. If the new value is
+                // far enough off the FMV-implied position
+                // (baseline × multiplier), the user dragged manually:
+                // recompute baseline so future FMV updates modulate
+                // around the new set point, and mirror to
+                // player.sliderValue so engine pace tracks the drag.
+                if #available(iOS 26.0, *), let service = fmvService as? FollowMyVoiceServiceV2 {
+                    let mult = max(service.currentMultiplier, 0.01)
+                    let expected = max(0, min(1, baseline * mult))
+                    if abs(newVal - expected) > 0.02 {
+                        let newBaseline = max(0, min(1, newVal / mult))
+                        fmvBaselineSlider = newBaseline
+                        player.sliderValue = newBaseline
+                    }
+                }
+                return
+            }
             player.sliderValue = newVal
         }
         .onChange(of: exposureCompensation) { _, newVal in
@@ -434,6 +176,9 @@ struct RecordingView: View {
         .onChange(of: cameraManager.isRecording) { _, recording in
             if recording {
                 withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
+                startFMVIfEnabled()
+            } else {
+                stopFMV()
             }
         }
         .onDisappear {
@@ -456,81 +201,35 @@ struct RecordingView: View {
             cameraManager.stop()
             dismiss()
         }
-        .preferredColorScheme(.dark)
-        .statusBarHidden(true)
-        .toast(
-            isPresented: $showAudioToast,
-            message: String(
-                localized: "hud.changeInSettings",
-                defaultValue: "Change in Settings",
-                comment: "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Paired with an Open Settings CTA."
-            ),
-            style: .info,
-            duration: 5,
-            actionLabel: String(
-                localized: "recording.hud.openSettings",
-                defaultValue: "Open Settings",
-                comment: "Button label inside the recording-HUD discovery toasts (audio + resolution) that switches the app to the Settings tab. Distinct from the compact 'Settings' label in toast.openSettings, which opens iOS Settings, not the app's Settings tab."
-            ),
-            action: {
-                selectedTab = .settings
-                dismiss()
-            }
-        )
-        .toast(
-            isPresented: $showResolutionToast,
-            message: String(
-                localized: "hud.changeInSettings",
-                defaultValue: "Change in Settings",
-                comment: "Same key as the audio-toast message; reused here for the resolution toast since the imperative is identical."
-            ),
-            style: .info,
-            duration: 5,
-            actionLabel: String(
-                localized: "recording.hud.openSettings",
-                defaultValue: "Open Settings",
-                comment: "Same key as the audio-toast action; reused here for the resolution toast since the action is identical (open the app's Settings tab)."
-            ),
-            action: {
-                selectedTab = .settings
-                dismiss()
-            }
-        )
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
             handleRecordingFinished(sourceURL: url)
         }
+        .preferredColorScheme(.dark)
+        .statusBarHidden(true)
+        .withRecordingToasts(
+            showAudioToast: $showAudioToast,
+            showResolutionToast: $showResolutionToast,
+            onOpenSettings: { selectedTab = .settings; dismiss() }
+        )
         .fullScreenCover(item: $previewRecording) { recording in
             VideoPreviewView(recording: recording, onDismiss: {
                 previewRecording = nil
                 resetDisplay()
-                // First-recording paywall: fires once per install for free
-                // users on any preview dismissal (back / save complete /
-                // delete confirm — all routes through this onDismiss).
-                // Pro users skip without consuming the one-shot, so a later
-                // Pro→Free downgrade still gets to trigger.
-                //
                 // Read UserDefaults directly here rather than the @AppStorage
-                // wrapper. This closure is captured by VideoPreviewView and
-                // executed after the parent RecordingView struct may have
-                // been recreated by SwiftUI; the captured @AppStorage can
-                // observe a stale snapshot of the wrapped value while the
-                // underlying UserDefaults key is already true. UserDefaults
-                // reads are always live, so this avoids the stale-capture
-                // bug that caused the paywall to fire twice in testing.
+                // wrapper to avoid the stale-capture bug that caused the paywall
+                // to fire twice in testing.
                 let alreadyShown = UserDefaults.standard.bool(forKey: "postFirstRecordingPaywallShown")
                 if !alreadyShown && !subscriptionManager.isSubscribed {
                     UserDefaults.standard.set(true, forKey: "postFirstRecordingPaywallShown")
-                    postFirstRecordingPaywallShown = true   // keep @AppStorage observers in sync
+                    postFirstRecordingPaywallShown = true
                     showFirstRecordingPaywall = true
                 }
             })
         }
         .fullScreenCover(isPresented: $showPaywall) {
-            PaywallView(source: "record_button", onPurchaseSuccess: {
-                startCountdown()
-            })
+            PaywallView(source: "record_button", onPurchaseSuccess: { startCountdown() })
         }
         .fullScreenCover(isPresented: $showFirstRecordingPaywall) {
             PaywallView(source: "first_recording")
@@ -539,9 +238,7 @@ struct RecordingView: View {
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
             isPresented: .constant(cameraManager.errorMessage != nil)
         ) {
-            Button {
-                cameraManager.errorMessage = nil
-            } label: {
+            Button { cameraManager.errorMessage = nil } label: {
                 Text("common.ok", comment: "OK button on the camera error alert")
             }
         } message: {
@@ -573,23 +270,336 @@ struct RecordingView: View {
             }
         }
         .onAppear {
-            // Consume the transient onboarding-auto-open signal set by
-            // ScriptListView's two auto-open paths. One-shot: cleared
-            // on first read so any subsequent RecordingView mount —
-            // including a manual demo-script replay — correctly
-            // triggers the explainer.
             let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
             if wasOnboardingAuto {
                 UserDefaults.standard.set(false, forKey: "nextRecordingIsOnboardingAuto")
             }
-            // Gate on cameraAuthStatus so the tip doesn't overlay the
-            // permission empty state when the user hasn't granted
-            // camera access yet.
             guard cameraAuthStatus == .authorized,
                   !wasOnboardingAuto,
                   !hasSeenCameraExplainer
             else { return }
             showCameraExplainer = true
+        }
+    }
+
+    // MARK: - Camera ZStack
+
+    /// The layers stacked over the camera preview when permission is granted.
+    @ViewBuilder
+    private var cameraZStack: some View {
+        ZStack {
+            // 1. Camera preview
+            CameraPreviewView(session: cameraManager.session)
+                .ignoresSafeArea()
+
+            // 1b. Dim overlay during recording / countdown
+            if dimDuringRecording {
+                Color.black
+                    .opacity((isCountingDown || cameraManager.isRecording) ? 0.4 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
+            }
+
+            // 2. Black container expanding from top cutout area
+            prompterContainerPanel
+
+            // 2b. Top-leading close button
+            if !cameraManager.isRecording {
+                closeButton
+                    .transition(.opacity)
+            }
+
+            // 3. Controls — always visible
+            VStack {
+                Spacer()
+                controlsOverlay
+            }
+
+            // 4. Countdown
+            if isCountingDown {
+                countdownOverlay
+            }
+
+            // 5. Audio route change toast
+            if let audioToast = cameraManager.audioRouteToast {
+                VStack {
+                    Text(audioToast)
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.7), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 80)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation { cameraManager.audioRouteToast = nil }
+                    }
+                }
+            }
+
+            // 6. Saved toast
+            if showSavedToast {
+                VStack {
+                    Text("recording.toast.saved", comment: "Toast shown after a recording is auto-saved when the app goes to background")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.black.opacity(0.7), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 80)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation { showSavedToast = false }
+                    }
+                }
+            }
+
+            // 7. Processing overlay
+            if isProcessingRecording {
+                ZStack {
+                    Color.black.opacity(0.85).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.5)
+                        Text(String(
+                            localized: "recording.processing",
+                            defaultValue: "Saving recording…",
+                            comment: "Overlay message shown while a just-finished recording is being watermarked, persisted, and indexed."
+                        ))
+                        .font(.body)
+                        .foregroundStyle(.white)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+
+    // MARK: - Prompter container panel
+
+    /// The black pill/rectangle that expands from the top cutout area,
+    /// showing the teleprompter text and the recording-timer badge.
+    private var prompterContainerPanel: some View {
+        GeometryReader { geo in
+            let cfg = CutoutLayoutConfig.current(
+                for: DeviceDetectionService.shared.cutoutType,
+                screenWidth: geo.size.width,
+                safeAreaTop: geo.safeAreaInsets.top
+            )
+
+            let safeTop = geo.safeAreaInsets.top
+            let collapsedHeight = max(1, safeTop - cfg.topPadding)
+            let wbwContentHeight: CGFloat = fontSize + 4 + 10
+            let classicContentHeight: CGFloat = 28 * 3 + 10
+            let contentHeight = isClassicMode ? classicContentHeight : wbwContentHeight
+            let expandedContentHeight = collapsedHeight + contentHeight
+            let expandedWidth = geo.size.width * 0.75
+
+            let textDisplayY: CGFloat = {
+                let rawY = CGFloat(textVerticalOffset) + textDragY
+                let minY: CGFloat = -15
+                let maxY: CGFloat = 20
+                if rawY < minY { return minY + (rawY - minY) * 0.05 }
+                if rawY > maxY { return maxY + (rawY - maxY) * 0.05 }
+                return rawY
+            }()
+
+            VStack(spacing: 8) {
+                prompterPill(cfg: cfg, expandedWidth: expandedWidth, expandedContentHeight: expandedContentHeight, textDisplayY: textDisplayY)
+
+                // Recording timer — follows the container horizontally.
+                // FMV step indicator (when active) sits to its right as
+                // a sibling pill so it never crowds the prompter text.
+                if cameraManager.isRecording {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 10, height: 10)
+                            Text(durationString(cameraManager.recordingDuration))
+                                .font(.caption.monospacedDigit().bold())
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.5), in: Capsule())
+
+                        if #available(iOS 26.0, *),
+                           let service = fmvService as? FollowMyVoiceServiceV2 {
+                            FMVStepIndicator(service: service)
+                        }
+                    }
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: cfg.isCameraOffset ? .topTrailing : .top
+            )
+            .padding(.trailing, cfg.isCameraOffset ? 8 : 0)
+            .padding(.top, cfg.topPadding)
+            .ignoresSafeArea(edges: .top)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isExpanded)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: displayMode)
+            .animation(.interactiveSpring(), value: isDragging)
+            .animation(.interactiveSpring(), value: isTextEditMode)
+        }
+    }
+
+    /// The black pill shape itself (extracted so `prompterContainerPanel`
+    /// stays within the type-checker's complexity budget).
+    @ViewBuilder
+    private func prompterPill(
+        cfg: CutoutLayoutConfig,
+        expandedWidth: CGFloat,
+        expandedContentHeight: CGFloat,
+        textDisplayY: CGFloat
+    ) -> some View {
+        UnevenRoundedRectangle(
+            topLeadingRadius: cfg.topCornerRadius,
+            bottomLeadingRadius: cfg.bottomCornerRadius,
+            bottomTrailingRadius: cfg.bottomCornerRadius,
+            topTrailingRadius: cfg.topCornerRadius,
+            style: .continuous
+        )
+        .fill(Color.black)
+        .frame(
+            width: isExpanded ? expandedWidth : cfg.collapsedWidth,
+            height: isExpanded ? expandedContentHeight : 0
+        )
+        .opacity(isExpanded ? 1 : 0)
+        .overlay(alignment: .top) {
+            if showTextContent {
+                wordDisplay
+                    .frame(width: expandedWidth - 32)
+                    .padding(.top, cfg.textTopOffset)
+                    .offset(y: textDisplayY)
+                    .transition(.opacity.animation(.easeIn(duration: 0.15)))
+            }
+        }
+        .clipped()
+        .overlay(alignment: .topTrailing) {
+            if isExpanded {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        displayMode = isClassicMode ? "wbw" : "classic"
+                    }
+                } label: {
+                    Image(systemName: isClassicMode ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .frame(width: 44, height: 44)
+                }
+            }
+        }
+        .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
+        .overlay(
+            UnevenRoundedRectangle(
+                topLeadingRadius: cfg.topCornerRadius,
+                bottomLeadingRadius: cfg.bottomCornerRadius,
+                bottomTrailingRadius: cfg.bottomCornerRadius,
+                topTrailingRadius: cfg.topCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(.white.opacity(isTextEditMode ? 0.2 : 0), lineWidth: 1)
+        )
+        // Long press + vertical drag = text offset inside container
+        .simultaneousGesture(
+            isExpanded ?
+            LongPressGesture(minimumDuration: 0.5)
+                .sequenced(before: DragGesture())
+                .onChanged { value in
+                    switch value {
+                    case .second(true, let drag):
+                        if !isTextEditMode {
+                            isTextEditMode = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }
+                        if let drag {
+                            textDragY = drag.translation.height
+                        }
+                    default:
+                        break
+                    }
+                }
+                .onEnded { _ in
+                    let rawY = CGFloat(textVerticalOffset) + textDragY
+                    let clampedY = min(max(rawY, -15), 20)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        textVerticalOffset = Double(clampedY)
+                        textDragY = 0
+                        isTextEditMode = false
+                    }
+                }
+            : nil
+        )
+        // Double tap = reset text and container position
+        .simultaneousGesture(
+            isExpanded ?
+            TapGesture(count: 2)
+                .onEnded {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        textVerticalOffset = 0
+                        textDragY = 0
+                    }
+                }
+            : nil
+        )
+    }
+
+    // MARK: - Close button
+
+    /// Top-leading back chevron. Visible only when not recording.
+    /// Sized + offset slightly tighter on SE-class devices because the
+    /// centered WBW container leaves less horizontal clearance there (~47pt)
+    /// than on notch/Dynamic Island layouts (~90pt).
+    private var closeButton: some View {
+        GeometryReader { geo in
+            let cfg = CutoutLayoutConfig.current(
+                for: DeviceDetectionService.shared.cutoutType,
+                screenWidth: geo.size.width,
+                safeAreaTop: geo.safeAreaInsets.top
+            )
+            let isCameraOffset = cfg.isCameraOffset
+            let closeBtnSize: CGFloat = isCameraOffset ? 42 : 32
+            let closeBtnLeading: CGFloat = isCameraOffset ? 12 : 8
+
+            // Mirror block 2's container-height derivation so the
+            // close button center stays glued to the container's
+            // vertical midpoint regardless of device class.
+            let safeTop = geo.safeAreaInsets.top
+            let collapsedHeight = max(1, safeTop - cfg.topPadding)
+            let wbwContentHeight: CGFloat = fontSize + 4 + 10
+            let containerHeight = collapsedHeight + wbwContentHeight
+            let containerVerticalCenter = cfg.topPadding + (containerHeight / 2)
+            let closeBtnTopPadding = max(0, containerVerticalCenter - (closeBtnSize / 2))
+
+            VStack {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: closeBtnSize, height: closeBtnSize)
+                            .modifier(GlassCircleModifier())
+                            .clipShape(Circle())
+                    }
+                    .padding(.leading, closeBtnLeading)
+                    .padding(.top, closeBtnTopPadding)
+                    Spacer()
+                }
+                Spacer()
+            }
+            .ignoresSafeArea(edges: .top)
         }
     }
 
@@ -672,6 +682,55 @@ struct RecordingView: View {
             } else {
                 PlaceholderLoopView(fontSize: fontSize, isClassicMode: isClassicMode)
             }
+        }
+    }
+
+    // MARK: - Follow My Voice V2 lifecycle
+
+    /// Spin up V2 if the user has the toggle on AND is subscribed AND
+    /// is on iOS 26+. The view-level `if #available` block guards the
+    /// type reference; on iOS 18 the call is a no-op.
+    private func startFMVIfEnabled() {
+        guard fmvEnabled, subscriptionManager.isSubscribed else { return }
+        if #available(iOS 26.0, *) {
+            let service = FollowMyVoiceServiceV2(engine: player, cameraManager: cameraManager)
+            self.fmvService = service
+            // Capture user's slider position before FMV starts
+            // modulating the thumb. Restored verbatim in stopFMV().
+            self.fmvBaselineSlider = speedSlider
+            let scriptText = script.content
+            Task { @MainActor in
+                do {
+                    try await service.start(scriptText: scriptText)
+                    AppAnalytics.log("follow_my_voice_v2_started", params: nil)
+                } catch {
+                    print("[FMV2] start failed: \(error)")
+                    self.fmvService = nil
+                    self.fmvBaselineSlider = nil
+                    AppAnalytics.log("follow_my_voice_v2_unavailable", params: [
+                        "reason": String(describing: error)
+                    ])
+                }
+            }
+        }
+    }
+
+    private func stopFMV() {
+        guard fmvService != nil else { return }
+        if #available(iOS 26.0, *), let v2 = fmvService as? FollowMyVoiceServiceV2 {
+            Task { @MainActor in
+                await v2.stop()
+            }
+        }
+        // Clear baseline FIRST so the speedSlider write below takes the
+        // non-FMV branch in the onChange watcher and mirrors back to
+        // `player.sliderValue`. Otherwise the slider would visually
+        // restore but the engine would keep playing at the held value.
+        let baseline = fmvBaselineSlider
+        fmvBaselineSlider = nil
+        fmvService = nil
+        if let baseline {
+            speedSlider = baseline
         }
     }
 
@@ -814,11 +873,25 @@ struct RecordingView: View {
                     .foregroundStyle(.white.opacity(0.5))
                 Slider(value: $speedSlider, in: 0...1)
                     .tint(.orange)
+                    .animation(.easeInOut(duration: 0.5), value: player.externalSpeedMultiplier)
                 Image(systemName: "hare.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.5))
             }
             .padding(.horizontal, 24)
+            .background {
+                // Invisible bridge: when FMV V2 is running with a
+                // captured baseline, FMVSliderSync observes the service
+                // and writes `baseline × currentMultiplier` back into
+                // $speedSlider whenever the step commits. The
+                // .background attachment keeps the bridge bound to the
+                // slider's lifecycle without touching layout.
+                if #available(iOS 26.0, *),
+                   let service = fmvService as? FollowMyVoiceServiceV2,
+                   let baseline = fmvBaselineSlider {
+                    FMVSliderSync(service: service, slider: $speedSlider, baseline: baseline)
+                }
+            }
 
             scrubBar
 
@@ -1009,3 +1082,61 @@ struct RecordingView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 }
+// MARK: - Recording toasts modifier
+
+private struct RecordingToastsModifier: ViewModifier {
+    @Binding var showAudioToast: Bool
+    @Binding var showResolutionToast: Bool
+    var onOpenSettings: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .toast(
+                isPresented: $showAudioToast,
+                message: String(
+                    localized: "hud.changeInSettings",
+                    defaultValue: "Change in Settings",
+                    comment: "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Paired with an Open Settings CTA."
+                ),
+                style: .info,
+                duration: 5,
+                actionLabel: String(
+                    localized: "recording.hud.openSettings",
+                    defaultValue: "Open Settings",
+                    comment: "Button label inside the recording-HUD discovery toasts (audio + resolution) that switches the app to the Settings tab."
+                ),
+                action: onOpenSettings
+            )
+            .toast(
+                isPresented: $showResolutionToast,
+                message: String(
+                    localized: "hud.changeInSettings",
+                    defaultValue: "Change in Settings",
+                    comment: "Same key as the audio-toast message; reused here for the resolution toast since the imperative is identical."
+                ),
+                style: .info,
+                duration: 5,
+                actionLabel: String(
+                    localized: "recording.hud.openSettings",
+                    defaultValue: "Open Settings",
+                    comment: "Same key as the audio-toast action; reused here for the resolution toast since the action is identical."
+                ),
+                action: onOpenSettings
+            )
+    }
+}
+
+private extension View {
+    func withRecordingToasts(
+        showAudioToast: Binding<Bool>,
+        showResolutionToast: Binding<Bool>,
+        onOpenSettings: @escaping () -> Void
+    ) -> some View {
+        modifier(RecordingToastsModifier(
+            showAudioToast: showAudioToast,
+            showResolutionToast: showResolutionToast,
+            onOpenSettings: onOpenSettings
+        ))
+    }
+}
+

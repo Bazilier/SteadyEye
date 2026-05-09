@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
     @AppStorage("useBluetoothMic") private var useBluetoothMic: Bool = false
+    @AppStorage("fmv_enabled") private var fmvEnabled: Bool = false
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @State private var showPaywall = false
@@ -260,6 +261,16 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    if #available(iOS 26.0, *) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(isOn: $fmvEnabled) {
+                                Text("settings.followMyVoice.toggle", comment: "Toggle: Follow my voice. Adapts the prompter pace to the user's actual speech.")
+                            }
+                            Text("settings.followMyVoice.englishOnly", comment: "Helper text: Follow My Voice supports English scripts only at v2.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 } header: {
                     Text("settings.section.recording", comment: "Settings section header")
                 }
@@ -322,6 +333,10 @@ struct SettingsView: View {
                     Text("Build: DEV")
                         .font(.caption)
                         .foregroundStyle(.orange)
+
+                    if #available(iOS 26.0, *) {
+                        SpeechAnalyzerDiagButton()
+                    }
                 }
 
                 Section("Notifications (DEV)") {
@@ -512,6 +527,16 @@ struct SettingsView: View {
                     showPaywall = true
                 }
             }
+            .onChange(of: fmvEnabled) { _, newValue in
+                // Same opt-in gate as 4K / stabilization: let the user
+                // flip the toggle, then roll it back and surface the
+                // paywall if they aren't subscribed.
+                if newValue && !subscriptionManager.isSubscribed {
+                    fmvEnabled = false
+                    paywallSource = "follow_my_voice"
+                    showPaywall = true
+                }
+            }
             .onAppear {
                 // Safeguard: if a previously-Pro user dropped to free with the
                 // toggle stuck on, force it back to off so CameraManager doesn't
@@ -525,6 +550,11 @@ struct SettingsView: View {
                 // captures to 1080p for free users.
                 if !subscriptionManager.canRecord4K && videoResolution == "4k" {
                     videoResolution = "1080p"
+                }
+                // Same safeguard for Follow-My-Voice — clear stale on
+                // for previously-subscribed-now-free users.
+                if !subscriptionManager.isSubscribed && fmvEnabled {
+                    fmvEnabled = false
                 }
             }
         }

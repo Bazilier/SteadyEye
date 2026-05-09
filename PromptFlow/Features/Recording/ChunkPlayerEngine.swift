@@ -10,6 +10,23 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published var progress: Double = 0
     @Published var isReady = false
 
+    /// External freeze, owned by FollowMyVoiceServiceV2. Independent of
+    /// `isPlaying` so a user-initiated pause and a voice-driven freeze
+    /// don't clobber each other. Flipping back to false re-fires the
+    /// advance loop without resetting the cursor.
+    var externallyFrozen: Bool = false {
+        didSet {
+            guard oldValue != externallyFrozen else { return }
+            if !externallyFrozen, isPlaying { scheduleAdvance() }
+        }
+    }
+
+    /// External speed multiplier (1.0 = no change, >1.0 = faster).
+    /// Currently only set by FollowMyVoiceServiceV2 for pace tracking. Composed
+    /// multiplicatively with the slider-derived base duration.
+    /// Published so the recording UI can react (visual slider thumb).
+    @Published var externalSpeedMultiplier: Double = 1.0
+
     var sliderValue: Double = 0.5
     @Published private(set) var supportsORP: Bool = true
     /// ORP per-word mode. Toggling this triggers re-chunking via reloadChunks().
@@ -120,11 +137,32 @@ final class ChunkPlayerEngine: ObservableObject {
 
     // MARK: - Duration
 
-    func chunkDuration(_ chunk: String) -> TimeInterval {
+    /// Baseline duration per typical word at the current slider position,
+    /// IGNORING `externalSpeedMultiplier`. Used by FMV2 to compute a
+    /// target multiplier from measured user WPM:
+    ///   target = baseline × measuredWPM × leadFactor / 60
+    /// Returns the per-word time the engine would spend if the multiplier
+    /// were 1.0. ORP path uses the slider-derived `orpBaseSpeedMs`
+    /// directly; non-ORP path uses a representative short word ("the")
+    /// against the same slider/strategy math the engine uses internally.
+    func averageBaselineDurationPerWord() -> TimeInterval {
         if useORPPath {
-            return strategy.durationPerWord(chunk: chunk, baseSpeedMs: orpBaseSpeedMs)
+            return TimeInterval(orpBaseSpeedMs) / 1000.0
+        } else {
+            return ChunkTimingCalculator.calculateDuration(for: "the", sliderValue: sliderValue, strategy: strategy)
         }
-        return ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
+    }
+
+    func chunkDuration(_ chunk: String) -> TimeInterval {
+        let base: TimeInterval
+        if useORPPath {
+            base = strategy.durationPerWord(chunk: chunk, baseSpeedMs: orpBaseSpeedMs)
+        } else {
+            base = ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
+        }
+        // multiplier > 1 means faster → shorter duration. Floor at 0.1
+        // defensively so a stuck-at-zero multiplier doesn't divide by zero.
+        return base / max(externalSpeedMultiplier, 0.1)
     }
 
     // MARK: - Internal scheduling
@@ -132,9 +170,19 @@ final class ChunkPlayerEngine: ObservableObject {
     private func scheduleAdvance() {
         advanceTask?.cancel()
         guard currentChunkIndex < chunks.count, isPlaying else { return }
+        guard !externallyFrozen else { return }
 
         let chunk = chunks[currentChunkIndex]
         let duration = chunkDuration(chunk)
+
+        // DIAGNOSTIC: surfaces the multiplier value at the moment the
+        // engine commits to a chunk-advance sleep. If `mul` here stays
+        // at 1.0 while FMV2 logs say it set it to 1.6, the chain is
+        // broken (different engine instance, write lost, etc.). If
+        // `mul` reflects FMV2's value but the UI feels unchanged, the
+        // bug is downstream (rendering / perception). Remove after
+        // diagnosis.
+        print("[ENGINE] chunk \(currentChunkIndex) duration=\(String(format: "%.3f", duration))s mul=\(String(format: "%.2f", externalSpeedMultiplier)) frozen=\(externallyFrozen)")
 
         advanceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))

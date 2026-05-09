@@ -32,6 +32,15 @@ final class CameraManager: NSObject, ObservableObject {
     let session = AVCaptureSession()
     private var videoDataOutput: AVCaptureVideoDataOutput?
     private var audioDataOutput: AVCaptureAudioDataOutput?
+
+    /// Optional fan-out for audio sample buffers on `sampleBufferQueue`.
+    /// Set by `RecordingView` when Follow-My-Voice is active so the FMV
+    /// service can compute RMS + feed SFSpeechRecognizer without spinning
+    /// up a separate AVAudioEngine. Called AFTER the asset writer has
+    /// consumed the buffer so the file's audio track is unaffected.
+    /// Read concurrently across `sampleBufferQueue` and the main thread
+    /// (when set/cleared) — the `ifNotNil` check tolerates the race.
+    var audioBufferBroadcast: ((CMSampleBuffer) -> Void)?
     private var assetWriterRecorder: AssetWriterRecorder?
     private var watermarkComposer: RealtimeWatermarkComposer?
     private var durationTimer: Timer?
@@ -537,6 +546,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         // contract is satisfied without explicit locking.
         if output is AVCaptureAudioDataOutput {
             assetWriterRecorder?.appendAudio(sampleBuffer)
+            audioBufferBroadcast?(sampleBuffer)
             return
         }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }

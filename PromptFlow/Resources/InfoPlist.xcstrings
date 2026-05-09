@@ -180,6 +180,36 @@
           }
         }
       }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "comment" : "Permission prompt shown when SteadyEye first uses on-device speech recognition for the optional Follow-My-Voice feature. Apple App Store requires this to be localized.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye uses speech recognition to follow your voice while recording. Speech is processed only on your device and never sent to a server."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye usa el reconocimiento de voz para seguir tu lectura mientras grabas. Tu voz se procesa solo en tu dispositivo y no se envía a ningún servidor."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O SteadyEye usa reconhecimento de voz para acompanhar sua leitura enquanto você grava. Sua voz é processada apenas no seu dispositivo e nunca é enviada a um servidor."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SteadyEye использует распознавание речи, чтобы подстраивать темп под твою речь во время записи. Звук обрабатывается только на устройстве и не отправляется на сервер."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
