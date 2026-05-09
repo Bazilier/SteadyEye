@@ -261,6 +261,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    #if false  // FMV v2 prototype hidden on main — see prototype/fmv-v2-speech-analyzer branch
                     if #available(iOS 26.0, *) {
                         VStack(alignment: .leading, spacing: 4) {
                             Toggle(isOn: $fmvEnabled) {
@@ -271,6 +272,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    #endif
                 } header: {
                     Text("settings.section.recording", comment: "Settings section header")
                 }
