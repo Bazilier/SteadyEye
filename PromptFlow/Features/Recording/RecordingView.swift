@@ -416,27 +416,18 @@ struct RecordingView: View {
                 prompterPill(cfg: cfg, expandedWidth: expandedWidth, expandedContentHeight: expandedContentHeight, textDisplayY: textDisplayY)
 
                 // Recording timer — follows the container horizontally.
-                // FMV step indicator (when active) sits to its right as
-                // a sibling pill so it never crowds the prompter text.
                 if cameraManager.isRecording {
-                    HStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(.red)
-                                .frame(width: 10, height: 10)
-                            Text(durationString(cameraManager.recordingDuration))
-                                .font(.caption.monospacedDigit().bold())
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.5), in: Capsule())
-
-                        if #available(iOS 26.0, *),
-                           let service = fmvService as? FollowMyVoiceServiceV2 {
-                            FMVStepIndicator(service: service)
-                        }
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 10, height: 10)
+                        Text(durationString(cameraManager.recordingDuration))
+                            .font(.caption.monospacedDigit().bold())
+                            .foregroundStyle(.white)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.5), in: Capsule())
                 }
             }
             .frame(
@@ -784,7 +775,7 @@ struct RecordingView: View {
     private func animateProgressForChunk(at index: Int) {
         guard !player.chunks.isEmpty, !isScrubbing else { return }
         let target = Double(index + 1) / Double(player.chunks.count)
-        let duration = player.chunkDuration(player.chunks[index])
+        let duration = player.chunkDuration(at: index)
         withAnimation(.linear(duration: duration)) {
             smoothProgress = target
         }

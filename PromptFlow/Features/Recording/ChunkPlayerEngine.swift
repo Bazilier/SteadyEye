@@ -7,6 +7,13 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published var currentChunkIndex = 0
     @Published var isPlaying = false
     @Published private(set) var chunks: [String] = []
+    /// Parallel array to `chunks` carrying per-chunk speed multiplier
+    /// (from `{N}` markers) and extra pause (from `///` markers).
+    /// Always the same length as `chunks` after `loadScript`. Populated
+    /// by `MarkerPreprocessor` on the Latin path; defaults (no-effect
+    /// metadata) on Arabic/CJK paths so the marker feature is Latin-only
+    /// at v1 without crashing other scripts.
+    private var chunkMetadata: [ChunkMetadata] = []
     @Published var progress: Double = 0
     @Published var isReady = false
 
@@ -54,6 +61,7 @@ final class ChunkPlayerEngine: ObservableObject {
         loadTask?.cancel()
 
         chunks = ["..."]
+        chunkMetadata = [ChunkMetadata()]
         currentChunkIndex = 0
         progress = 0
         isPlaying = false
@@ -64,19 +72,35 @@ final class ChunkPlayerEngine: ObservableObject {
         let orpMode = orpEnabled
         let baseSpeed = orpBaseSpeedMs
         loadTask = Task { [weak self] in
-            // Detect + chunk on background, only return Sendable results
-            let newChunks = await Task.detached {
+            // Detect strategy + chunk on background. Latin scripts run
+            // through MarkerPreprocessor so `{N}` and `///` resolve to
+            // chunkMetadata; non-Latin scripts skip preprocessing and
+            // emit no-effect metadata (markers stay in text as-is).
+            let result: (chunks: [String], metadata: [ChunkMetadata]) = await Task.detached {
                 let strat = LanguageDetector.detect(scriptText)
-                if orpMode && strat.supportsORP {
-                    return strat.chunksPerWord(text: scriptText, baseSpeedMs: baseSpeed)
+                if strat is LatinLanguageStrategy {
+                    let chunker: (String) -> [String]
+                    if orpMode && strat.supportsORP {
+                        chunker = { strat.chunksPerWord(text: $0, baseSpeedMs: baseSpeed) }
+                    } else {
+                        chunker = { strat.chunks(from: $0) }
+                    }
+                    return MarkerPreprocessor.process(rawText: scriptText, chunker: chunker)
                 } else {
-                    return strat.chunks(from: scriptText)
+                    let chunks: [String]
+                    if orpMode && strat.supportsORP {
+                        chunks = strat.chunksPerWord(text: scriptText, baseSpeedMs: baseSpeed)
+                    } else {
+                        chunks = strat.chunks(from: scriptText)
+                    }
+                    return (chunks, Array(repeating: ChunkMetadata(), count: chunks.count))
                 }
             }.value
             guard let self else { return }
             // Strategy is cheap to recreate on MainActor
             self.strategy = LanguageDetector.detect(scriptText)
-            self.chunks = newChunks
+            self.chunks = result.chunks
+            self.chunkMetadata = result.metadata
             self.currentChunkIndex = 0
             self.isReady = true
         }
@@ -153,16 +177,28 @@ final class ChunkPlayerEngine: ObservableObject {
         }
     }
 
-    func chunkDuration(_ chunk: String) -> TimeInterval {
+    /// Per-chunk duration, composed from:
+    ///   base (slider × strategy)
+    ///     ÷ markerMul (from `{N}` inline marker)
+    ///     ÷ externalSpeedMultiplier (FMV2)
+    ///     + extraPauseSec (from `///` inline marker, NOT scaled)
+    /// markerMul and externalSpeedMultiplier multiply together to form
+    /// the divisor — slowdowns stack, speedups stack, mixing slows-and-
+    /// speeds-at-once partially cancel. The combined divisor is floored
+    /// at 0.1 so a pathological 0× can't divide by zero.
+    func chunkDuration(at index: Int) -> TimeInterval {
+        guard index >= 0, index < chunks.count else { return 0 }
+        let chunk = chunks[index]
+        let meta = (index < chunkMetadata.count) ? chunkMetadata[index] : ChunkMetadata()
+
         let base: TimeInterval
         if useORPPath {
             base = strategy.durationPerWord(chunk: chunk, baseSpeedMs: orpBaseSpeedMs)
         } else {
             base = ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
         }
-        // multiplier > 1 means faster → shorter duration. Floor at 0.1
-        // defensively so a stuck-at-zero multiplier doesn't divide by zero.
-        return base / max(externalSpeedMultiplier, 0.1)
+        let combinedMul = max(externalSpeedMultiplier * meta.speedMultiplier, 0.1)
+        return base / combinedMul + meta.extraPauseSec
     }
 
     // MARK: - Internal scheduling
@@ -172,17 +208,7 @@ final class ChunkPlayerEngine: ObservableObject {
         guard currentChunkIndex < chunks.count, isPlaying else { return }
         guard !externallyFrozen else { return }
 
-        let chunk = chunks[currentChunkIndex]
-        let duration = chunkDuration(chunk)
-
-        // DIAGNOSTIC: surfaces the multiplier value at the moment the
-        // engine commits to a chunk-advance sleep. If `mul` here stays
-        // at 1.0 while FMV2 logs say it set it to 1.6, the chain is
-        // broken (different engine instance, write lost, etc.). If
-        // `mul` reflects FMV2's value but the UI feels unchanged, the
-        // bug is downstream (rendering / perception). Remove after
-        // diagnosis.
-        print("[ENGINE] chunk \(currentChunkIndex) duration=\(String(format: "%.3f", duration))s mul=\(String(format: "%.2f", externalSpeedMultiplier)) frozen=\(externallyFrozen)")
+        let duration = chunkDuration(at: currentChunkIndex)
 
         advanceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))

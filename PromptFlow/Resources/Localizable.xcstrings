@@ -7214,12 +7214,6 @@
         }
       }
     },
-    "settings.followMyVoice.englishOnly" : {
-      "comment" : "Helper text: Follow My Voice supports English scripts only at v2."
-    },
-    "settings.followMyVoice.toggle" : {
-      "comment" : "Toggle: Follow my voice. Adapts the prompter pace to the user's actual speech."
-    },
     "settings.recording.autoStart" : {
       "comment" : "Toggle label for auto-starting the teleprompter when recording begins.",
       "extractionState" : "manual",

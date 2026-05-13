@@ -411,7 +411,6 @@ final class FollowMyVoiceServiceV2: ObservableObject {
         if abs(drifted - currentMultiplier) > 0.005 {
             currentMultiplier = drifted
             engine.externalSpeedMultiplier = drifted
-            print("[FMV2] silence drift: mul → \(String(format: "%.2f", drifted))")
         }
     }
 
