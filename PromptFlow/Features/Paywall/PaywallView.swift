@@ -2,11 +2,17 @@ import SwiftUI
 import RevenueCat
 
 enum PaywallPlan: String, CaseIterable, Identifiable {
-    case monthly, annual, lifetime
+    case weekly, monthly, annual, lifetime
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .weekly:
+            return String(
+                localized: "paywall.v2.plan.weekly",
+                defaultValue: "Weekly",
+                comment: "Paywall v2 plan row title."
+            )
         case .monthly:
             return String(
                 localized: "paywall.v2.plan.monthly",
@@ -80,13 +86,40 @@ struct PaywallView: View {
     private var annualPackage: Package? { resolvedOffering?.annual }
     private var monthlyPackage: Package? { resolvedOffering?.monthly }
     private var lifetimePackage: Package? { resolvedOffering?.lifetime }
+    private var weeklyPackage: Package? { resolvedOffering?.weekly }
 
     private func package(for plan: PaywallPlan) -> Package? {
         switch plan {
+        case .weekly: return weeklyPackage
         case .monthly: return monthlyPackage
         case .annual: return annualPackage
         case .lifetime: return lifetimePackage
         }
+    }
+
+    // MARK: - Remote-Config-driven visible plan set
+
+    /// Plans listed in `paywall_plans` that also have a resolved package.
+    /// A plan appears only if it is BOTH configured as visible AND its
+    /// RevenueCat package exists — so a plan in the JSON with no product
+    /// (e.g. weekly before its RC product ships) silently collapses out.
+    private var renderablePlans: [PaywallPlan] {
+        let visible = PaywallConfig.visiblePlans.filter { package(for: $0) != nil }
+        if !visible.isEmpty { return visible }
+        // Offering not loaded yet (or none of the configured plans have a
+        // package): fall back to whatever packages exist, in fixed order,
+        // and never render zero plans.
+        let fallback: [PaywallPlan] = [.monthly, .annual, .lifetime].filter { package(for: $0) != nil }
+        return fallback.isEmpty ? [.annual] : fallback
+    }
+
+    /// The pre-selected / collapsed plan, honoring `paywall_default_plan`
+    /// but constrained to something actually on screen: the RC default if
+    /// it is renderable, else the first renderable plan, else annual.
+    private var resolvedDefaultPlan: PaywallPlan {
+        let d = PaywallConfig.defaultPlan
+        if renderablePlans.contains(d) { return d }
+        return renderablePlans.first ?? .annual
     }
 
     // MARK: - Intro pricing helper
@@ -186,6 +219,13 @@ struct PaywallView: View {
 
     private func priceText(for plan: PaywallPlan) -> String {
         switch plan {
+        case .weekly:
+            let raw = weeklyPackage?.localizedPriceString ?? "$2.99"
+            return String(
+                localized: "paywall.v2.pricePerWeek",
+                defaultValue: "\(raw) / week",
+                comment: "Paywall v2 weekly plan price label. %@ is the localized currency amount."
+            )
         case .monthly:
             let raw = monthlyPackage?.localizedPriceString ?? "$6.99"
             return String(
@@ -248,7 +288,7 @@ struct PaywallView: View {
             bottomSheetHeight = newHeight
         }
         .onAppear {
-            selectedPlan = .annual
+            selectedPlan = resolvedDefaultPlan
             Task { await manager.loadOfferings() }
             // Stamp the shared "any paywall shown" timestamp on every appear,
             // regardless of source or build flavor. ContentView's cold-start
@@ -620,11 +660,11 @@ struct PaywallView: View {
         VStack(spacing: 16) {
             VStack(spacing: 10) {
                 if isExpanded {
-                    planRow(plan: .monthly)
-                    planRow(plan: .annual)
-                    planRow(plan: .lifetime)
+                    ForEach(renderablePlans) { plan in
+                        planRow(plan: plan)
+                    }
                 } else {
-                    planRow(plan: .annual)
+                    planRow(plan: resolvedDefaultPlan)
                 }
             }
 
@@ -648,7 +688,7 @@ struct PaywallView: View {
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     if isExpanded {
-                        selectedPlan = .annual
+                        selectedPlan = resolvedDefaultPlan
                     }
                     isExpanded.toggle()
                 }

@@ -54,6 +54,7 @@ final class RemoteConfigManager {
     /// as a fallback when RC returns empty for an unknown key).
     private let defaults: [String: String] = [
         "paywall_offering_id":       "default",
+        "paywall_plans":             "[\"monthly\",\"annual\",\"lifetime\"]",
         "paywall_headline_key":      "paywall.v2.headline.getFullAccess",
         "paywall_subtitle_with_pct": "paywall.v2.subtitle.specialOfferWithPct",
         "paywall_subtitle_no_pct":   "paywall.v2.subtitle.getFullAccess",
@@ -129,5 +130,32 @@ final class RemoteConfigManager {
         if !value.isEmpty { return value }
         #endif
         return defaults[key] ?? ""
+    }
+
+    /// Decodes a JSON-typed Remote Config value into `T`. Works in both
+    /// build flavors: in !DEV it reads the native `RemoteConfigValue`
+    /// (so the console parameter can be typed JSON) and, if that value is
+    /// absent/unparseable, falls back to parsing the compiled default
+    /// string; in DEV (where `remoteConfig` doesn't exist) it parses the
+    /// compiled default string directly. Returns nil only when both paths
+    /// fail — callers apply their own fail-safe.
+    func decodeJSON<T: Decodable>(_ key: String, as type: T.Type) -> T? {
+        #if !DEV
+        // Live RC: read native JSON value, re-encode to Data, decode to T.
+        let rcValue = remoteConfig.configValue(forKey: key)
+        if let obj = rcValue.jsonValue,
+           let data = try? JSONSerialization.data(withJSONObject: obj),
+           let decoded = try? JSONDecoder().decode(T.self, from: data) {
+            return decoded
+        }
+        // Fall through to defaults if live value is absent/unparseable.
+        #endif
+        // DEV build AND !DEV fallback: parse the compiled default string.
+        if let raw = defaults[key],
+           let data = raw.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(T.self, from: data) {
+            return decoded
+        }
+        return nil
     }
 }

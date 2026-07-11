@@ -75,4 +75,16 @@ enum PaywallConfig {
         default:         return .annual
         }
     }
+
+    /// Ordered set of plans the paywall should display, driven by the
+    /// `paywall_plans` Remote Config key (a JSON array of plan raw values,
+    /// e.g. `["monthly","annual","lifetime"]`). Unknown strings are ignored
+    /// so a future plan id in the console can't crash older clients. Any
+    /// bad / empty / non-JSON value fails safe to the three shipped plans.
+    /// Note: weekly appears here only if the console explicitly lists it.
+    static var visiblePlans: [PaywallPlan] {
+        let ids = RemoteConfigManager.shared.decodeJSON("paywall_plans", as: [String].self) ?? []
+        let parsed = ids.compactMap { PaywallPlan(rawValue: $0) }
+        return parsed.isEmpty ? [.monthly, .annual, .lifetime] : parsed
+    }
 }
