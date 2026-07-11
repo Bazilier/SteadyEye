@@ -333,5 +333,14 @@ struct OnboardingView: View {
         // deny-toast with a Settings deep link if photos was denied.
         pendingDemoRecording = cameraGranted && micGranted
         hasSeenOnboarding = true
+        // Native App Store review prompt — fires once on first
+        // completion, but only when the user actually has a working
+        // app (camera + mic granted). The denial-skip paths
+        // ("settings_opened", "skipped_after_denied") deliberately
+        // bypass this so we don't ask for a rating from users whose
+        // core feature is broken.
+        if cameraGranted && micGranted {
+            ReviewPromptManager.handleOnboardingCompleted()
+        }
     }
 }
