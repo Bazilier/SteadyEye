@@ -53,7 +53,7 @@ final class RemoteConfigManager {
     /// RC by `setDefaults()`, AND used directly by DEV builds (and
     /// as a fallback when RC returns empty for an unknown key).
     private let defaults: [String: String] = [
-        "paywall_offering_id":       "discount_50",
+        "paywall_offering_id":       "default",
         "paywall_headline_key":      "paywall.v2.headline.getFullAccess",
         "paywall_subtitle_with_pct": "paywall.v2.subtitle.specialOfferWithPct",
         "paywall_subtitle_no_pct":   "paywall.v2.subtitle.getFullAccess",
