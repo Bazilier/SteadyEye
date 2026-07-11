@@ -29,6 +29,7 @@ struct SettingsView: View {
     #if DEV
     @State private var devNotificationStatus: String = "loading…"
     @State private var devPendingCount: Int = 0
+    @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
     #endif
 
     private var restoreResultTitle: String {
@@ -339,6 +340,15 @@ struct SettingsView: View {
                     if #available(iOS 26.0, *) {
                         SpeechAnalyzerDiagButton()
                     }
+                }
+
+                Section("Chromakey (DEV)") {
+                    Toggle(isOn: $devChromakeyEnabled) {
+                        Text("Chromakey background (replace camera)")
+                    }
+                    Text("Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Notifications (DEV)") {

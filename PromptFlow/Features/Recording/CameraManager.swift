@@ -53,15 +53,37 @@ final class CameraManager: NSObject, ObservableObject {
         super.init()
     }
 
+    // MARK: - Chromakey background mode (DEV)
+
+    /// Single source of truth for chromakey mockup mode. When true, the
+    /// camera preview renders a solid #00B140 fill and the capture session
+    /// is not started — used for recording UI mockup videos where real
+    /// footage is composited behind the SteadyEye interface in post.
+    /// Read once per view lifecycle; toggle changes require re-entering RecordingView.
+    static var isChromakeyActive: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        #if DEV
+        return UserDefaults.standard.bool(forKey: "dev_chromakey_enabled")
+        #else
+        return false
+        #endif
+        #endif
+    }
+
     // MARK: - Start / Stop
 
     func start(position: AVCaptureDevice.Position = .front) {
         cameraPosition = position
-        #if targetEnvironment(simulator)
-        // No real camera in Simulator — mark session ready immediately so UI is fully interactive.
-        isSessionReady = true
-        isAudioReady = true
-        #else
+        if Self.isChromakeyActive {
+            // No real camera (Simulator) or chromakey mockup mode — mark
+            // session ready immediately so UI is fully interactive.
+            isSessionReady = true
+            isAudioReady = true
+            return
+        }
+        #if !targetEnvironment(simulator)
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
             if self.session.isRunning {
@@ -74,10 +96,12 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     func stop() {
-        #if targetEnvironment(simulator)
-        isSessionReady = false
-        isAudioReady = false
-        #else
+        if Self.isChromakeyActive {
+            isSessionReady = false
+            isAudioReady = false
+            return
+        }
+        #if !targetEnvironment(simulator)
         if let observer = routeChangeObserver {
             NotificationCenter.default.removeObserver(observer)
             routeChangeObserver = nil
@@ -355,15 +379,21 @@ final class CameraManager: NSObject, ObservableObject {
     func startRecording() {
         guard !isRecording else { return }
 
-        #if targetEnvironment(simulator)
-        // Fake recording: flip UI state and start the duration timer — no AVCapture calls.
-        recordingStartTime = Date()
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self, let start = self.recordingStartTime else { return }
-            self.recordingDuration = Date().timeIntervalSince(start)
+        if Self.isChromakeyActive {
+            // Fake recording: flip UI state and start the duration timer — no AVCapture calls.
+            #if DEV
+            print("[chromakey] recording skipped — chromakey mode active")
+            #endif
+            recordingStartTime = Date()
+            durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                guard let self, let start = self.recordingStartTime else { return }
+                self.recordingDuration = Date().timeIntervalSince(start)
+            }
+            isRecording = true
+            return
         }
-        isRecording = true
-        #else
+
+        #if !targetEnvironment(simulator)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("mov")
@@ -442,9 +472,12 @@ final class CameraManager: NSObject, ObservableObject {
         recordingDuration = 0
         recordingStartTime = nil
 
-        #if targetEnvironment(simulator)
-        // No file to write — nothing to do. lastRecordedURL stays nil so VideoPreviewView is not triggered.
-        #else
+        if Self.isChromakeyActive {
+            // No file to write — nothing to do. lastRecordedURL stays nil so VideoPreviewView is not triggered.
+            return
+        }
+
+        #if !targetEnvironment(simulator)
         // Register background task so the video file finishes writing even if app is backgrounded
         backgroundTaskID = UIApplication.shared.beginBackgroundTask { [weak self] in
             self?.endBackgroundTask()

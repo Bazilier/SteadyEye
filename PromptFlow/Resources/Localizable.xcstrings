@@ -735,6 +735,12 @@
         }
       }
     },
+    "Chromakey (DEV)" : {
+
+    },
+    "Chromakey background (replace camera)" : {
+
+    },
     "common.cancel" : {
       "comment" : "Generic Cancel button used in alerts and toolbars.",
       "extractionState" : "manual",
@@ -5113,6 +5119,9 @@
           }
         }
       }
+    },
+    "Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open." : {
+
     },
     "Request push permission" : {
 
