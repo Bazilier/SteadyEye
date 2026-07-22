@@ -296,6 +296,8 @@ struct PaywallView: View {
                 "offering_id": resolvedOffering?.identifier ?? "default",
                 "experiment_paywall_v1": ExperimentManager.shared.variant(for: .paywallV1)
             ])
+            // MMP conversion-value event, same cadence as the log above.
+            AppServices.attribution?.trackEvent("paywall_shown")
         }
         .onDisappear {
             AppAnalytics.log("paywall_dismissed", params: [
@@ -815,6 +817,11 @@ struct PaywallView: View {
                     AnalyticsParameterValue: firstPeriodPrice,
                     AnalyticsParameterCurrency: purchasedProduct.currencyCode ?? "USD"
                 ])
+                // MMP conversion-value event carrying the first-period amount so
+                // Tenjin buckets it into the right revenue range. Valued custom
+                // event only — no revenue transaction, so it does not
+                // double-count RC's server-side purchase forwarding.
+                AppServices.attribution?.trackEvent("purchase", value: Int(firstPeriodPrice.rounded()))
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:

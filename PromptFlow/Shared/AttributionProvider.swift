@@ -17,10 +17,16 @@ protocol AttributionProvider {
     /// available for the first install event.
     func connect()
 
-    /// Report a named attribution event to the MMP. Vendor-neutral seam for
-    /// future custom events — currently has no call sites (intentionally unused,
-    /// harmless generic method).
+    /// Report a named attribution event to the MMP. Used to drive the MMP's
+    /// SKAdNetwork conversion-value mapping (events matched by exact name).
     func trackEvent(_ name: String)
+
+    /// Report a named attribution event carrying an integer value — drives the
+    /// MMP's conversion-value mapping for value-bucketed events (e.g. purchase
+    /// revenue ranges). This sends a valued custom event only; it does NOT
+    /// record a revenue transaction, so it does not double-count revenue that
+    /// RevenueCat already forwards server-side.
+    func trackEvent(_ name: String, value: Int)
 
     /// Report a purchase/revenue event to the MMP.
     ///
@@ -87,6 +93,17 @@ final class TenjinAttributionProvider: AttributionProvider {
         guard sdkKey != nil else { return }
         #if !DEV
         TenjinSDK.sendEvent(withName: name)
+        #endif // !DEV
+    }
+
+    func trackEvent(_ name: String, value: Int) {
+        guard sdkKey != nil else { return }
+        #if !DEV
+        // `sendEventWithName:andValue:` sends a valued custom event for the
+        // SKAN conversion-value mapping WITHOUT recording a revenue
+        // transaction (unlike `transaction(...)`), so it never double-counts
+        // revenue that RevenueCat forwards to Tenjin server-side.
+        TenjinSDK.sendEvent(withName: name, andValue: value)
         #endif // !DEV
     }
 

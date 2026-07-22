@@ -201,6 +201,9 @@ final class SubscriptionManager: ObservableObject {
 
                 if !wasInTrial && nowInTrial {
                     // free/none → trial
+                    // MMP conversion-value event, fired on the transition only
+                    // (edge-detected), not on every customerInfo tick.
+                    AppServices.attribution?.trackEvent("start_trial")
                     Task { @MainActor in
                         await NotificationScheduler.shared.schedule(.trialStarted, in: 60)
                         await NotificationScheduler.shared.schedule(.trialDay5, in: 5 * 24 * 3600)

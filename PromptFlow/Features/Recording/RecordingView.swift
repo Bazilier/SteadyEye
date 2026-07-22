@@ -1047,6 +1047,8 @@ struct RecordingView: View {
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())
                     ])
+                    // MMP conversion-value event (once, gated by `wasFirst`).
+                    AppServices.attribution?.trackEvent("first_recording_completed")
                 }
                 // Usage-based App Store review: counts this confirmed save and
                 // prompts on exactly the 2nd successful recording (cooldown +
