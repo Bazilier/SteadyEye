@@ -1048,6 +1048,11 @@ struct RecordingView: View {
                         "duration_sec": Int(duration.rounded())
                     ])
                 }
+                // Usage-based App Store review: counts this confirmed save and
+                // prompts on exactly the 2nd successful recording (cooldown +
+                // one-shot enforced inside). Only the auto-persist success path
+                // reaches here — cancel/failure and screen-open do not.
+                ReviewPromptManager.handleSuccessfulRecording()
                 previewRecording = recording
             case .failure:
                 // Auto-save failed entirely (file move error, generator error,
