@@ -37,13 +37,6 @@ final class SubscriptionManager: ObservableObject {
     /// `checkAccess()` so the listener doesn't false-fire on launch.
     private var lastObservedTrialState: Bool = false
 
-    /// Same change-detection pattern as `lastObservedTrialState` but for
-    /// the entitlement-active flag. Used to call `OfferEngine.purchaseCompleted`
-    /// on the free→subscribed transition (catches purchases via restore,
-    /// family sharing, or any path that doesn't go through `purchase(_:)`
-    /// directly). Initialized in `checkAccess()` to prevent false-fire.
-    private var lastObservedSubscriptionState: Bool = false
-
     /// DEV-only escape hatch for testing freemium gating without buying or
     /// cancelling a sandbox subscription. Values: "off", "free", "subscribed".
     /// Ignored entirely in Release builds. Persisted in UserDefaults so the
@@ -217,21 +210,6 @@ final class SubscriptionManager: ObservableObject {
                     // trial → ended (cancelled or converted to paid)
                     NotificationScheduler.shared.cancel([.trialStarted, .trialDay5, .trialEnding24h])
                 }
-
-                // Subscription-state edge detection — catches purchases
-                // that don't flow through `purchase(_:)` (restore,
-                // family share, intro-offer auto-grant). Marks any
-                // currently-active offer as converted.
-                let nowSubscribed = entitlement?.isActive == true
-                let wasSubscribed = self.lastObservedSubscriptionState
-                self.lastObservedSubscriptionState = nowSubscribed
-
-                if !wasSubscribed && nowSubscribed {
-                    OfferEngine.shared.purchaseCompleted(
-                        source: "customer_info_stream",
-                        offeringIdPurchasedFrom: nil
-                    )
-                }
             }
         }
         #endif
@@ -254,11 +232,9 @@ final class SubscriptionManager: ObservableObject {
             isSubscribedReal = entitlement?.isActive == true
             isTrialActive = entitlement?.periodType == .trial
             // Seed change-detection so the customerInfoStream listener
-            // doesn't false-fire its trial→started or free→subscribed
-            // branches on the first tick (which echoes the values we
-            // just read here).
+            // doesn't false-fire its trial→started branch on the first
+            // tick (which echoes the values we just read here).
             lastObservedTrialState = isTrialActive
-            lastObservedSubscriptionState = isSubscribedReal
             updateAnalyticsSubscriptionState()
         } catch {
             // Keep current state on error

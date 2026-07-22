@@ -1,5 +1,6 @@
 import SwiftUI
 import RevenueCat
+import FirebaseAnalytics
 
 enum PaywallPlan: String, CaseIterable, Identifiable {
     case weekly, monthly, annual, lifetime
@@ -38,11 +39,10 @@ enum PaywallPlan: String, CaseIterable, Identifiable {
 struct PaywallView: View {
     let source: String
     /// Optional RC offering identifier. Explicit override — when set,
-    /// packages resolve from the named offering directly, bypassing
-    /// OfferEngine. When `nil` (default for all current call sites),
-    /// OfferEngine decides which offering to use based on user state
-    /// (active discount window, etc.), falling back to `offerings.current`
-    /// if no offer is active.
+    /// packages resolve from the named offering directly. When `nil`
+    /// (default for all current call sites), the offering is chosen from
+    /// `PaywallConfig.offeringId` / the `paywall_v1` experiment, falling
+    /// back to `offerings.current`.
     var offeringId: String? = nil
     var onPurchaseSuccess: (() -> Void)? = nil
 
@@ -57,13 +57,6 @@ struct PaywallView: View {
     @State private var restoreResultMessage: String? = nil
     @State private var restoreSucceeded: Bool = false
     @State private var showRestoreAlert: Bool = false
-    /// Explicit synchronous marker that a purchase succeeded inside this
-    /// PaywallView's lifetime. Used by `.onDisappear` to gate OfferEngine's
-    /// dismiss-without-purchase signal — `SubscriptionManager.isSubscribed`
-    /// can lag the dismiss by one runloop tick because RC's
-    /// customerInfoStream is async, which would otherwise let
-    /// `paywallDismissedWithoutPurchase` fire for a user who just bought.
-    @State private var didPurchaseSuccessfully: Bool = false
 
     // MARK: - Packages from offerings
 
@@ -309,16 +302,6 @@ struct PaywallView: View {
                 "source": source,
                 "purchased": SubscriptionManager.shared.isSubscribed
             ])
-            // Notify OfferEngine on dismiss-without-purchase so it can
-            // start the discount window on first dismiss. Skip when the
-            // user just purchased — `purchaseCompleted` handles that.
-            // Reads the local `didPurchaseSuccessfully` flag rather than
-            // `manager.isSubscribed` because the latter lags by one runloop
-            // tick (customerInfoStream is async), which would otherwise
-            // false-fire `offer_started` for a converted user.
-            if !didPurchaseSuccessfully {
-                OfferEngine.shared.paywallDismissedWithoutPurchase(source: source)
-            }
         }
     }
 
@@ -817,7 +800,21 @@ struct PaywallView: View {
                     "source": source,
                     "was_trial": isTrial
                 ])
-                didPurchaseSuccessfully = true
+                // Standard Firebase purchase event for Google App Campaign
+                // conversion tracking (fires alongside the custom event above,
+                // on every successful purchase / plan). The value is the
+                // EFFECTIVE first-period amount charged: the intro/disc50 price
+                // when an intro offer applied to this purchase — using the same
+                // `introductoryDiscount` signal the paywall uses to display
+                // price — otherwise the base price. Read dynamically so it stays
+                // correct whether disc50 is on or off; never a hardcoded price.
+                let purchasedProduct = pkg.storeProduct
+                let firstPeriodPrice = ((purchasedProduct.introductoryDiscount?.price
+                    ?? purchasedProduct.price) as NSDecimalNumber).doubleValue
+                AppAnalytics.log(AnalyticsEventPurchase, params: [
+                    AnalyticsParameterValue: firstPeriodPrice,
+                    AnalyticsParameterCurrency: purchasedProduct.currencyCode ?? "USD"
+                ])
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:

@@ -420,31 +420,6 @@ struct SettingsView: View {
                 .onAppear {
                     Task { await refreshDevDiagnostics() }
                 }
-
-                // Parked 2026-05-03: discount_50 is now the RC Current
-                // offering, so the timer-based offer engine is unused.
-                // Section preserved (commented) in case timer-based
-                // activation is revived for a winback or re-engagement
-                // offer; the underlying OfferEngine APIs still exist.
-                #if false
-                Section("Offer Engine (DEV)") {
-                    HStack {
-                        Text("Discount 50 state")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(OfferEngine.shared.devStateString(for: .discount50AfterFirstDismiss))
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.tint)
-                    }
-                    Button("Force start discount_50") {
-                        OfferEngine.shared.devForceStart(.discount50AfterFirstDismiss)
-                    }
-                    Button("Reset all offer state") {
-                        OfferEngine.shared.resetAllOfferState()
-                    }
-                    .foregroundStyle(.red)
-                }
-                #endif
                 #endif
 
                 Section {

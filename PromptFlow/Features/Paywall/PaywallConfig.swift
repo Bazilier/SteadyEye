@@ -9,9 +9,9 @@ import Foundation
 /// dictionary lookup inside the Firebase SDK — negligible.
 enum PaywallConfig {
     /// RC offering identifier the paywall should display. Default
-    /// `"discount_50"` — matches the hardcoded value before the RC
-    /// migration. The experiment override in `PaywallView` may swap
-    /// this for `"default"` based on `paywall_v1` variant assignment.
+    /// `"default"` (see `RemoteConfigManager` defaults). The experiment
+    /// override in `PaywallView` selects `"default"` for the `trial`
+    /// variant of `paywall_v1`; other variants use this RC value.
     static var offeringId: String {
         RemoteConfigManager.shared.string("paywall_offering_id")
     }
