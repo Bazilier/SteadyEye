@@ -332,15 +332,22 @@ struct OnboardingView: View {
         // without photos access; the Save → Camera Roll path surfaces a
         // deny-toast with a Settings deep link if photos was denied.
         pendingDemoRecording = cameraGranted && micGranted
-        hasSeenOnboarding = true
-        // Native App Store review prompt — fires once on first
-        // completion, but only when the user actually has a working
-        // app (camera + mic granted). The denial-skip paths
-        // ("settings_opened", "skipped_after_denied") deliberately
-        // bypass this so we don't ask for a rating from users whose
-        // core feature is broken.
-        if cameraGranted && micGranted {
-            ReviewPromptManager.handleOnboardingCompleted()
+        // Request ATT at the very end of onboarding, immediately before the
+        // first main screen appears. The MMP (Tenjin) connect() runs inside
+        // the completion handler — after the user responds, granted or denied
+        // — so IDFA is available for the first install event when authorized.
+        // Only after the prompt resolves do we flip `hasSeenOnboarding`, which
+        // drives the transition to the main UI.
+        Task { @MainActor in
+            await ATTManager.requestIfNeeded()
+            AppServices.attribution?.connect()
+            AppServices.attribution?.syncToRevenueCat()
+            hasSeenOnboarding = true
+            // NOTE: The App Store review prompt used to fire here, but was
+            // removed to avoid stacking two system dialogs (ATT + review) at
+            // onboarding end and to align with the review strategy of asking
+            // after a few days of use. There is currently no other review
+            // trigger in the app — a usage-based one should be added later.
         }
     }
 }

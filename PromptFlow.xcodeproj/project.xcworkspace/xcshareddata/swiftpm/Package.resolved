@@ -1,5 +1,5 @@
 {
-  "originHash" : "20821b1e321451d11126168f5e85f6c57bd3f0d14cd6506d06770e668f822c83",
+  "originHash" : "e99e3a8118105603f1e065dbc88139e2d27b829da28e3b6b420018d03e0d4df4",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -134,6 +134,15 @@
       "state" : {
         "revision" : "abb0d68c3e7ba97b16ab51c38fcaca16b0e358c8",
         "version" : "5.66.0"
+      }
+    },
+    {
+      "identity" : "tenjin-ios-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tenjin/tenjin-ios-spm",
+      "state" : {
+        "revision" : "a284b83d45caa7f8d523b2322edf8dfa398ad3fd",
+        "version" : "1.17.1"
       }
     }
   ],

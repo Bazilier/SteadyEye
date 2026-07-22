@@ -73,6 +73,26 @@ struct SteadyEyeApp: App {
             }
         }
         MetaAnalytics.logAppActivation()
+
+        // Instantiate the MMP attribution provider (Tenjin). connect() is
+        // deliberately NOT called here — it fires from the ATT completion
+        // handler at the end of onboarding (OnboardingView.finishOnboarding)
+        // so IDFA is available for the first install event when granted.
+        AppServices.attribution = TenjinAttributionProvider()
+
+        // Returning users who already finished onboarding skip the onboarding
+        // flow (and its connect() call) on every relaunch/update, so Tenjin
+        // would otherwise never see them. Connect here for those users. This
+        // does NOT prompt ATT — connect() is independent of the ATT flow. New
+        // users still hit the onboarding-completion path (hasSeenOnboarding is
+        // false on first launch); the provider's one-shot guard prevents a
+        // double connect if both paths ever fire in one session.
+        if UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+            AppServices.attribution?.connect()
+            // Purchases.configure ran above, so the RC subscriber exists;
+            // syncToRevenueCat self-guards on Purchases.isConfigured anyway.
+            AppServices.attribution?.syncToRevenueCat()
+        }
         #endif
 
         // Runs after Purchases.configure above, so its internal
@@ -111,10 +131,9 @@ struct SteadyEyeApp: App {
                         .modelContainer(container)
                         .environmentObject(subscriptionManager)
                         .transition(.opacity)
-                        .task {
-                            try? await Task.sleep(for: .seconds(1))
-                            await ATTManager.requestIfNeeded()
-                        }
+                    // ATT is no longer requested on launch — it now fires at
+                    // the end of onboarding (OnboardingView.finishOnboarding)
+                    // so the MMP can connect() with IDFA available.
                 } else {
                     SplashView()
                         .transition(.opacity)
