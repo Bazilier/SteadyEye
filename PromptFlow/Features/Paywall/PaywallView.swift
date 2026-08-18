@@ -48,6 +48,9 @@ struct PaywallView: View {
 
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var manager = SubscriptionManager.shared
+    /// Re-renders this view when a new Remote Config activates, so a
+    /// config published mid-session reaches an already-visible paywall.
+    @ObservedObject private var remoteConfig = RemoteConfigManager.shared
 
     @State private var selectedPlan: PaywallPlan = PaywallConfig.defaultPlan
     @State private var errorMessage: String?
@@ -58,13 +61,49 @@ struct PaywallView: View {
     @State private var restoreSucceeded: Bool = false
     @State private var showRestoreAlert: Bool = false
 
+    /// Whether THIS user can still receive the introductory offer.
+    ///
+    /// A tri-state, not a boolean: `.unknown` is genuinely different from
+    /// `.ineligible`, and RevenueCat supplies it as a first-class case rather
+    /// than something we synthesise. Starts `.unknown` and is replaced once
+    /// `refreshTrialEligibility()` resolves.
+    @State private var trialEligibility: IntroEligibilityStatus = .unknown
+
     // MARK: - Packages from offerings
 
-    private var resolvedOffering: Offering? {
+    /// SINGLE SOURCE OF TRUTH for which offering is displayed and whether trial
+    /// presentation is permitted. Both are returned together so the products on
+    /// screen and the copy describing them can never disagree.
+    ///
+    /// `paywall_mode` is authoritative. In trial mode it selects the offering
+    /// outright and `paywall_offering_id` is inert; in default mode
+    /// `paywall_offering_id` chooses as it always has — which is what keeps
+    /// `discount_50` reachable. An operator therefore cannot express an
+    /// inconsistent pair: mode wins, and the losing key simply does not apply.
+    private var paywallResolution: (offering: Offering?, mode: PaywallMode) {
         // Explicit caller override wins over both Remote Config and
         // the experiment assignment (used by A/B test landing pages,
-        // future winback campaigns, etc.).
-        if let explicit = offeringId { return manager.offering(for: explicit) }
+        // future winback campaigns, etc.). Always default presentation:
+        // a caller naming an offering directly is not asking for trial copy.
+        if let explicit = offeringId {
+            return (manager.offering(for: explicit), .default)
+        }
+
+        if PaywallConfig.mode == .trial {
+            // Resolve BY NAME, deliberately NOT via `manager.offering(for:)` —
+            // that helper silently substitutes `offerings.current` on a miss,
+            // which here would paint trial copy over non-trial products. A miss
+            // must degrade to default mode entirely, not inherit the dashboard's
+            // current offering.
+            if let trialOffering = manager.offerings?[PaywallConfig.trialOfferingId] {
+                return (trialOffering, .trial)
+            }
+            PaywallDiagnostics.trialOfferingUnresolved(
+                attemptedMode: .trial,
+                offeringId: PaywallConfig.trialOfferingId
+            )
+            // Fall through to default mode, copy included.
+        }
 
         // Experiment override: users in `paywall_v1 == "trial"` see
         // the legacy `default` offering (7-day trial flow). All other
@@ -72,9 +111,41 @@ struct PaywallView: View {
         // through to whatever `paywall_offering_id` dictates (currently
         // `discount_50`). Variant assignment is sticky per install
         // and gets logged to GA4 via the `paywall_shown` event below.
+        // NOTE: this variant's `"trial"` is unrelated to `paywall_mode`
+        // `"trial"` — see the warning on `PaywallMode`.
         let variant = ExperimentManager.shared.variant(for: .paywallV1)
         let chosenId: String = (variant == "trial") ? "default" : PaywallConfig.offeringId
-        return manager.offering(for: chosenId) ?? manager.offering(for: nil)
+        return (manager.offering(for: chosenId) ?? manager.offering(for: nil), .default)
+    }
+
+    private var resolvedOffering: Offering? { paywallResolution.offering }
+
+    /// Whether the paywall should render trial copy for the CURRENTLY SELECTED
+    /// plan. Driven by the selected plan's product, not by the mode, so tapping
+    /// Monthly in trial mode shows freemium copy and tapping Annual restores
+    /// trial copy — live, because `selectedPlan` is `@State` and re-renders
+    /// `body`.
+    ///
+    /// Requires BOTH conditions, and fails closed on either:
+    ///  - the product carries an actual FREE TRIAL (`paymentMode == .freeTrial`,
+    ///    not merely the presence of an introductory discount, which is also
+    ///    true for a paid intro offer), and
+    ///  - the plan is annual, because the trial subtitle is written for an
+    ///    annual term.
+    private var showsTrialCopy: Bool {
+        // Eligibility first: a user who has already consumed the group's
+        // introductory offer must never be promised it again.
+        guard isEligibleForTrial else { return false }
+        guard paywallResolution.mode == .trial,
+              let product = package(for: selectedPlan)?.storeProduct,
+              product.introductoryDiscount?.paymentMode == .freeTrial
+        else { return false }
+
+        guard selectedPlan == .annual else {
+            PaywallDiagnostics.trialOnNonAnnualPlan(selectedPlan.rawValue)
+            return false
+        }
+        return true
     }
     private var annualPackage: Package? { resolvedOffering?.annual }
     private var monthlyPackage: Package? { resolvedOffering?.monthly }
@@ -178,6 +249,148 @@ struct PaywallView: View {
         }
     }
 
+    // MARK: - Free-trial row presentation
+
+    /// Row presentation for a product whose introductory offer is an actual
+    /// FREE TRIAL (`paymentMode == .freeTrial`), as opposed to a paid
+    /// introductory discount.
+    ///
+    /// Deliberately SEPARATE from `introDisplay(for:)` rather than a change to
+    /// it. That helper drives the `discount_50` offering's rows and the hero
+    /// subtitle's savings percentage, and a free trial lands in its percentage
+    /// formula as a 100% discount — which is where the green "100% OFF" badge
+    /// came from. Branching here leaves every non-trial presentation byte for
+    /// byte identical.
+    private struct TrialRowDisplay {
+        /// Compact badge naming the trial. Intentionally terse — the duration
+        /// line beside it carries the meaning, and a truncated badge would be
+        /// worse than a short one.
+        let badge: String
+        /// Trial length, stated explicitly and derived from the offer period.
+        let duration: String
+        /// Recurring price and term once the trial ends.
+        let secondary: String
+    }
+
+    /// Returns nil unless the product carries a genuine free trial, so callers
+    /// fall through to the existing intro/base-price presentation.
+    private func trialDisplay(for product: StoreProduct) -> TrialRowDisplay? {
+        // Same eligibility input as `showsTrialCopy`, so the row and the copy
+        // can never disagree about whether a trial is on offer.
+        guard isEligibleForTrial else { return nil }
+        guard let intro = product.introductoryDiscount,
+              intro.paymentMode == .freeTrial,
+              let basePeriod = product.subscriptionPeriod
+        else { return nil }
+
+        let count = intro.subscriptionPeriod.value * intro.numberOfPeriods
+        let duration: String
+        switch intro.subscriptionPeriod.unit {
+        case .day:
+            duration = trialDurationInDays(count)
+        case .week:
+            // Converted to days on purpose. App Store Connect offers no "7
+            // days" option — a seven-day trial is configured as 1 week — so
+            // StoreKit reports `.week`, and the row used to read "first week".
+            // Stating "7 days" is the point of this whole change: it is the
+            // number a reviewer checks against the three-day minimum.
+            duration = trialDurationInDays(count * 7)
+        case .month:
+            duration = trialDurationInMonths(count)
+        case .year:
+            duration = trialDurationInYears(count)
+        @unknown default:
+            return nil
+        }
+
+        return TrialRowDisplay(
+            badge: String(
+                localized: "paywall.v2.trial.badge",
+                defaultValue: "FREE",
+                comment: "Compact badge shown next to a paywall plan title when that plan's product carries a free trial."
+            ),
+            duration: duration,
+            // Reuses the existing, already-localized secondary line so the
+            // recurring price and term stay visible after the trial.
+            secondary: formatIntroSecondary(
+                price: product.localizedPriceString,
+                unit: basePeriod.unit
+            )
+        )
+    }
+
+    private func trialDurationInDays(_ count: Int) -> String {
+        String(
+            localized: "paywall.v2.trial.freeForDays",
+            defaultValue: "Free for \(count) days",
+            comment: "Paywall plan row duration line for a free trial measured in days. %lld is the day count."
+        )
+    }
+
+    private func trialDurationInMonths(_ count: Int) -> String {
+        String(
+            localized: "paywall.v2.trial.freeForMonths",
+            defaultValue: "Free for \(count) months",
+            comment: "Paywall plan row duration line for a free trial measured in months. %lld is the month count."
+        )
+    }
+
+    private func trialDurationInYears(_ count: Int) -> String {
+        String(
+            localized: "paywall.v2.trial.freeForYears",
+            defaultValue: "Free for \(count) years",
+            comment: "Paywall plan row duration line for a free trial measured in years. %lld is the year count."
+        )
+    }
+
+    // MARK: - Introductory-offer eligibility
+
+    /// The single eligibility input consulted by BOTH trial decisions —
+    /// `showsTrialCopy` (headline/subtitle/CTA, selection-scoped) and
+    /// `trialDisplay(for:)` (the plan row, per-product). They are deliberately
+    /// different conditions, but they share this value, so neither can present
+    /// a trial the other hides.
+    ///
+    /// UNKNOWN FAILS TOWARD HIDING. Showing default copy to an eligible user
+    /// understates the offer and the StoreKit sheet then over-delivers; showing
+    /// trial copy to an ineligible user overstates it and the sheet contradicts
+    /// it. Only one of those is a broken promise. `.noIntroOfferExists` lands
+    /// here too — there is no trial to present.
+    private var isEligibleForTrial: Bool {
+        trialEligibility == .eligible
+    }
+
+    /// Resolves eligibility for the annual product.
+    ///
+    /// Apple grants one introductory offer per SUBSCRIPTION GROUP, and the
+    /// trial and default annual SKUs share a group, so the annual answer is the
+    /// group's answer — which is why one query gates every row.
+    ///
+    /// NO NETWORK CALL, but only for the CURRENT configuration: RevenueCat 5.x
+    /// defaults to `StoreKitVersion.storeKit2`, and the app calls plain
+    /// `Purchases.configure(withAPIKey:)` with no override, so this resolves via
+    /// StoreKit 2's on-device `isEligibleForIntroOffer` against products the
+    /// offerings fetch already cached. If RevenueCat is ever pinned to
+    /// StoreKit 1, the SK1 path reads the local receipt and FALLS BACK TO A
+    /// BACKEND CALL — at which point this becomes a network dependency on the
+    /// paywall path. Do not assume it is unconditionally local.
+    private func refreshTrialEligibility() async {
+        // `Purchases.shared` fatal-errors when unconfigured, which is the case
+        // in DEV builds. Today `annualPackage` is always nil there (DEV skips
+        // `loadOfferings`), so the guard below would suffice — but relying on
+        // that coincidence is how the next refactor crashes a debug build.
+        guard Purchases.isConfigured else {
+            trialEligibility = .unknown
+            return
+        }
+        guard let product = annualPackage?.storeProduct else {
+            // Offerings not loaded yet. Stay `.unknown`, which hides the trial.
+            trialEligibility = .unknown
+            return
+        }
+        trialEligibility = await Purchases.shared.checkTrialOrIntroDiscountEligibility(product: product)
+    }
+
     /// Highest intro savings percentage across the visible subscription
     /// packages (monthly + annual). Used by the hero subtitle and any
     /// other top-level "X% OFF" copy. Returns nil when no package has an
@@ -191,6 +404,12 @@ struct PaywallView: View {
         return percents.max()
     }
 
+    /// Hero headline copy. Trial variant when the selected plan carries a free
+    /// trial; otherwise today's Remote-Config-driven default.
+    private var heroHeadlineText: String {
+        showsTrialCopy ? PaywallConfig.trialHeadline : PaywallConfig.headline
+    }
+
     /// Hero subtitle copy. When at least one visible package has an
     /// intro discount, surface the actual saved percentage — Apple's
     /// regional StoreKit pricing tiers don't always produce the
@@ -198,6 +417,16 @@ struct PaywallView: View {
     /// variant when no visible plan has an active intro (e.g. user
     /// already used the intro for this subscription group).
     private var heroSubtitleText: String {
+        // Trial copy substitutes the localized recurring price through the same
+        // localized-format-string mechanism the percentage subtitle uses below
+        // (`%@` here, `%lld` there). Never a hardcoded currency or amount.
+        // Falls through to the existing logic if the catalog entry or the price
+        // is unavailable.
+        if showsTrialCopy,
+           let template = PaywallConfig.trialSubtitleFormat,
+           let price = package(for: selectedPlan)?.storeProduct.localizedPriceString {
+            return String(format: template, price)
+        }
         if let pct = maxSavingsPercent, pct >= 1 {
             // Template is a localized format string with a `%lld`
             // placeholder for the integer percent (and `%%` for the
@@ -296,8 +525,26 @@ struct PaywallView: View {
                 "offering_id": resolvedOffering?.identifier ?? "default",
                 "experiment_paywall_v1": ExperimentManager.shared.variant(for: .paywallV1)
             ])
-            // MMP conversion-value event, same cadence as the log above.
+            // MMP funnel event, same cadence as the log above.
             AppServices.attribution?.trackEvent("paywall_shown")
+        }
+        // Re-runs whenever the annual product changes identity — including nil →
+        // resolved when offerings finish loading, and on an offering swap after
+        // a Remote Config activation. Fits the existing re-render pattern
+        // (activationCount, selectedPlan) rather than adding new machinery, and
+        // adds no offerings fetch of its own.
+        .task(id: annualPackage?.storeProduct.productIdentifier) {
+            await refreshTrialEligibility()
+        }
+        .onChange(of: remoteConfig.activationCount) { _, _ in
+            // The body re-renders on its own (every PaywallConfig accessor
+            // reads live), but `selectedPlan` is @State and survives the
+            // re-render. If the newly activated `paywall_plans` no longer
+            // contains it, the CTA would stay bound to a plan that is not on
+            // screen — so re-clamp to the configured default.
+            if !renderablePlans.contains(selectedPlan) {
+                selectedPlan = resolvedDefaultPlan
+            }
         }
         .onDisappear {
             AppAnalytics.log("paywall_dismissed", params: [
@@ -400,7 +647,7 @@ struct PaywallView: View {
 
     private var heroSection: some View {
         VStack(spacing: 12) {
-            Text(PaywallConfig.headline)
+            Text(heroHeadlineText)
                 .font(.largeTitle.weight(.bold))
                 .foregroundColor(.orange)
                 .multilineTextAlignment(.center)
@@ -638,7 +885,7 @@ struct PaywallView: View {
     /// marketing can A/B test wording without an app update. Default
     /// `"Continue"` matches the previous hardcoded copy.
     private var continueButtonLabel: String {
-        PaywallConfig.ctaLabel
+        showsTrialCopy ? PaywallConfig.trialCtaLabel : PaywallConfig.ctaLabel
     }
 
     private var bottomSheet: some View {
@@ -718,9 +965,13 @@ struct PaywallView: View {
 
     private func planRow(plan: PaywallPlan) -> some View {
         let pkg = package(for: plan)
-        let intro = pkg.flatMap { introDisplay(for: $0.storeProduct) }
+        // A genuine free trial takes precedence and suppresses the intro-discount
+        // presentation entirely — otherwise its zero price scores 100% in
+        // `savingsPercent` and renders as a "100% OFF" sale badge.
+        let trial = pkg.flatMap { trialDisplay(for: $0.storeProduct) }
+        let intro = trial == nil ? pkg.flatMap { introDisplay(for: $0.storeProduct) } : nil
         let basePrice = priceText(for: plan)
-        let displayPrice = intro?.primary ?? basePrice
+        let displayPrice = trial?.duration ?? intro?.primary ?? basePrice
         let isSelected = selectedPlan == plan
         return Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -734,7 +985,15 @@ struct PaywallView: View {
                             .font(.body)
                             .bold()
                             .foregroundColor(.white)
-                        if let intro, intro.savingsPercent >= 30 {
+                        if let trial {
+                            Text(trial.badge)
+                                .font(.caption2).bold()
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.green)
+                                .foregroundColor(.black)
+                                .clipShape(Capsule())
+                        } else if let intro, intro.savingsPercent >= 30 {
                             Text(String(
                                 localized: "paywall.intro.savingsBadge",
                                 defaultValue: "\(intro.savingsPercent)% OFF",
@@ -748,8 +1007,8 @@ struct PaywallView: View {
                                 .clipShape(Capsule())
                         }
                     }
-                    if let intro {
-                        Text(intro.secondary)
+                    if let secondary = trial?.secondary ?? intro?.secondary {
+                        Text(secondary)
                             .font(.footnote)
                             .foregroundColor(.secondary)
                     }
@@ -802,26 +1061,55 @@ struct PaywallView: View {
                     "source": source,
                     "was_trial": isTrial
                 ])
-                // Standard Firebase purchase event for Google App Campaign
-                // conversion tracking (fires alongside the custom event above,
-                // on every successful purchase / plan). The value is the
-                // EFFECTIVE first-period amount charged: the intro/disc50 price
-                // when an intro offer applied to this purchase — using the same
-                // `introductoryDiscount` signal the paywall uses to display
-                // price — otherwise the base price. Read dynamically so it stays
-                // correct whether disc50 is on or off; never a hardcoded price.
                 let purchasedProduct = pkg.storeProduct
-                let firstPeriodPrice = ((purchasedProduct.introductoryDiscount?.price
-                    ?? purchasedProduct.price) as NSDecimalNumber).doubleValue
-                AppAnalytics.log(AnalyticsEventPurchase, params: [
-                    AnalyticsParameterValue: firstPeriodPrice,
-                    AnalyticsParameterCurrency: purchasedProduct.currencyCode ?? "USD"
-                ])
-                // MMP conversion-value event carrying the first-period amount so
-                // Tenjin buckets it into the right revenue range. Valued custom
-                // event only — no revenue transaction, so it does not
-                // double-count RC's server-side purchase forwarding.
-                AppServices.attribution?.trackEvent("purchase", value: Int(firstPeriodPrice.rounded()))
+                // The offering is switched remotely between plain products and
+                // products carrying a free-trial introductory offer, so this
+                // branch — not a build flag — is what keeps both modes correct.
+                //
+                // `isTrial` is RevenueCat's `periodType == .trial` for the
+                // entitlement this purchase produced. Note `.intro` (a PAID
+                // introductory price) is deliberately NOT a trial and takes the
+                // revenue path below.
+                if isTrial {
+                    // Free trial started: no money has changed hands, so NO
+                    // revenue event fires here — neither GA4 `purchase` nor
+                    // `af_purchase`. Reporting revenue now would make every
+                    // trial start look like income and would over-report every
+                    // trial that later cancels.
+                    //
+                    // The trial→paid conversion is not observable reliably on
+                    // the client (it needs the user to reopen the app after
+                    // renewal); it will be reported server-side from RevenueCat
+                    // webhooks in a separate task. Until that lands, a converted
+                    // trial produces no purchase event anywhere.
+                    AppAnalytics.log("trial_started", params: [
+                        "plan": planName,
+                        "source": source
+                    ])
+                    // MMP trial event. Carries no revenue by construction: the
+                    // provider's `trackEvent` seam has no revenue parameter.
+                    AppServices.attribution?.trackEvent("trial_started")
+                } else {
+                    // Money received. Report the product's full recurring price
+                    // rather than the first-period amount, so a paid
+                    // introductory offer does not depress the bidding signal.
+                    let recurringPrice = (purchasedProduct.price as NSDecimalNumber).doubleValue
+                    // Bound once and shared by both destinations below, so the
+                    // GA4 purchase event and the MMP revenue event can never
+                    // report different amounts or currencies for the same
+                    // transaction.
+                    let purchaseCurrency = purchasedProduct.currencyCode ?? "USD"
+                    AppAnalytics.log(AnalyticsEventPurchase, params: [
+                        AnalyticsParameterValue: recurringPrice,
+                        AnalyticsParameterCurrency: purchaseCurrency
+                    ])
+                    // MMP revenue event, from the identical values.
+                    AppServices.attribution?.trackPurchase(
+                        revenue: recurringPrice,
+                        currency: purchaseCurrency,
+                        productId: purchasedProduct.productIdentifier
+                    )
+                }
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:

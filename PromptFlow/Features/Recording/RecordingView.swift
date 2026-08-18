@@ -962,20 +962,13 @@ struct RecordingView: View {
             player.pause()
             // Stay on current chunk — do not reset
         } else {
-            let isDemoScript = script.isDemo
-            let canRecord = isDemoScript || SubscriptionManager.shared.canRecord
-            guard canRecord else {
+            guard SubscriptionManager.shared.canRecord else {
                 showPaywall = true
                 return
             }
             if AVAudioApplication.shared.recordPermission != .granted {
                 showMicPermissionAlert = true
                 return
-            }
-            if isDemoScript && !SubscriptionManager.shared.isSubscribed {
-                AppAnalytics.log("recording_demo_bypass", params: [
-                    "script_length_words": script.content.split(separator: " ").count
-                ])
             }
             startCountdown()
         }
@@ -1041,13 +1034,10 @@ struct RecordingView: View {
                 ])
                 if wasFirst {
                     hasCompletedFirstRecording = true
-                    #if !DEV
-                    MetaAnalytics.logFirstRecordingCompleted()
-                    #endif
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())
                     ])
-                    // MMP conversion-value event (once, gated by `wasFirst`).
+                    // MMP funnel event (once, gated by `wasFirst`).
                     AppServices.attribution?.trackEvent("first_recording_completed")
                 }
                 // Usage-based App Store review: counts this confirmed save and

@@ -1,6 +1,8 @@
 import Foundation
 import AVFoundation
 import CoreVideo
+import VideoToolbox
+import os
 
 /// AVAssetWriter wrapper for the realtime burn-in pipeline. Owns a video
 /// input (with a pixel buffer adaptor for composer-produced BGRA frames)
@@ -31,6 +33,32 @@ final class AssetWriterRecorder {
 
     private var sessionStartedAtPTS: CMTime?
 
+    private let camLog = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye",
+        category: "CameraDiagnostic"
+    )
+    /// Writer's configured output size, captured at `startRecording` for the
+    /// multi-frame dimension sampling and finish diagnostics.
+    private var configuredVideoSize: CGSize = .zero
+    /// Active composer path ("pro" pass-through vs "free" render-to-pool),
+    /// supplied by the caller. Reported on a sampled `buffer_dims` mismatch: on
+    /// the pro path a mismatch is unrecoverable (the encoder silently rescales
+    /// the frame → rotated + stretched output).
+    private var composerPath = "free"
+    /// Frame index from the start of the recording, used to drive dimension
+    /// sampling. Per-frame hot-path cost is this increment plus a set-membership
+    /// check; dimensions are read only on sampled frames.
+    private var videoFrameIndex = 0
+    /// Frame indices at which buffer dimensions are sampled + logged, after
+    /// which sampling stops. A preset change can make AVFoundation deliver the
+    /// opening buffers at the previous size before the new format settles, so we
+    /// look across several early frames rather than trusting frame one.
+    private static let dimSampleFrames: Set<Int> = [1, 2, 3, 5, 10, 30, 60]
+    /// Count of SAMPLED frames whose dimensions did not match the writer size.
+    private var mismatchedSampleCount = 0
+    /// Total video frames appended to the writer, for the finish diagnostic.
+    private var framesWritten = 0
+
     /// Pool the composer should use for output BGRA frames. Available only
     /// after `startRecording` returns successfully.
     var pixelBufferPool: CVPixelBufferPool? {
@@ -42,7 +70,7 @@ final class AssetWriterRecorder {
     /// instance in `.recording` state. The writer's session has NOT yet
     /// been started — that happens on the first appended video frame so the
     /// timeline starts at the actual first-frame PTS rather than 0.
-    func startRecording(to url: URL, videoSize: CGSize, fps: Int) throws {
+    func startRecording(to url: URL, videoSize: CGSize, fps: Int, composerPath: String = "free") throws {
         precondition(state == .idle, "AssetWriterRecorder.startRecording called from non-idle state")
 
         // Pre-condition: writer fails if the file already exists.
@@ -51,22 +79,70 @@ final class AssetWriterRecorder {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         writer.shouldOptimizeForNetworkUse = false
 
-        // Video input — BGRA in (from composer), H.264 out.
+        // Video input — BGRA in (from composer), HEVC out where supported.
+        //
+        // Codec: prefer HEVC when the device has a HEVC hardware codec. We gate
+        // on `VTIsHardwareDecodeSupported` — technically a decode probe, but on
+        // the iOS 17+ device floor (A12/iPhone XS and later) hardware HEVC
+        // decode implies hardware HEVC encode, so it's a reliable, public,
+        // allocation-free proxy for encode availability. H.264 is the fallback
+        // and is effectively dead in practice on this floor; the
+        // `encoder_config` log below makes the chosen codec unambiguous so an
+        // unexpected H.264 landing is visible in the field.
+        let useHEVC = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
+        let codec: AVVideoCodecType = useHEVC ? .hevc : .h264
+
+        // Resolution tier from the ACTUAL writer size (not the UserDefaults
+        // setting): the portrait output is 2160x3840 (4K) or 1080x1920 (1080p).
+        let is4K = videoSize.width >= 2160 || videoSize.height >= 2160
+
+        // Explicit tiered average bitrate. The previous 0.1 bits-per-pixel
+        // formula produced only ~24.9 Mbps for a 2160x3840 4K frame at 30 fps —
+        // matching the measured 25.3 Mbps and roughly half of Apple's ~47 Mbps
+        // for H.264 4K30, which is why detailed/moving 4K looked soft. These
+        // fixed per-codec/per-tier values replace that formula rather than
+        // re-tuning the bpp constant. Base values are quoted at 30 fps and
+        // scaled linearly with fps.
+        let baseBitrate30: Int
+        switch (useHEVC, is4K) {
+        case (true,  true):  baseBitrate30 = 30_000_000   // HEVC 4K
+        case (true,  false): baseBitrate30 = 10_000_000   // HEVC 1080p
+        case (false, true):  baseBitrate30 = 45_000_000   // H.264 4K (fallback)
+        case (false, false): baseBitrate30 = 16_000_000   // H.264 1080p (fallback)
+        }
+        let targetBitrate = Int(Double(baseBitrate30) * Double(fps) / 30.0)
+
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: targetBitrate,
+            AVVideoMaxKeyFrameIntervalKey: fps,           // one keyframe per second
+            AVVideoExpectedSourceFrameRateKey: fps
+        ]
+        // Preserve the explicit H.264 profile level on the fallback path only;
+        // the constant is H.264-specific and invalid for HEVC, which uses the
+        // encoder's default profile.
+        if !useHEVC {
+            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
+        }
+
         let videoSettings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoCodecKey: codec,
             AVVideoWidthKey: Int(videoSize.width),
             AVVideoHeightKey: Int(videoSize.height),
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: bitRate(for: videoSize, fps: fps),
-                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
-                AVVideoMaxKeyFrameIntervalKey: max(fps, 30)
-            ]
+            AVVideoCompressionPropertiesKey: compression
         ]
+
+        // Diagnostic: encoder configuration at recording start.
+        let codecName = useHEVC ? "hevc" : "h264"
+        let bitrateMbps = targetBitrate / 1_000_000
+        camLog.notice(
+            "event=encoder_config codec=\(codecName, privacy: .public) bitrate_mbps=\(bitrateMbps) keyframe_interval=\(fps) fps=\(fps) videoSize=\(Int(videoSize.width))x\(Int(videoSize.height))"
+        )
+
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = true
 
         // Source pixel format for the adaptor. BGRA matches what
-        // CIContext.render writes; the H.264 encoder accepts BGRA via the
+        // CIContext.render writes; the encoder accepts BGRA via the
         // adaptor's automatic format conversion. IOSurface backing keeps
         // the buffer GPU-resident from composer through encoder.
         let sourceAttrs: [String: Any] = [
@@ -116,6 +192,8 @@ final class AssetWriterRecorder {
         self.audioInput = audioInput
         self.pixelBufferAdaptor = adaptor
         self.outputURL = url
+        self.configuredVideoSize = videoSize
+        self.composerPath = composerPath
         self.state = .recording
     }
 
@@ -134,8 +212,34 @@ final class AssetWriterRecorder {
             sessionStartedAtPTS = pts
         }
 
+        // Multi-frame dimension sampling (logging only — never auto-corrects or
+        // re-encodes). Cheap per frame: an increment + a set-membership check;
+        // dimensions are read only on sampled frames. A dimension mismatch on
+        // the opening frames is a settling artifact after a preset change, so
+        // the error is raised only if the mismatch is still present at frame 30.
+        videoFrameIndex += 1
+        if videoFrameIndex <= 60, Self.dimSampleFrames.contains(videoFrameIndex) {
+            let frame = videoFrameIndex
+            let bw = CVPixelBufferGetWidth(pixelBuffer)
+            let bh = CVPixelBufferGetHeight(pixelBuffer)
+            let cw = Int(configuredVideoSize.width)
+            let ch = Int(configuredVideoSize.height)
+            let path = composerPath
+            let match = bw == cw && bh == ch
+            if !match { mismatchedSampleCount += 1 }
+            camLog.notice(
+                "event=buffer_dims frame=\(frame) buffer=\(bw)x\(bh) writer_size=\(cw)x\(ch) match=\(match) path=\(path, privacy: .public)"
+            )
+            if !match, frame == 30 {
+                camLog.error(
+                    "event=first_sample_buffer_mismatch buffer=\(bw)x\(bh) writer_size=\(cw)x\(ch) path=\(path, privacy: .public)"
+                )
+            }
+        }
+
         guard adaptor.assetWriterInput.isReadyForMoreMediaData else { return }
         adaptor.append(pixelBuffer, withPresentationTime: pts)
+        framesWritten += 1
     }
 
     /// Appends an audio sample buffer. Skips audio that arrives before the
@@ -167,6 +271,11 @@ final class AssetWriterRecorder {
 
         writer.finishWriting { [weak self] in
             guard let self else { return }
+            // Diagnostic: recording finish. `configuredVideoSize` is the cheap
+            // final-dimensions signal (no AVAsset load needed).
+            self.camLog.notice(
+                "event=recording_finish status=\(writer.status.rawValue) error=\(writer.error?.localizedDescription ?? "none", privacy: .public) final_size=\(Int(self.configuredVideoSize.width))x\(Int(self.configuredVideoSize.height)) frames_written=\(self.framesWritten) mismatched_frames=\(self.mismatchedSampleCount)"
+            )
             switch writer.status {
             case .completed:
                 self.state = .finished
@@ -184,15 +293,5 @@ final class AssetWriterRecorder {
                 ])))
             }
         }
-    }
-
-    /// H.264 bitrate. ~6.5 Mbps for 1080p30, scales with pixel count and
-    /// frame rate at 0.1 bits/pixel — a rough industry default for "good"
-    /// H.264 quality. Tune if side-by-side reveals visible compression.
-    private func bitRate(for size: CGSize, fps: Int) -> Int {
-        let pixels = Int(size.width * size.height)
-        let bitsPerPixel = 0.1
-        let scaledFPS = max(fps, 30)
-        return Int(Double(pixels) * bitsPerPixel * Double(scaledFPS))
     }
 }

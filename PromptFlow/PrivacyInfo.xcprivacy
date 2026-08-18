@@ -2,8 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- The app requests ATT and forwards the IDFA to an MMP (AppsFlyer) and
+         to RevenueCat's attribution integrations, so it does use data for
+         tracking as Apple defines it. NSPrivacyTrackingDomains stays EMPTY on
+         purpose: first-party code contacts no tracking domain of its own (the
+         Railway backend serves chat and an ASA attribution proxy, neither of
+         which is advertising tracking). AppsFlyer's own bundled
+         PrivacyInfo.xcprivacy declares its 16 att.* tracking domains, and
+         Xcode aggregates every SDK manifest with this one at build time.
+         Duplicating them here would risk drifting from the SDK's list — and a
+         wrong entry makes iOS block real traffic once ATT is denied. -->
     <key>NSPrivacyTracking</key>
-    <false/>
+    <true/>
     <key>NSPrivacyTrackingDomains</key>
     <array/>
     <key>NSPrivacyAccessedAPITypes</key>
@@ -35,13 +45,18 @@
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeDeviceID</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
-            <false/>
+            <true/>
+            <!-- Tracking flipped to true alongside NSPrivacyTracking above:
+                 the IDFA is forwarded to an MMP for install attribution. A
+                 manifest declaring NSPrivacyTracking=true while every collected
+                 type says Tracking=false is self-contradictory. -->
             <key>NSPrivacyCollectedDataTypeTracking</key>
-            <false/>
+            <true/>
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
             </array>
         </dict>
         <dict>

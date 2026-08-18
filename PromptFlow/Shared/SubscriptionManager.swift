@@ -122,7 +122,23 @@ final class SubscriptionManager: ObservableObject {
     // folds in `Self.devMode` and `devSubscriptionOverride`. Don't add another
     // `Self.devMode ||` short-circuit here — it would defeat the DEV override.
 
-    var canRecord: Bool { isSubscribed }
+    /// FREEMIUM: recording is not entitlement-gated. Free users may record
+    /// their own scripts, watermarked — the free/paid difference is
+    /// `showWatermark` (below), not access. Unchanged from what ships today.
+    ///
+    /// TRIAL MODE: stricter. Once an install is FROZEN into trial mode, an
+    /// inactive entitlement makes recording unavailable entirely — no
+    /// watermarked path, no demo path. This covers both a consumed trial and a
+    /// declined one; the product treats them alike.
+    ///
+    /// Gated on `persistedMode`, never on `PaywallConfig.mode`: the latter falls
+    /// back to a live Remote Config read before the mode is frozen, and the
+    /// stricter rules must never bite an install that has not committed to
+    /// trial. `nil` (not frozen) therefore behaves as freemium.
+    var canRecord: Bool {
+        if PaywallConfig.persistedMode == .trial, !isSubscribed { return false }
+        return true
+    }
     var canOptimizeToday: Bool {
         if isSubscribed {
             return canOptimizeAsPro
@@ -201,9 +217,24 @@ final class SubscriptionManager: ObservableObject {
 
                 if !wasInTrial && nowInTrial {
                     // free/none → trial
-                    // MMP conversion-value event, fired on the transition only
-                    // (edge-detected), not on every customerInfo tick.
-                    AppServices.attribution?.trackEvent("start_trial")
+                    //
+                    // REACHABLE. The trial offering is live in RevenueCat and
+                    // approved in App Store Connect, so this branch fires for
+                    // real users. The notification scheduling below is
+                    // load-bearing — do not delete it.
+                    //
+                    // No analytics or attribution event fires here, and that is
+                    // deliberate. `trial_started` / `af_start_trial` are emitted
+                    // from PaywallView's purchase result instead, off
+                    // `periodType == .trial`, because that path fires exactly
+                    // once per purchase. This branch cannot make that guarantee:
+                    // `lastObservedTrialState` is in-memory only and is seeded
+                    // by `checkAccess()`, which suspends on a network call while
+                    // `customerInfoStream` emits its cached value immediately —
+                    // so on a cold launch during an active trial this branch can
+                    // re-fire for a trial that started days ago. That race still
+                    // affects the notification scheduling below (it may
+                    // re-schedule), but no longer any event.
                     Task { @MainActor in
                         await NotificationScheduler.shared.schedule(.trialStarted, in: 60)
                         await NotificationScheduler.shared.schedule(.trialDay5, in: 5 * 24 * 3600)

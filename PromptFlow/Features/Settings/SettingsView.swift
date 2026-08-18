@@ -7,6 +7,10 @@ struct SettingsView: View {
     @Query private var settingsArray: [AppSettings]
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    /// The chat row is gated by the live `chat_enabled_for` Remote Config
+    /// value; observing keeps it correct when a config activates while
+    /// Settings is open.
+    @ObservedObject private var remoteConfig = RemoteConfigManager.shared
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
@@ -421,6 +425,23 @@ struct SettingsView: View {
                     Task { await refreshDevDiagnostics() }
                 }
                 #endif
+
+                // Runtime-gated, NOT `#if DEV`. Trial mode is unreachable in DEV
+                // builds (Remote Config never runs there), and Staging — where it
+                // IS testable — does not define DEV. Gating on the Firebase
+                // project the build is pointed at is the only discriminator that
+                // renders in Staging while staying absent from Release.
+                // Hardcoded English, matching the other developer-only controls.
+                if RemoteConfigManager.shared.isNonProductionFirebaseProject {
+                    Section("Staging Tools") {
+                        Button("Reset Paywall Mode") {
+                            PaywallConfig.resetPersistedMode()
+                        }
+                        Text("Clears the frozen paywall_mode so the next resolution re-reads Remote Config. Non-production Firebase projects only.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 Section {
                     HStack {

@@ -1,5 +1,5 @@
 {
-  "originHash" : "e99e3a8118105603f1e065dbc88139e2d27b829da28e3b6b420018d03e0d4df4",
+  "originHash" : "65e64d6419e845650e33bf4757393f7f550862a03b710c80041754a6139a57a5",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -20,12 +20,12 @@
       }
     },
     {
-      "identity" : "facebook-ios-sdk",
+      "identity" : "appsflyerframework",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/facebook/facebook-ios-sdk",
+      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework",
       "state" : {
-        "revision" : "8c90832bf2302d9ecd0d23cb63b81f1fb9a36497",
-        "version" : "18.0.3"
+        "revision" : "edd3e30e4bafe527bc3df51250479302120510f3",
+        "version" : "6.18.1"
       }
     },
     {
@@ -134,15 +134,6 @@
       "state" : {
         "revision" : "abb0d68c3e7ba97b16ab51c38fcaca16b0e358c8",
         "version" : "5.66.0"
-      }
-    },
-    {
-      "identity" : "tenjin-ios-spm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tenjin/tenjin-ios-spm",
-      "state" : {
-        "revision" : "a284b83d45caa7f8d523b2322edf8dfa398ad3fd",
-        "version" : "1.17.1"
       }
     }
   ],

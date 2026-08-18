@@ -30,10 +30,17 @@ final class PlaybackController: ObservableObject {
     /// that mirrors this, so we don't write here mid-drag.
     @Published var currentTime: Double = 0
 
-    /// Total length of the recording, in seconds. Seeded from
-    /// `Recording.duration` at `setup` time so the scrubber's max
-    /// bound is correct on the first frame (no async wait on
-    /// `currentItem.duration`).
+    /// Total length of the recording, in seconds — what the scrubber
+    /// maps its track to and what the total-time readout displays.
+    ///
+    /// Seeded at `setup` from the caller's `initialDuration` and then
+    /// replaced by the asset's own duration as soon as `load(.duration)`
+    /// resolves. The seed is wall-clock recording time, which overstates
+    /// the file: the interval starts when the user taps record, before
+    /// the writer is built and before the first frame lands. It is kept
+    /// only as a safe non-zero denominator for the brief load window
+    /// (and as the fallback if the asset can't report a usable
+    /// duration) — it is not the answer.
     @Published var duration: Double = 0
 
     /// Mirrors `player.timeControlStatus == .playing`. Driven by KVO
@@ -51,6 +58,10 @@ final class PlaybackController: ObservableObject {
     private var timeObserverToken: Any?
     private var endObserver: NSObjectProtocol?
     private var statusObservation: NSKeyValueObservation?
+    /// In-flight asset-duration load started by `setup`. Cancelled on
+    /// re-`setup` and in `teardown` so a dismissed preview doesn't leave
+    /// a task holding the asset.
+    private var durationLoadTask: Task<Void, Never>?
     /// Captured at `beginScrubbing()` so `endScrubbing()` can decide
     /// whether to resume playback. If the user paused before
     /// dragging, we leave the player paused after release.
@@ -90,7 +101,13 @@ final class PlaybackController: ObservableObject {
             object: avPlayer.currentItem,
             queue: .main
         ) { [weak self] _ in
-            self?.player?.pause()
+            guard let self else { return }
+            self.player?.pause()
+            // The periodic observer above ticks at 1/30s, so its last
+            // tick before the end can land just short of `duration` and
+            // leave the thumb inside the track on a finished video.
+            // Snap it so "played to the end" reads as played to the end.
+            self.currentTime = self.duration
         }
 
         // KVO on `timeControlStatus`: single source of truth for
@@ -107,12 +124,38 @@ final class PlaybackController: ObservableObject {
             }
         }
 
+        // Replace the wall-clock seed with what the file actually
+        // contains. The synchronous `AVAsset.duration` is deprecated on
+        // this deployment target, so this goes through the async
+        // `load(.duration)` property — the same pattern VideoPreviewView
+        // already uses to read `naturalSize` / `preferredTransform`.
+        //
+        // Runs on the main actor (inherited from this type's isolation),
+        // which is where the `@Published` write has to happen anyway.
+        // If the load fails, or reports a non-numeric or non-positive
+        // time, the seeded value stands — a slightly long duration beats
+        // 0 or NaN.
+        durationLoadTask?.cancel()
+        durationLoadTask = Task { [weak self] in
+            guard let item = avPlayer.currentItem,
+                  let loaded = try? await item.asset.load(.duration),
+                  loaded.isNumeric,
+                  loaded.seconds > 0 else { return }
+            // A late completion must not clobber a newer presentation:
+            // only write if this is still the player we loaded for.
+            guard let self, self.player === avPlayer else { return }
+            self.duration = loaded.seconds
+        }
+
         avPlayer.play()
     }
 
     /// Removes observers and pauses the player. Safe to call when
     /// `setup` was never invoked.
     func teardown() {
+        durationLoadTask?.cancel()
+        durationLoadTask = nil
+
         if let token = timeObserverToken {
             player?.removeTimeObserver(token)
         }

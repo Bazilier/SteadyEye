@@ -447,6 +447,18 @@ struct ScriptEditorView: View {
         .padding(.vertical, 8)
     }
 
+    /// TRIAL MODE, entitlement inactive: AI optimisation is unavailable
+    /// entirely and the freemium once-per-day allowance does not apply.
+    ///
+    /// Evaluated at the call sites rather than folded into
+    /// `SubscriptionManager.canOptimizeToday`, because that property is what
+    /// freemium depends on and it also backs a DEV diagnostics readout — a third
+    /// arm inside it would change both. Gated on the FROZEN mode, so an install
+    /// that has not committed to trial behaves as freemium.
+    private var trialRestrictionsApply: Bool {
+        PaywallConfig.persistedMode == .trial && !subscriptionManager.isSubscribed
+    }
+
     // MARK: - Optimize CTA
 
     /// Large bottom-of-editor primary action. Visual style mirrors
@@ -462,7 +474,12 @@ struct ScriptEditorView: View {
                 fakeOptimizeForDemo()
                 return
             }
-            if !subscriptionManager.canOptimizeToday {
+            // Checked BEFORE `canOptimizeToday` so the freemium daily allowance
+            // is never consulted, let alone granted, under trial restrictions.
+            if trialRestrictionsApply {
+                paywallSource = "ai_optimize"
+                showPaywall = true
+            } else if !subscriptionManager.canOptimizeToday {
                 if subscriptionManager.isSubscribed {
                     showProDailyLimitAlert = true
                 } else {
@@ -578,6 +595,12 @@ struct ScriptEditorView: View {
     }
 
     private func optimizeForReading() {
+        // Defence-in-depth, mirroring the CTA branch above.
+        guard !trialRestrictionsApply else {
+            paywallSource = "ai_optimize"
+            showPaywall = true
+            return
+        }
         guard subscriptionManager.canOptimizeToday else {
             paywallSource = "ai_optimize"
             showPaywall = true

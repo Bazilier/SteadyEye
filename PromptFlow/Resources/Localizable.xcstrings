@@ -720,6 +720,9 @@
         }
       }
     },
+    "Clears the frozen paywall_mode so the next resolution re-reads Remote Config. Non-production Firebase projects only." : {
+
+    },
     "common.cancel" : {
       "comment" : "Generic Cancel button used in alerts and toolbars.",
       "extractionState" : "manual",
@@ -2936,6 +2939,36 @@
         }
       }
     },
+    "paywall.v2.cta.startFilmingFree" : {
+      "comment" : "Paywall primary CTA label shown when the selected plan carries a free trial (paywall_mode = trial, annual plan selected).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start filming for free"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empieza a grabar gratis"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comece a gravar de graça"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать снимать бесплатно"
+          }
+        }
+      }
+    },
     "paywall.v2.cta.unlockSteadyEye" : {
       "comment" : "Paywall CTA variant — branded unlock framing using the product name (untranslated across locales). Selected per-experiment via Remote Config (`paywall_cta_key`).",
       "extractionState" : "manual",
@@ -3344,6 +3377,36 @@
         }
       }
     },
+    "paywall.v2.headline.freeTrial" : {
+      "comment" : "Paywall hero headline shown when the selected plan carries a free trial (paywall_mode = trial, annual plan selected).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try it free for seven days"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pruébalo gratis siete días"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teste grátis por sete dias"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Семь дней бесплатно"
+          }
+        }
+      }
+    },
     "paywall.v2.headline.getFullAccess" : {
       "comment" : "Paywall hero headline. Source key for the default `paywall_headline_key` Remote Config value. Variant headlines may be added under `paywall.v2.headline.<variant>` keys; the active key is selected per-user via Remote Config so marketing can A/B test copy without an app update.",
       "extractionState" : "manual",
@@ -3734,6 +3797,36 @@
         }
       }
     },
+    "paywall.v2.subtitle.freeTrialPerYear" : {
+      "comment" : "Paywall hero subtitle shown when the selected plan carries a free trial. %@ is the localized recurring price of the annual plan, substituted at runtime — never hardcode a currency or amount.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Then %@ per year. Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Después %@ al año. Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois %@ por ano. Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Потом %@ в год. Отменить можно в любой момент."
+          }
+        }
+      }
+    },
     "paywall.v2.subtitle.getFullAccess" : {
       "comment" : "Paywall hero subtitle shown beneath the headline when no visible package has an active intro discount. Resolved as a String Catalog key delivered via Remote Config (default key matches this entry).",
       "extractionState" : "manual",
@@ -3820,6 +3913,306 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Специальное предложение — скидка %lld%%"
+          }
+        }
+      }
+    },
+    "paywall.v2.trial.badge" : {
+      "comment" : "Compact badge shown next to a paywall plan title when that plan's product carries a free trial. Kept very short: the duration line beside it states the trial length explicitly.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FREE"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GRATIS"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GRÁTIS"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "БЕСПЛАТНО"
+          }
+        }
+      }
+    },
+    "paywall.v2.trial.freeForDays" : {
+      "comment" : "Paywall plan row duration line for a free trial measured in days. %lld is the day count, derived from the product's introductory offer period (weeks are converted to days).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld days"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld días"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld dia"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld dias"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld дня бесплатно"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld дней бесплатно"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld день бесплатно"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld дней бесплатно"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "paywall.v2.trial.freeForMonths" : {
+      "comment" : "Paywall plan row duration line for a free trial measured in months. %lld is the month count, derived from the product's introductory offer period.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld month"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld months"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld mes"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld meses"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld mês"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld meses"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld месяца бесплатно"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld месяцев бесплатно"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld месяц бесплатно"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld месяцев бесплатно"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "paywall.v2.trial.freeForYears" : {
+      "comment" : "Paywall plan row duration line for a free trial measured in years. %lld is the year count, derived from the product's introductory offer period.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld year"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Free for %lld years"
+                }
+              }
+            }
+          }
+        },
+        "es-419" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld año"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gratis por %lld años"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld ano"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Grátis por %lld anos"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld года бесплатно"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld лет бесплатно"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld год бесплатно"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld лет бесплатно"
+                }
+              }
+            }
           }
         }
       }
@@ -5113,6 +5506,9 @@
           }
         }
       }
+    },
+    "Reset Paywall Mode" : {
+
     },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
@@ -7947,6 +8343,9 @@
       }
     },
     "SpeechAnalyzer is RUNNING — recording audio routes here." : {
+
+    },
+    "Staging Tools" : {
 
     },
     "SteadyEye needs camera and microphone access to record your videos. You can enable them later in Settings if you change your mind." : {

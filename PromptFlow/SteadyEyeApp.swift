@@ -72,27 +72,19 @@ struct SteadyEyeApp: App {
                 await AppAttributionService.syncToFirebase()
             }
         }
-        MetaAnalytics.logAppActivation()
-
-        // Instantiate the MMP attribution provider (Tenjin). connect() is
-        // deliberately NOT called here — it fires from the ATT completion
-        // handler at the end of onboarding (OnboardingView.finishOnboarding)
-        // so IDFA is available for the first install event when granted.
-        AppServices.attribution = TenjinAttributionProvider()
-
-        // Returning users who already finished onboarding skip the onboarding
-        // flow (and its connect() call) on every relaunch/update, so Tenjin
-        // would otherwise never see them. Connect here for those users. This
-        // does NOT prompt ATT — connect() is independent of the ATT flow. New
-        // users still hit the onboarding-completion path (hasSeenOnboarding is
-        // false on first launch); the provider's one-shot guard prevents a
-        // double connect if both paths ever fire in one session.
-        if UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
-            AppServices.attribution?.connect()
-            // Purchases.configure ran above, so the RC subscriber exists;
-            // syncToRevenueCat self-guards on Purchases.isConfigured anyway.
-            AppServices.attribution?.syncToRevenueCat()
-        }
+        // Instantiate the MMP attribution provider (AppsFlyer) and start it
+        // immediately — early in the first session, on the main thread, with
+        // NO onboarding gate. A user who installs, opens the app and abandons
+        // onboarding still registers an install. The SDK is separately told to
+        // hold the first session until the ATT prompt at the end of onboarding
+        // resolves (or its timeout elapses), so starting this early does not
+        // cost us the IDFA when the user grants.
+        AppServices.attribution = AppsFlyerAttributionProvider()
+        AppServices.attribution?.start()
+        // Purchases.configure ran above, so the RC subscriber exists;
+        // syncToRevenueCat self-guards on Purchases.isConfigured anyway and
+        // retries on a later call if the bridge could not be written yet.
+        AppServices.attribution?.syncToRevenueCat()
         #endif
 
         // Runs after Purchases.configure above, so its internal
@@ -158,6 +150,12 @@ struct SteadyEyeApp: App {
             // reinstall). Production minimumFetchInterval (3600s) throttles
             // duplicate fetches; DEBUG builds use 0 for instant pickup.
             if newPhase == .active {
+                // MMP session ping. App.init only runs on a cold start, but
+                // iOS keeps the process alive for hours, so without this a warm
+                // foreground would never be counted as a session. The SDK
+                // de-duplicates pings that arrive close together, so the extra
+                // call right after a cold launch is harmless.
+                AppServices.attribution?.start()
                 Task { await SubscriptionManager.shared.checkAccess() }
                 Task { await SubscriptionManager.shared.rescheduleInactiveReminder() }
                 Task { await RemoteConfigManager.shared.fetchAndActivate() }

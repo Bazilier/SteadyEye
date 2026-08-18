@@ -333,14 +333,18 @@ struct OnboardingView: View {
         // deny-toast with a Settings deep link if photos was denied.
         pendingDemoRecording = cameraGranted && micGranted
         // Request ATT at the very end of onboarding, immediately before the
-        // first main screen appears. The MMP (Tenjin) connect() runs inside
-        // the completion handler — after the user responds, granted or denied
-        // — so IDFA is available for the first install event when authorized.
+        // first main screen appears. The MMP is NOT started here — it starts in
+        // `SteadyEyeApp.init`, ungated, so an abandoned onboarding still
+        // registers an install. The SDK holds its first session back until this
+        // prompt resolves (or its timeout elapses), so the IDFA still reaches
+        // the install event when the user grants.
         // Only after the prompt resolves do we flip `hasSeenOnboarding`, which
         // drives the transition to the main UI.
         Task { @MainActor in
             await ATTManager.requestIfNeeded()
-            AppServices.attribution?.connect()
+            // Now that the ATT decision is in, write the (real or all-zeros)
+            // IDFA through to RevenueCat. Retries here because the launch-time
+            // call ran before the user had answered.
             AppServices.attribution?.syncToRevenueCat()
             hasSeenOnboarding = true
             // NOTE: The App Store review prompt used to fire here, but was
