@@ -15,8 +15,7 @@ struct ScriptEditorView: View {
     @State private var isOptimizing = false
     @State private var optimizeError: String?
     @State private var showRateLimitAlert = false
-    @State private var showPaywall = false
-    @State private var paywallSource: String = "ai_optimize"
+    @State private var paywallPresentation: PaywallPresentation?
     @State private var showWordLimitAlert = false
     @State private var showPasteLimitAlert = false
     @State private var showProDailyLimitAlert = false
@@ -213,8 +212,7 @@ struct ScriptEditorView: View {
                     ))
                 }
                 Button {
-                    paywallSource = "word_limit"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "word_limit")
                 } label: {
                     Text(String(
                         localized: "scripts.editor.wordLimit.upgrade",
@@ -252,8 +250,7 @@ struct ScriptEditorView: View {
                     ))
                 }
                 Button {
-                    paywallSource = "word_limit"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "word_limit")
                 } label: {
                     Text(String(
                         localized: "scripts.editor.wordLimit.upgrade",
@@ -273,8 +270,8 @@ struct ScriptEditorView: View {
                     comment: "Body of the paste-limit alert. %1$lld is the word count of the pasted text."
                 ))
             }
-            .fullScreenCover(isPresented: $showPaywall) {
-                PaywallView(source: paywallSource)
+            .fullScreenCover(item: $paywallPresentation) { presentation in
+                PaywallView(source: presentation.source)
             }
             .alert(
                 Text(String(
@@ -483,14 +480,12 @@ struct ScriptEditorView: View {
             // Checked BEFORE `canOptimizeToday` so the freemium daily allowance
             // is never consulted, let alone granted, under trial restrictions.
             if trialRestrictionsApply {
-                paywallSource = "ai_optimize"
-                showPaywall = true
+                paywallPresentation = PaywallPresentation(source: "ai_optimize")
             } else if !subscriptionManager.canOptimizeToday {
                 if subscriptionManager.isSubscribed {
                     showProDailyLimitAlert = true
                 } else {
-                    paywallSource = "ai_optimize"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "ai_optimize")
                 }
             } else {
                 optimizeForReading()
@@ -603,13 +598,11 @@ struct ScriptEditorView: View {
     private func optimizeForReading() {
         // Defence-in-depth, mirroring the CTA branch above.
         guard !trialRestrictionsApply else {
-            paywallSource = "ai_optimize"
-            showPaywall = true
+            paywallPresentation = PaywallPresentation(source: "ai_optimize")
             return
         }
         guard subscriptionManager.canOptimizeToday else {
-            paywallSource = "ai_optimize"
-            showPaywall = true
+            paywallPresentation = PaywallPresentation(source: "ai_optimize")
             return
         }
         guard RateLimiter.canMakeAPICall() else {

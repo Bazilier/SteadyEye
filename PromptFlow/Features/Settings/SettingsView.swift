@@ -21,8 +21,7 @@ struct SettingsView: View {
     @AppStorage("fmv_enabled") private var fmvEnabled: Bool = false
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
-    @State private var showPaywall = false
-    @State private var paywallSource: String = "settings_preview"
+    @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
     @State private var restoreSucceeded = false
@@ -305,8 +304,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Preview Paywall") {
-                        paywallSource = "settings_preview"
-                        showPaywall = true
+                        paywallPresentation = PaywallPresentation(source: "settings_preview")
                     }
                     Button("Reset Tips") {
                         UserDefaults.standard.set(false, forKey: "hasSeenEditorTip")
@@ -507,8 +505,8 @@ struct SettingsView: View {
                 }
             }
             #endif
-            .fullScreenCover(isPresented: $showPaywall) {
-                PaywallView(source: paywallSource)
+            .fullScreenCover(item: $paywallPresentation) { presentation in
+                PaywallView(source: presentation.source)
             }
             .fullScreenCover(isPresented: $showUpgradePaywall) {
                 PaywallView(source: "settings_upgrade_row")
@@ -524,15 +522,13 @@ struct SettingsView: View {
             .onChange(of: videoResolution) { _, newValue in
                 if newValue == "4k" && !subscriptionManager.canRecord4K {
                     videoResolution = "1080p"
-                    paywallSource = "resolution_4k"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "resolution_4k")
                 }
             }
             .onChange(of: stabilizationEnabled) { _, newValue in
                 if newValue && !subscriptionManager.canUseStabilization {
                     stabilizationEnabled = false
-                    paywallSource = "stabilization"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "stabilization")
                 }
             }
             .onChange(of: fmvEnabled) { _, newValue in
@@ -541,8 +537,7 @@ struct SettingsView: View {
                 // paywall if they aren't subscribed.
                 if newValue && !subscriptionManager.isSubscribed {
                     fmvEnabled = false
-                    paywallSource = "follow_my_voice"
-                    showPaywall = true
+                    paywallPresentation = PaywallPresentation(source: "follow_my_voice")
                 }
             }
             .onAppear {

@@ -1046,10 +1046,22 @@ struct RecordingView: View {
                 // reaches here — cancel/failure and screen-open do not.
                 ReviewPromptManager.handleSuccessfulRecording()
                 previewRecording = recording
-            case .failure:
+            case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,
                 // etc.). Don't present the preview — clean up the temp source
                 // file so it doesn't leak. The user can retake the clip.
+                //
+                // Mirrors `recording_stopped`'s parameter shape so the two can
+                // be joined on a session. `error_reason` is the NSError
+                // domain/code, NOT `localizedDescription`: this app ships four
+                // locales and a localized reason fragments into four buckets
+                // for one failure.
+                let nsError = error as NSError
+                AppAnalytics.log("recording_failed", params: [
+                    "duration_sec": Int(duration.rounded()),
+                    "display_mode": displayMode,
+                    "error_reason": "\(nsError.domain)/\(nsError.code)"
+                ])
                 try? FileManager.default.removeItem(at: sourceURL)
                 resetDisplay()
             }

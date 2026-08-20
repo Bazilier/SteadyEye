@@ -687,6 +687,22 @@ final class CameraManager: NSObject, ObservableObject {
                         self.lastRecordedURL = url
                     }
                 case .failure(let error):
+                    // Writer-level failure (AVAssetWriter status != .completed).
+                    // This path never sets `lastRecordedURL`, so RecordingView's
+                    // persist flow — and its own `recording_failed` — is never
+                    // reached. Without this the take is invisible to analytics:
+                    // `recording_stopped` fires either way, so a failed write
+                    // looks exactly like a user stopping after a second.
+                    // Same parameter shape as `recording_stopped` above;
+                    // `error_reason` is the NSError domain/code rather than
+                    // `localizedDescription`, which would fragment across the
+                    // app's four locales.
+                    let nsError = error as NSError
+                    AppAnalytics.log("recording_failed", params: [
+                        "duration_sec": Int(self.lastRecordingDuration.rounded()),
+                        "display_mode": UserDefaults.standard.string(forKey: "teleprompterMode") ?? "wbw",
+                        "error_reason": "\(nsError.domain)/\(nsError.code)"
+                    ])
                     self.errorMessage = String(
                         localized: "camera.error.recordingError",
                         defaultValue: "Recording error: \(error.localizedDescription)",

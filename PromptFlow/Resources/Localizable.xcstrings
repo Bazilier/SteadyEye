@@ -4398,31 +4398,61 @@
       }
     },
     "push.trial_ending_24h.body" : {
-      "comment" : "Body of the trial-ends-tomorrow push notification (fires 6 days into the 7-day trial).",
+      "comment" : "Body of the trial-ends-tomorrow push notification (fires 6 days into the 7-day trial). %@ is the localized renewal price from StoreKit (e.g. '$79.99' or 'R$ 399,90') - never hardcode a currency symbol or amount. The placeholder MUST appear; translate only the surrounding wording.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Renews at $49.99/year unless you cancel in Settings."
+            "value" : "Renews at %@/year unless you cancel in Settings."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se renueva a $49.99/año. Cancela en Ajustes si lo deseas."
+            "value" : "Se renueva a %@/año. Cancela en Ajustes si lo deseas."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Renova por $49.99/ano. Cancele em Ajustes se quiser."
+            "value" : "Renova por %@/ano. Cancele em Ajustes se quiser."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Автоматически продлится за $49.99/год. Отменить можно в Настройках."
+            "value" : "Автоматически продлится за %@/год. Отменить можно в Настройках."
+          }
+        }
+      }
+    },
+    "push.trial_ending_24h.bodyNoPrice" : {
+      "comment" : "Fallback body for the trial-ends-tomorrow push, used when the localized renewal price could not be resolved at schedule time. Identical to `push.trial_ending_24h.body` with the price clause dropped. NEVER substitute a hardcoded amount here - a literal figure is correct for one storefront and wrong for every other.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renews yearly unless you cancel in Settings."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se renueva cada año. Cancela en Ajustes si lo deseas."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renova a cada ano. Cancele em Ajustes se quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продлевается каждый год. Отменить можно в Настройках."
           }
         }
       }

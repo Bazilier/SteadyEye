@@ -36,6 +36,23 @@ enum PaywallPlan: String, CaseIterable, Identifiable {
     }
 }
 
+/// Presentation token for `fullScreenCover(item:)`, carrying the analytics
+/// `source` alongside the presented/not-presented state so the two move in a
+/// SINGLE state write.
+///
+/// With two independent `@State` values — a `Bool` and a separate source
+/// `String` — SwiftUI can build `PaywallView` before the source assignment has
+/// landed. `source` is a `let` on a struct that is rebuilt on every re-render
+/// while the view's own `@State` survives, so `paywall_shown` (emitted once
+/// from `.onAppear`, latched) could report the stale value while every later
+/// event in the same presentation reported the fresh one. Binding the source to
+/// the item removes the window rather than papering over it: the closure below
+/// receives the value that triggered the presentation.
+struct PaywallPresentation: Identifiable {
+    let id = UUID()
+    let source: String
+}
+
 struct PaywallView: View {
     let source: String
     /// Optional RC offering identifier. Explicit override — when set,
@@ -72,6 +89,25 @@ struct PaywallView: View {
     /// One-shot guard for `paywall_shown`. The event is deferred until the
     /// offering resolves, and several lifecycle hooks race to emit it.
     @State private var hasLoggedPaywallShown: Bool = false
+
+    /// One-shot guard for `paywall_dismissed`, mirroring `hasLoggedPaywallShown`.
+    /// `onDisappear` fires more than once per presentation — StoreKit's payment
+    /// sheet covering this `fullScreenCover` triggers one on its own — so the
+    /// event needs the same latch the appear side already has.
+    @State private var hasLoggedPaywallDismissed: Bool = false
+
+    /// Whether this presentation ended in the user holding `access`, by purchase
+    /// or by restore. Read by `paywall_dismissed`, which cannot ask
+    /// `SubscriptionManager` directly: `onDisappear` can fire while the purchase
+    /// is still in flight, long before `isSubscribedReal` is written.
+    @State private var didPurchase: Bool = false
+
+    /// True only while THIS view's purchase is awaiting the store. Owned here
+    /// rather than read from `SubscriptionManager.isLoading`, which is also
+    /// raised by `restorePurchases()` — a restore in flight would otherwise
+    /// suppress a genuine dismissal, since the Dismiss button stays tappable
+    /// throughout one.
+    @State private var isPurchaseInFlight: Bool = false
 
     // MARK: - Packages from offerings
 
@@ -440,16 +476,30 @@ struct PaywallView: View {
     /// the common path, so waiting bought nothing and let the event land after
     /// dismissal.
     ///
-    /// A cache miss — prewarm unfinished, failed, or `.skipped` — logs `false`,
-    /// which is the accurate answer at that instant: with no `.eligible` entry
-    /// the paywall cannot present a trial, because `isEligibleForTrial` is not
-    /// satisfied either.
+    /// `trial_available` is THREE-VALUED, not a Bool. A cache miss — prewarm
+    /// unfinished, failed, or `.skipped`, or the annual package not yet resolved
+    /// — reports `"unknown"`, never `"not_eligible"`. The two are genuinely
+    /// different: an eligible user whose prewarm has not landed sees trial copy
+    /// moments later, once `refreshTrialEligibility()`'s live fallback resolves,
+    /// so collapsing that case into a negative under-reported real eligibility
+    /// and made the parameter unusable as a denominator.
+    ///
+    /// The values are deliberately not `"true"` / `"false"`: the parameter
+    /// previously carried a Bool, and a string that reads like one would merge
+    /// with that history in GA4 instead of showing up as a clean break.
     private func logPaywallShown() {
         guard !hasLoggedPaywallShown else { return }
         hasLoggedPaywallShown = true
-        let trialAvailable: Bool = {
-            guard let identifier = annualPackage?.storeProduct.productIdentifier else { return false }
-            return manager.trialEligibility[identifier] == .eligible
+        let trialAvailable: String = {
+            guard let identifier = annualPackage?.storeProduct.productIdentifier else { return "unknown" }
+            switch manager.trialEligibility[identifier] {
+            case .eligible:                      return "eligible"
+            case .ineligible, .noIntroOfferExists: return "not_eligible"
+            // `.unknown` and a cache miss (`nil`) are the same statement: the
+            // answer is not in yet.
+            case .unknown, .none:                return "unknown"
+            @unknown default:                    return "unknown"
+            }
         }()
         AppAnalytics.log("paywall_shown", params: [
             "source": source,
@@ -516,17 +566,18 @@ struct PaywallView: View {
     /// ("$79.99 / year" over "billed annually"). Dropping the suffix also drops
     /// the four `paywall.v2.pricePer*` wrapper keys, which had no other caller.
     ///
-    /// ⚠️ The literals are LAST-RESORT fallbacks for the window before offerings
-    /// load — they are not the source of truth and are known to be stale (annual
-    /// is really $79.99, not $49.99). Real prices come from StoreKit via
-    /// `localizedPriceString`; these are deliberately left at their existing
-    /// values rather than guessed at, because App Store Connect is the only
-    /// authority and it is not readable from this repo.
+    /// ⚠️ The literals are a LAST-RESORT fallback for the window before offerings
+    /// load, and they are NOT the source of truth. Real prices come from StoreKit
+    /// via `localizedPriceString`; these are US-dollar list prices shown only if
+    /// that is unavailable, and they are neither localized nor currency-converted.
+    /// App Store Connect is the only authority, and it is not readable from this
+    /// repo — so THESE MUST BE UPDATED BY HAND whenever a price changes there, or
+    /// the paywall will briefly show a price the user will not be charged.
     private func priceText(for plan: PaywallPlan) -> String {
         switch plan {
-        case .weekly:   return weeklyPackage?.localizedPriceString ?? "$2.99"
-        case .monthly:  return monthlyPackage?.localizedPriceString ?? "$6.99"
-        case .annual:   return annualPackage?.localizedPriceString ?? "$49.99"
+        case .weekly:   return weeklyPackage?.localizedPriceString ?? "$4.99"
+        case .monthly:  return monthlyPackage?.localizedPriceString ?? "$13.99"
+        case .annual:   return annualPackage?.localizedPriceString ?? "$79.99"
         case .lifetime: return lifetimePackage?.localizedPriceString ?? "$99.99"
         }
     }
@@ -597,6 +648,14 @@ struct PaywallView: View {
                     // User is now Pro — dismissing the paywall drops them back
                     // into the app instead of leaving them stranded on a wall
                     // they no longer need.
+                    //
+                    // A restore onto an active entitlement ends the presentation
+                    // in the same state a purchase does, so it reports
+                    // `purchased=true` too. Set here rather than where
+                    // `restoreSucceeded` is assigned: this alert's only control
+                    // is this button, so a successful restore cannot reach
+                    // dismissal by any other route.
+                    didPurchase = true
                     dismiss()
                 }
             }
@@ -642,9 +701,18 @@ struct PaywallView: View {
             }
         }
         .onDisappear {
+            // A purchase in flight means this is NOT a dismissal: StoreKit's
+            // payment sheet presenting over this `fullScreenCover` fires
+            // `onDisappear` seconds before the purchase resolves. The flag is
+            // set synchronously on the main actor before the store call, and
+            // cleared the instant it returns — before the success path calls
+            // `dismiss()` — so the real dismissal always logs.
+            guard !isPurchaseInFlight else { return }
+            guard !hasLoggedPaywallDismissed else { return }
+            hasLoggedPaywallDismissed = true
             AppAnalytics.log("paywall_dismissed", params: [
                 "source": source,
-                "purchased": SubscriptionManager.shared.isSubscribed
+                "purchased": didPurchase
             ])
         }
     }
@@ -1157,19 +1225,35 @@ struct PaywallView: View {
     private func purchase(_ plan: PaywallPlan) {
         guard let pkg = package(for: plan) else {
             // RC offerings haven't loaded yet (DEV mode short-circuits, network
-            // failure, or RC config error). Silent no-op — there is no
-            // reasonable in-app fallback. The user can tap again once the
-            // offerings load via .onAppear's loadOfferings task.
+            // failure, or RC config error). No in-app fallback — the user can
+            // tap again once the offerings load via .onAppear's loadOfferings
+            // task — but the tap is reported, because an unreported one makes
+            // the user look like they never tried.
+            //
+            // Deliberately NOT `purchase_initiated`: no purchase started, and
+            // emitting it here would depress the initiated→succeeded ratio with
+            // attempts that never reached the store.
+            AppAnalytics.log("purchase_unavailable", params: [
+                "plan": plan.rawValue,
+                "source": source
+            ])
             return
         }
         errorMessage = nil
         let planName = plan.rawValue
+        // Raised here, synchronously, rather than as the Task's first statement:
+        // the store call cannot begin before this line has run, so there is no
+        // scheduling order in which the payment sheet's `onDisappear` beats it.
+        isPurchaseInFlight = true
         AppAnalytics.log("purchase_initiated", params: [
             "plan": planName,
             "source": source
         ])
         Task {
             let outcome = await manager.purchase(pkg)
+            // Cleared before the switch, so every outcome — including the
+            // success path's `dismiss()` below — sees a settled purchase.
+            isPurchaseInFlight = false
             switch outcome {
             case .succeeded(let isTrial):
                 AppAnalytics.log("purchase_succeeded", params: [
@@ -1226,6 +1310,10 @@ struct PaywallView: View {
                         productId: purchasedProduct.productIdentifier
                     )
                 }
+                // Set before `dismiss()` so the `onDisappear` this triggers
+                // reports the purchase rather than re-reading subscription state
+                // that may not have propagated yet.
+                didPurchase = true
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:

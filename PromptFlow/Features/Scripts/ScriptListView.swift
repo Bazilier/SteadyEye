@@ -37,8 +37,7 @@ struct ScriptListView: View {
     @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
     @State private var showBulkImport = false
-    @State private var showPaywall = false
-    @State private var paywallSource: String = ""
+    @State private var paywallPresentation: PaywallPresentation?
     /// Captured at tap time and passed into BulkImportView so the
     /// `bulk_import_opened` analytics event can split funnels by entry
     /// surface. Both the toolbar `doc.on.doc` button and the empty-state
@@ -103,8 +102,7 @@ struct ScriptListView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     if !subscriptionManager.isSubscribed {
                         Button(action: {
-                            paywallSource = "scripts_crown"
-                            showPaywall = true
+                            paywallPresentation = PaywallPresentation(source: "scripts_crown")
                         }) {
                             Image(systemName: "crown.fill")
                                 .foregroundColor(.orange)
@@ -136,8 +134,8 @@ struct ScriptListView: View {
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView(entryPoint: bulkImportEntryPoint)
             }
-            .fullScreenCover(isPresented: $showPaywall) {
-                PaywallView(source: paywallSource)
+            .fullScreenCover(item: $paywallPresentation) { presentation in
+                PaywallView(source: presentation.source)
             }
         }
         .preferredColorScheme(.dark)
@@ -326,10 +324,11 @@ struct ScriptListView: View {
             return
         }
         if !subscriptionManager.canBulkImport {
-            paywallSource = entryPoint == "toolbar"
-                ? "import_gate_post_demo"
-                : "import_gate_empty"
-            showPaywall = true
+            paywallPresentation = PaywallPresentation(
+                source: entryPoint == "toolbar"
+                    ? "import_gate_post_demo"
+                    : "import_gate_empty"
+            )
             return
         }
         bulkImportEntryPoint = entryPoint

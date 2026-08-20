@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 import RevenueCat
 import FirebaseAnalytics
 
@@ -74,7 +75,31 @@ final class SubscriptionManager: ObservableObject {
     /// to detect free→trial and trial→ended transitions, which drive the
     /// trial-related local notifications. Initialized after the first
     /// `checkAccess()` so the listener doesn't false-fire on launch.
-    private var lastObservedTrialState: Bool = false
+    ///
+    /// PERSISTED across launches. A trial converts ~7 days after it starts,
+    /// while the app is not running, so an in-memory-only flag would read
+    /// `false` on the next cold launch and the trial→paid branch would never
+    /// fire. Persisting is also what makes `trial_converted` fire at most once:
+    /// the flip to `false` survives the process, so a later tick for the same
+    /// transition no longer satisfies `wasInTrial`.
+    private var lastObservedTrialState: Bool =
+        UserDefaults.standard.bool(forKey: SubscriptionManager.trialStateKey)
+    {
+        didSet {
+            UserDefaults.standard.set(lastObservedTrialState, forKey: Self.trialStateKey)
+            // Any write — from `checkAccess()`'s first-launch seed or from the
+            // stream listener's edge detection — counts as seeded, so the seed
+            // can never fire after an observation has already been recorded.
+            UserDefaults.standard.set(true, forKey: Self.trialStateSeededKey)
+        }
+    }
+
+    static let trialStateKey = "lastObservedTrialState"
+
+    /// Marks that `lastObservedTrialState` holds a real observation. Kept
+    /// separate from the value because `false` is a legitimate persisted state
+    /// and therefore cannot itself signal "never written".
+    static let trialStateSeededKey = "lastObservedTrialStateSeeded"
 
     /// DEV-only escape hatch for testing freemium gating without buying or
     /// cancelling a sandbox subscription. Values: "off", "free", "subscribed".
@@ -304,14 +329,55 @@ final class SubscriptionManager: ObservableObject {
                     // re-fire for a trial that started days ago. That race still
                     // affects the notification scheduling below (it may
                     // re-schedule), but no longer any event.
+                    // Resolved BEFORE the Task so it is read from the same
+                    // CustomerInfo tick that detected the trial. `nil` here is
+                    // expected on a cold launch into an existing trial — prewarm
+                    // skips for an entitled user, so offerings are never fetched
+                    // — and the notification drops its price clause rather than
+                    // quoting a figure.
+                    let renewalPrice = self.localizedPrice(
+                        forProductID: entitlement?.productIdentifier
+                    )
+                    // `.trialStarted` (60s) and `.trialDay5` (day 5) are no longer
+                    // sent — only the day-6 renewal warning is. Their
+                    // `NotificationKind` cases and localized strings are kept on
+                    // purpose, so re-enabling either is one `schedule` line here
+                    // and nothing else; the DEV diagnostics panel still fires
+                    // both on demand.
                     Task { @MainActor in
-                        await NotificationScheduler.shared.schedule(.trialStarted, in: 60)
-                        await NotificationScheduler.shared.schedule(.trialDay5, in: 5 * 24 * 3600)
-                        await NotificationScheduler.shared.schedule(.trialEnding24h, in: 6 * 24 * 3600)
+                        await NotificationScheduler.shared.schedule(
+                            .trialEnding24h,
+                            in: 6 * 24 * 3600,
+                            price: renewalPrice
+                        )
                     }
                 } else if wasInTrial && !nowInTrial {
-                    // trial → ended (cancelled or converted to paid)
-                    NotificationScheduler.shared.cancel([.trialStarted, .trialDay5, .trialEnding24h])
+                    // trial → ended. `isActive` is the discriminator: the
+                    // entitlement survives a conversion to paid and lapses on a
+                    // cancellation or expiry. Notifications are cancelled either
+                    // way.
+                    // Only the kind this branch's counterpart schedules. The two
+                    // retired kinds are not listed because nothing schedules them
+                    // any more; both fired well before trial end anyway, so
+                    // cancelling them here never prevented a delivery.
+                    NotificationScheduler.shared.cancel(.trialEnding24h)
+                    if entitlement?.isActive == true {
+                        // trial → paid.
+                        //
+                        // BEST-EFFORT ONLY. This fires just once the user opens
+                        // the app after the conversion renewal lands, which may
+                        // be days later or never. RevenueCat's webhooks remain
+                        // the authoritative source for conversion accounting —
+                        // treat this event as a funnel signal, not as revenue
+                        // truth. No revenue parameter is attached for the same
+                        // reason, and no attribution call is made here:
+                        // RevenueCat's own AppsFlyer integration already
+                        // delivers the conversion server-side as `af_subscribe`.
+                        AppAnalytics.log("trial_converted", params: [
+                            "plan": Self.planName(forProductID: entitlement?.productIdentifier),
+                            "product_id": entitlement?.productIdentifier ?? "unknown"
+                        ])
+                    }
                 }
             }
         }
@@ -341,7 +407,17 @@ final class SubscriptionManager: ObservableObject {
             // Seed change-detection so the customerInfoStream listener
             // doesn't false-fire its trial→started branch on the first
             // tick (which echoes the values we just read here).
-            lastObservedTrialState = isTrialActive
+            //
+            // FIRST EVER LAUNCH ONLY. After that the persisted value is
+            // authoritative and the stream listener owns every further
+            // mutation. Seeding unconditionally would overwrite a persisted
+            // `true` with the post-conversion `false` read back here, and the
+            // trial→paid transition would be gone before the listener could
+            // observe it — defeating the persistence on the one path it exists
+            // to protect.
+            if !UserDefaults.standard.bool(forKey: Self.trialStateSeededKey) {
+                lastObservedTrialState = isTrialActive
+            }
             updateAnalyticsSubscriptionState()
         } catch {
             // Keep current state on error
@@ -372,7 +448,39 @@ final class SubscriptionManager: ObservableObject {
         return offerings?[id] ?? offerings?.current
     }
 
+    /// StoreKit's localized price string for a product identifier, taken from
+    /// the offerings already loaded in this session — correct currency and
+    /// formatting for the user's storefront, unlike any literal we could write.
+    ///
+    /// Returns `nil` rather than a placeholder when offerings are not loaded, so
+    /// callers are forced to degrade instead of quoting an amount. Searches
+    /// `offerings.all` because the product may sit in the `trial` offering, the
+    /// `default` one, or whatever `paywall_offering_id` names.
+    func localizedPrice(forProductID id: String?) -> String? {
+        guard let id, let offerings else { return nil }
+        for offering in offerings.all.values {
+            if let package = offering.availablePackages.first(
+                where: { $0.storeProduct.productIdentifier == id }
+            ) {
+                return package.storeProduct.localizedPriceString
+            }
+        }
+        return nil
+    }
+
     // MARK: - Paywall data prewarm
+
+    /// Prewarm diagnostics. Deliberately NOT the bare `print` this file uses for
+    /// its `⚠️` lines: those fire once, only on a misconfiguration guard, and are
+    /// meant to be impossible to miss. This one is happy-path, runs on every
+    /// launch for every non-subscriber, and interpolates the whole eligibility
+    /// dictionary — so it is routed through `Logger` at `.debug`, which is not
+    /// emitted or persisted in a release install and does not even evaluate its
+    /// interpolation unless something is streaming the subsystem.
+    private let prewarmLog = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye",
+        category: "Prewarm"
+    )
 
     /// Resolves everything the paywall renders — offerings and intro-offer
     /// eligibility — BEFORE the paywall is opened, so its first paint is its
@@ -446,7 +554,7 @@ final class SubscriptionManager: ObservableObject {
         )
         trialEligibility = results.mapValues(\.status)
         prewarmState = .ready
-        print("[Prewarm] ready — \(identifiers.count) product(s): \(trialEligibility)")
+        prewarmLog.debug("ready — \(identifiers.count) product(s): \(String(describing: self.trialEligibility))")
         #endif
     }
 
@@ -635,10 +743,60 @@ final class SubscriptionManager: ObservableObject {
 // MARK: - Product IDs
 extension SubscriptionManager {
     enum ProductID {
+        static let weekly = "steadyeye_weekly"
         static let monthly = "steadyeye_monthly"
         static let annual = "steadyeye_annual"
         static let lifetime = "steadyeye_lifetime"
+
+        /// The `trial` offering's annual SKU. A SEPARATE App Store product from
+        /// `annual`, not the same product with an offer attached — both ship at
+        /// once and the prewarm reports them side by side
+        /// (`steadyeye_annual: noIntroOfferExists`, `steadyeye_annual_trial:
+        /// eligible`). It is the product a converting trial reports, so
+        /// `planName(forProductID:)` must map it or every `trial_converted`
+        /// lands in an "unknown" bucket.
+        static let annualTrial = "steadyeye_annual_trial"
+
+        /// Suffix marking a trial-offering variant of a base product.
+        static let trialSuffix = "_trial"
     }
 
     static let entitlementID = "access"
+
+    /// Plan label for a product identifier, in the SAME vocabulary
+    /// `purchase_succeeded` reports — the cases return `PaywallPlan` raw values
+    /// verbatim rather than re-spelling them, so `trial_converted` can be
+    /// pivoted against the purchase funnel without a second naming scheme.
+    ///
+    /// A trial-offering SKU reports the SAME plan as its base product
+    /// (`steadyeye_annual_trial` → `annual`), so a converted trial pivots
+    /// against `purchase_succeeded` instead of splitting into a parallel
+    /// "…_trial" bucket.
+    ///
+    /// All five App Store SKUs are mapped, `steadyeye_weekly` included — it is
+    /// provisioned but not currently sold, and is handled here so that shipping
+    /// it needs no code change. `"unknown"` therefore now means a genuinely
+    /// unrecognised identifier: a product added to App Store Connect without a
+    /// matching `ProductID` constant, which is worth investigating rather than
+    /// silently bucketing under a guessed plan.
+    static func planName(forProductID id: String?) -> String {
+        switch id {
+        case ProductID.annual, ProductID.annualTrial:
+            return PaywallPlan.annual.rawValue
+        case ProductID.monthly:
+            return PaywallPlan.monthly.rawValue
+        case ProductID.weekly:
+            return PaywallPlan.weekly.rawValue
+        case ProductID.lifetime:
+            return PaywallPlan.lifetime.rawValue
+        default:
+            // Any trial variant beyond the one named above — a
+            // `steadyeye_monthly_trial`, a future `steadyeye_weekly_trial` —
+            // resolves through its base SKU. This only ever succeeds when that
+            // base is itself a known constant, so an unrecognised product still
+            // reports "unknown" rather than being filed under a guessed plan.
+            guard let id, id.hasSuffix(ProductID.trialSuffix) else { return "unknown" }
+            return planName(forProductID: String(id.dropLast(ProductID.trialSuffix.count)))
+        }
+    }
 }
