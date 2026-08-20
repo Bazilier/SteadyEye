@@ -9,6 +9,26 @@ enum PurchaseOutcome {
     case userCancelled
 }
 
+/// Lifecycle of the paywall data prewarm (offerings + intro-offer eligibility).
+/// The paywall reads this to know whether the data it needs is already settled.
+enum PrewarmState {
+    /// User holds the `access` entitlement, so paywall data is never needed and
+    /// no network work was done. NOT a failure.
+    case skipped
+    /// Nothing attempted yet, or invalidated by an entitlement change.
+    case idle
+    case loading
+    case ready
+    case failed(Error)
+}
+
+enum PrewarmError: Error {
+    /// `loadOfferings()` returned without populating `offerings`.
+    case offeringsUnavailable
+    /// Offerings loaded but no candidate offering exposed an annual product.
+    case noAnnualProducts
+}
+
 /// Manages subscription state via RevenueCat.
 /// In DEV builds, all features are unlocked without RC calls.
 final class SubscriptionManager: ObservableObject {
@@ -29,6 +49,25 @@ final class SubscriptionManager: ObservableObject {
     @Published var isTrialActive: Bool = false
     @Published var offerings: Offerings?
     @Published var isLoading: Bool = false
+
+    /// Prewarmed intro-offer eligibility, keyed by product identifier. Written
+    /// only by `prewarmPaywallData()`; the paywall reads it and falls back to
+    /// its own query on a miss.
+    @Published private(set) var trialEligibility: [String: IntroEligibilityStatus] = [:]
+
+    /// Single signal the UI reads to know whether paywall data is settled.
+    @Published private(set) var prewarmState: PrewarmState = .idle
+
+    /// Last `access` state observed by the customerInfoStream listener. `nil`
+    /// until the first observation, so the launch tick is never mistaken for a
+    /// held -> not-held transition.
+    private var lastObservedEntitlementActive: Bool?
+
+    /// Latch for "the first CustomerInfo has been applied". `isSubscribedReal`
+    /// starts `false`, so anything that must not mistake a subscriber for a
+    /// free user has to wait for this rather than read the initial value.
+    private var hasResolvedEntitlement = false
+    private var entitlementWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Internal change-detection flag for the customerInfoStream listener.
     /// Compared against the latest customerInfo's trial state on each tick
@@ -131,6 +170,14 @@ final class SubscriptionManager: ObservableObject {
     /// watermarked path, no demo path. This covers both a consumed trial and a
     /// declined one; the product treats them alike.
     ///
+    /// HYBRID MODE: deliberately NOT matched by the test below, and the test is
+    /// `== .trial` rather than `!= .default` precisely to express that.
+    /// `.hybrid` presents the same free trial as `.trial`, but once the
+    /// entitlement lapses it falls back to FREEMIUM gating — recording stays
+    /// available, watermarked. Post-expiry behaviour is the only thing
+    /// separating the two modes, so widening this test to `!= .default` would
+    /// erase the distinction entirely. The omission is the feature.
+    ///
     /// Gated on `persistedMode`, never on `PaywallConfig.mode`: the latter falls
     /// back to a live Remote Config read before the mode is frozen, and the
     /// stricter rules must never bite an install that has not committed to
@@ -184,8 +231,14 @@ final class SubscriptionManager: ObservableObject {
         return
         #else
         Task {
+            // Sequenced, not concurrent: `prewarmPaywallData()` must read a
+            // resolved entitlement, and `checkAccess()` is the CustomerInfo
+            // fetch already in flight — so prewarm waits on that one rather
+            // than issuing a second. Offerings are no longer loaded
+            // unconditionally here; prewarm loads them, and only for users who
+            // can actually see a paywall.
             await checkAccess()
-            await loadOfferings()
+            await prewarmPaywallData()
         }
         // Long-running listener on RC's customerInfoStream. Fires whenever
         // RevenueCat detects an entitlement change — renewal, expiration,
@@ -207,6 +260,22 @@ final class SubscriptionManager: ObservableObject {
                 self.isSubscribedReal = entitlement?.isActive == true
                 self.isTrialActive = entitlement?.periodType == .trial
                 self.updateAnalyticsSubscriptionState()
+                // The stream emits RC's CACHED CustomerInfo immediately, so this
+                // is usually what resolves the latch first — ahead of
+                // `checkAccess()`, which suspends on the network.
+                self.markEntitlementResolved()
+
+                // Entitlement transition. Only held -> not-held re-arms the
+                // prewarm: expiry, a cancellation taking effect, or a restore
+                // onto a lapsed account. `nil` means "not observed yet", so the
+                // launch tick cannot be mistaken for a transition and cannot
+                // re-run a prewarm that is already `.ready`.
+                let nowEntitled = entitlement?.isActive == true
+                let wasEntitled = self.lastObservedEntitlementActive
+                self.lastObservedEntitlementActive = nowEntitled
+                if wasEntitled == true && !nowEntitled {
+                    self.invalidatePrewarmForEntitlementChange()
+                }
 
                 // Trial-state edge detection. `lastObservedTrialState`
                 // is seeded by checkAccess on launch so the very first
@@ -256,6 +325,10 @@ final class SubscriptionManager: ObservableObject {
         #if DEV
         isSubscribedReal = true
         #else
+        // Every exit path resolves the latch, including the unconfigured and
+        // throwing ones — a waiter that never wakes would hang prewarm forever,
+        // which is worse than prewarming against a pessimistic `false`.
+        defer { markEntitlementResolved() }
         guard Purchases.isConfigured else {
             print("⚠️ checkAccess called before Purchases.configure (missing apiKey?)")
             return
@@ -297,6 +370,118 @@ final class SubscriptionManager: ObservableObject {
     func offering(for id: String?) -> Offering? {
         guard let id else { return offerings?.current }
         return offerings?[id] ?? offerings?.current
+    }
+
+    // MARK: - Paywall data prewarm
+
+    /// Resolves everything the paywall renders — offerings and intro-offer
+    /// eligibility — BEFORE the paywall is opened, so its first paint is its
+    /// settled paint. Fire-and-forget; never on a caller's critical path.
+    ///
+    /// Does ZERO network work for a user holding `access`: they will never see
+    /// a paywall, so the data is dead weight.
+    @MainActor
+    func prewarmPaywallData() async {
+        #if DEV
+        return
+        #else
+        // GUARD 1 — entitlement. `isSubscribedReal` starts `false`, so reading
+        // it before the first CustomerInfo lands would run the whole prewarm
+        // for a paying subscriber. Wait for the resolution that is already in
+        // flight instead of firing a second `customerInfo()` fetch.
+        await awaitEntitlementResolution()
+        guard !isSubscribed else {
+            prewarmState = .skipped
+            return
+        }
+
+        // GUARD 2 — idempotence. Safe against concurrent callers: this check
+        // and the `.loading` write below are both on the main actor with no
+        // suspension between them, so two callers cannot both pass.
+        switch prewarmState {
+        case .loading, .ready:
+            return
+        case .idle, .skipped, .failed:
+            break
+        }
+        prewarmState = .loading
+
+        await loadOfferings()
+        guard let offerings else {
+            prewarmState = .failed(PrewarmError.offeringsUnavailable)
+            return
+        }
+
+        // Every offering `PaywallView.paywallResolution` can land on: the
+        // `trial` offering, whatever `paywall_offering_id` names, the legacy
+        // `default` offering the `paywall_v1` experiment selects, and
+        // `offerings.current` as the final fallback. Missing one would leave
+        // that cohort on the fallback query and back to today's flicker.
+        let candidates: [Offering?] = [
+            offerings[PaywallConfig.trialOfferingId],
+            offerings[PaywallConfig.offeringId],
+            offerings["default"],
+            offerings.current
+        ]
+        // Annual only: the eligibility question is per SUBSCRIPTION GROUP, and
+        // the paywall asks it of the annual product alone (PaywallView's
+        // `refreshTrialEligibility`). Deduplicated because these offerings
+        // routinely share a product.
+        var identifiers: [String] = []
+        var seen = Set<String>()
+        for product in candidates.compactMap({ $0?.annual?.storeProduct })
+        where seen.insert(product.productIdentifier).inserted {
+            identifiers.append(product.productIdentifier)
+        }
+        guard !identifiers.isEmpty else {
+            prewarmState = .failed(PrewarmError.noAnnualProducts)
+            return
+        }
+
+        // Batch API — one call for every identifier. Returns
+        // `[String: IntroEligibility]`; the cache stores the `.status` the
+        // paywall actually compares against.
+        let results = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
+            productIdentifiers: identifiers
+        )
+        trialEligibility = results.mapValues(\.status)
+        prewarmState = .ready
+        print("[Prewarm] ready — \(identifiers.count) product(s): \(trialEligibility)")
+        #endif
+    }
+
+    /// Re-evaluates the prewarm after the `access` entitlement changes.
+    /// Subscribed now: drop the cache, mark `.skipped`. Not subscribed: reset
+    /// to `.idle` so guard 2 cannot short-circuit, then prewarm again.
+    @MainActor
+    private func invalidatePrewarmForEntitlementChange() {
+        if isSubscribed {
+            trialEligibility = [:]
+            prewarmState = .skipped
+            return
+        }
+        prewarmState = .idle
+        Task { await prewarmPaywallData() }
+    }
+
+    /// Wakes anything waiting on the first CustomerInfo. Idempotent.
+    @MainActor
+    private func markEntitlementResolved() {
+        guard !hasResolvedEntitlement else { return }
+        hasResolvedEntitlement = true
+        let waiters = entitlementWaiters
+        entitlementWaiters = []
+        for waiter in waiters { waiter.resume() }
+    }
+
+    /// Suspends until the first CustomerInfo has been applied. Returns
+    /// immediately once resolved, so it costs nothing after launch.
+    @MainActor
+    private func awaitEntitlementResolution() async {
+        if hasResolvedEntitlement { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            entitlementWaiters.append(continuation)
+        }
     }
 
     @MainActor
@@ -342,6 +527,9 @@ final class SubscriptionManager: ObservableObject {
             let isTrial = entitlement?.periodType == .trial
             isSubscribedReal = true
             isTrialActive = isTrial
+            // The user now holds `access`, so the cached eligibility is stale by
+            // definition — they just consumed the intro offer it described.
+            invalidatePrewarmForEntitlementChange()
             return .succeeded(isTrial: isTrial)
         } catch {
             guard let code = error as? RevenueCat.ErrorCode else {
@@ -388,6 +576,10 @@ final class SubscriptionManager: ObservableObject {
                 "had_active_entitlement": isSubscribedReal
             ])
             updateAnalyticsSubscriptionState()
+            // Restore can land either way: onto an active entitlement (cache is
+            // now dead weight) or onto a lapsed one (cache may be stale for a
+            // different Apple ID). Both are handled here.
+            invalidatePrewarmForEntitlementChange()
             return isSubscribedReal
         } catch {
             AppAnalytics.log("restore_failed", params: [

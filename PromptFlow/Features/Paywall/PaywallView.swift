@@ -69,17 +69,28 @@ struct PaywallView: View {
     /// `refreshTrialEligibility()` resolves.
     @State private var trialEligibility: IntroEligibilityStatus = .unknown
 
+    /// One-shot guard for `paywall_shown`. The event is deferred until the
+    /// offering resolves, and several lifecycle hooks race to emit it.
+    @State private var hasLoggedPaywallShown: Bool = false
+
     // MARK: - Packages from offerings
 
     /// SINGLE SOURCE OF TRUTH for which offering is displayed and whether trial
     /// presentation is permitted. Both are returned together so the products on
     /// screen and the copy describing them can never disagree.
     ///
-    /// `paywall_mode` is authoritative. In trial mode it selects the offering
-    /// outright and `paywall_offering_id` is inert; in default mode
-    /// `paywall_offering_id` chooses as it always has — which is what keeps
-    /// `discount_50` reachable. An operator therefore cannot express an
-    /// inconsistent pair: mode wins, and the losing key simply does not apply.
+    /// `paywall_mode` is authoritative. In any NON-DEFAULT mode (`.trial` and
+    /// `.hybrid` alike) it selects the offering outright and
+    /// `paywall_offering_id` is inert; in default mode `paywall_offering_id`
+    /// chooses as it always has — which is what keeps `discount_50` reachable.
+    /// An operator therefore cannot express an inconsistent pair: mode wins,
+    /// and the losing key simply does not apply.
+    ///
+    /// The resolved mode is returned VERBATIM rather than collapsed to
+    /// `.trial`, so a caller can still tell `.hybrid` from `.trial`. Nothing on
+    /// the paywall needs that distinction today — presentation is identical —
+    /// but flattening it here would silently discard the only signal that says
+    /// which mode is live.
     private var paywallResolution: (offering: Offering?, mode: PaywallMode) {
         // Explicit caller override wins over both Remote Config and
         // the experiment assignment (used by A/B test landing pages,
@@ -89,17 +100,25 @@ struct PaywallView: View {
             return (manager.offering(for: explicit), .default)
         }
 
-        if PaywallConfig.mode == .trial {
+        // `!= .default` rather than `== .trial`: this is a PRESENTATION
+        // decision, and `.hybrid` presents exactly as `.trial` does. Every
+        // future non-default mode should opt in here by construction.
+        let configuredMode = PaywallConfig.mode
+        if configuredMode != .default {
             // Resolve BY NAME, deliberately NOT via `manager.offering(for:)` —
             // that helper silently substitutes `offerings.current` on a miss,
             // which here would paint trial copy over non-trial products. A miss
             // must degrade to default mode entirely, not inherit the dashboard's
             // current offering.
             if let trialOffering = manager.offerings?[PaywallConfig.trialOfferingId] {
-                return (trialOffering, .trial)
+                return (trialOffering, configuredMode)
             }
+            // Report the mode that was ACTUALLY configured, never a hardcoded
+            // `.trial`. This value reaches both the console warning and the
+            // `paywall_mode_fallback` event, and naming the wrong mode would
+            // send whoever reads it to the wrong Remote Config parameter.
             PaywallDiagnostics.trialOfferingUnresolved(
-                attemptedMode: .trial,
+                attemptedMode: configuredMode,
                 offeringId: PaywallConfig.trialOfferingId
             )
             // Fall through to default mode, copy included.
@@ -136,7 +155,9 @@ struct PaywallView: View {
         // Eligibility first: a user who has already consumed the group's
         // introductory offer must never be promised it again.
         guard isEligibleForTrial else { return false }
-        guard paywallResolution.mode == .trial,
+        // `!= .default` for the same reason as the offering resolution above:
+        // hero copy is presentation, and `.hybrid` presents as `.trial`.
+        guard paywallResolution.mode != .default,
               let product = package(for: selectedPlan)?.storeProduct,
               product.introductoryDiscount?.paymentMode == .freeTrial
         else { return false }
@@ -200,8 +221,21 @@ struct PaywallView: View {
     /// Returns nil when the product has no `introductoryDiscount` (user is
     /// either ineligible or the product carries no intro at all). The plan
     /// row falls back to `priceText(for:)` in that case.
+    ///
+    /// ALSO returns nil for a FREE TRIAL, and that exclusion is load-bearing.
+    /// A free trial has `intro.price == 0`, which scores exactly 100 in the
+    /// savings arithmetic below — the source of the fabricated "100% OFF"
+    /// badge, "$0.00 first week" row and "Special offer — 100%% off" hero.
+    /// A free trial is `trialDisplay(for:)`'s responsibility EXCLUSIVELY; this
+    /// helper presents genuine PAID intro offers only (`.payAsYouGo` /
+    /// `.payUpFront`, e.g. the parked `discount_50` offering).
+    ///
+    /// Guarding here rather than at the call site is deliberate: `planRow` is
+    /// not the only caller — `maxSavingsPercent` reaches this directly, and it
+    /// drives the hero subtitle. One guard covers both.
     private func introDisplay(for product: StoreProduct) -> IntroPriceDisplay? {
         guard let intro = product.introductoryDiscount,
+              intro.paymentMode != .freeTrial,
               let basePeriod = product.subscriptionPeriod
         else { return nil }
         let totalUnits = intro.subscriptionPeriod.value * intro.numberOfPeriods
@@ -262,11 +296,11 @@ struct PaywallView: View {
     /// came from. Branching here leaves every non-trial presentation byte for
     /// byte identical.
     private struct TrialRowDisplay {
-        /// Compact badge naming the trial. Intentionally terse — the duration
-        /// line beside it carries the meaning, and a truncated badge would be
-        /// worse than a short one.
-        let badge: String
         /// Trial length, stated explicitly and derived from the offer period.
+        /// This is the row's ONLY trial signal — a "FREE" pill next to the plan
+        /// title used to sit beside it, but "Annual" + "FREE" + "Free for 7
+        /// days" said "free" twice and read as though the yearly subscription
+        /// itself were free.
         let duration: String
         /// Recurring price and term once the trial ends.
         let secondary: String
@@ -304,11 +338,6 @@ struct PaywallView: View {
         }
 
         return TrialRowDisplay(
-            badge: String(
-                localized: "paywall.v2.trial.badge",
-                defaultValue: "FREE",
-                comment: "Compact badge shown next to a paywall plan title when that plan's product carries a free trial."
-            ),
             duration: duration,
             // Reuses the existing, already-localized secondary line so the
             // recurring price and term stay visible after the trial.
@@ -388,7 +417,48 @@ struct PaywallView: View {
             trialEligibility = .unknown
             return
         }
+        // Prewarmed answer, resolved at launch by
+        // `SubscriptionManager.prewarmPaywallData()`. On the common path it is
+        // already here, so this view never issues a query and its first paint
+        // is its settled paint.
+        if let cached = manager.trialEligibility[product.productIdentifier] {
+            trialEligibility = cached
+            return
+        }
+        // FALLBACK — byte-identical to the pre-prewarm behaviour. Reached when
+        // the prewarm failed, was `.skipped` for a subscriber who has since
+        // lapsed, has not finished yet, or did not cover this product.
         trialEligibility = await Purchases.shared.checkTrialOrIntroDiscountEligibility(product: product)
+    }
+
+    /// Emits `paywall_shown` exactly once per presentation, from `onAppear`.
+    ///
+    /// Fires SYNCHRONOUSLY during appear so it always precedes any
+    /// `paywall_dismissed` or purchase event from the same presentation. It is
+    /// no longer deferred until the offering resolves: `trial_available` now
+    /// comes from the launch-time prewarm cache, which is already populated on
+    /// the common path, so waiting bought nothing and let the event land after
+    /// dismissal.
+    ///
+    /// A cache miss — prewarm unfinished, failed, or `.skipped` — logs `false`,
+    /// which is the accurate answer at that instant: with no `.eligible` entry
+    /// the paywall cannot present a trial, because `isEligibleForTrial` is not
+    /// satisfied either.
+    private func logPaywallShown() {
+        guard !hasLoggedPaywallShown else { return }
+        hasLoggedPaywallShown = true
+        let trialAvailable: Bool = {
+            guard let identifier = annualPackage?.storeProduct.productIdentifier else { return false }
+            return manager.trialEligibility[identifier] == .eligible
+        }()
+        AppAnalytics.log("paywall_shown", params: [
+            "source": source,
+            "trial_available": trialAvailable,
+            "offering_id": resolvedOffering?.identifier ?? "default",
+            "experiment_paywall_v1": ExperimentManager.shared.variant(for: .paywallV1)
+        ])
+        // MMP funnel event, same cadence as the log above.
+        AppServices.attribution?.trackEvent("paywall_shown")
     }
 
     /// Highest intro savings percentage across the visible subscription
@@ -439,35 +509,62 @@ struct PaywallView: View {
         return PaywallConfig.subtitleNoPct
     }
 
+    /// The plan's price and NOTHING ELSE — no period suffix.
+    ///
+    /// The period is now stated by `billingPeriodText(for:)` on the line
+    /// directly beneath, so keeping "/ year" here would print the term twice
+    /// ("$79.99 / year" over "billed annually"). Dropping the suffix also drops
+    /// the four `paywall.v2.pricePer*` wrapper keys, which had no other caller.
+    ///
+    /// ⚠️ The literals are LAST-RESORT fallbacks for the window before offerings
+    /// load — they are not the source of truth and are known to be stale (annual
+    /// is really $79.99, not $49.99). Real prices come from StoreKit via
+    /// `localizedPriceString`; these are deliberately left at their existing
+    /// values rather than guessed at, because App Store Connect is the only
+    /// authority and it is not readable from this repo.
     private func priceText(for plan: PaywallPlan) -> String {
         switch plan {
-        case .weekly:
-            let raw = weeklyPackage?.localizedPriceString ?? "$2.99"
+        case .weekly:   return weeklyPackage?.localizedPriceString ?? "$2.99"
+        case .monthly:  return monthlyPackage?.localizedPriceString ?? "$6.99"
+        case .annual:   return annualPackage?.localizedPriceString ?? "$49.99"
+        case .lifetime: return lifetimePackage?.localizedPriceString ?? "$99.99"
+        }
+    }
+
+    /// Billing cadence for the row's secondary line — the fallback when there is
+    /// no trial and no intro offer, so EVERY row is two lines and their heights
+    /// match.
+    ///
+    /// Derived from the plan, never from parsing the price string. Optional by
+    /// contract: a plan without a key renders no secondary rather than a raw key
+    /// name. The switch is exhaustive today, so nil is currently unreachable —
+    /// adding a `PaywallPlan` case would fail to compile here, which is the
+    /// louder failure and the one we want.
+    private func billingPeriodText(for plan: PaywallPlan) -> String? {
+        switch plan {
+        case .annual:
             return String(
-                localized: "paywall.v2.pricePerWeek",
-                defaultValue: "\(raw) / week",
-                comment: "Paywall v2 weekly plan price label. %@ is the localized currency amount."
+                localized: "paywall.v2.billing.annually",
+                defaultValue: "billed annually",
+                comment: "Paywall plan row secondary line stating the billing cadence of an annual subscription. Shown beneath the price when the plan has no free trial and no introductory offer."
             )
         case .monthly:
-            let raw = monthlyPackage?.localizedPriceString ?? "$6.99"
             return String(
-                localized: "paywall.v2.pricePerMonth",
-                defaultValue: "\(raw) / month",
-                comment: "Paywall v2 monthly plan price label. %@ is the localized currency amount."
+                localized: "paywall.v2.billing.monthly",
+                defaultValue: "billed monthly",
+                comment: "Paywall plan row secondary line stating the billing cadence of a monthly subscription. Shown beneath the price when the plan has no free trial and no introductory offer."
             )
-        case .annual:
-            let raw = annualPackage?.localizedPriceString ?? "$49.99"
+        case .weekly:
             return String(
-                localized: "paywall.v2.pricePerYear",
-                defaultValue: "\(raw) / year",
-                comment: "Paywall v2 annual plan price label. %@ is the localized currency amount."
+                localized: "paywall.v2.billing.weekly",
+                defaultValue: "billed weekly",
+                comment: "Paywall plan row secondary line stating the billing cadence of a weekly subscription. Shown beneath the price when the plan has no free trial and no introductory offer."
             )
         case .lifetime:
-            let raw = lifetimePackage?.localizedPriceString ?? "$99.99"
             return String(
-                localized: "paywall.v2.priceLifetime",
-                defaultValue: "\(raw) one-time",
-                comment: "Paywall v2 lifetime plan price label. %@ is the localized currency amount."
+                localized: "paywall.v2.billing.oneTime",
+                defaultValue: "one-time payment",
+                comment: "Paywall plan row secondary line for the lifetime plan, which is a single purchase rather than a recurring subscription. Shown beneath the price."
             )
         }
     }
@@ -511,22 +608,20 @@ struct PaywallView: View {
         }
         .onAppear {
             selectedPlan = resolvedDefaultPlan
-            Task { await manager.loadOfferings() }
+            // Offerings normally arrive from the launch-time prewarm. Load here
+            // only if that did not produce them — a `.skipped` prewarm whose
+            // subscriber lapsed mid-session, a failed prewarm, or a paywall
+            // opened before it finished.
+            if manager.offerings == nil {
+                Task { await manager.loadOfferings() }
+            }
             // Stamp the shared "any paywall shown" timestamp on every appear,
             // regardless of source or build flavor. ContentView's cold-start
             // paywall trigger reads this same UserDefaults key to enforce its
             // 1-hour cross-source cooldown. Writing in DEV too so the cooldown
             // can be tested without flipping build configs.
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastAnyPaywallShownAt")
-            let trialAvailable = resolvedOffering?.annual?.storeProduct.introductoryDiscount != nil
-            AppAnalytics.log("paywall_shown", params: [
-                "source": source,
-                "trial_available": trialAvailable,
-                "offering_id": resolvedOffering?.identifier ?? "default",
-                "experiment_paywall_v1": ExperimentManager.shared.variant(for: .paywallV1)
-            ])
-            // MMP funnel event, same cadence as the log above.
-            AppServices.attribution?.trackEvent("paywall_shown")
+            logPaywallShown()
         }
         // Re-runs whenever the annual product changes identity — including nil →
         // resolved when offerings finish loading, and on an offering swap after
@@ -979,44 +1074,65 @@ struct PaywallView: View {
             }
         }) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(plan.title)
-                            .font(.body)
-                            .bold()
-                            .foregroundColor(.white)
-                        if let trial {
-                            Text(trial.badge)
-                                .font(.caption2).bold()
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.green)
-                                .foregroundColor(.black)
-                                .clipShape(Capsule())
-                        } else if let intro, intro.savingsPercent >= 30 {
-                            Text(String(
-                                localized: "paywall.intro.savingsBadge",
-                                defaultValue: "\(intro.savingsPercent)% OFF",
-                                comment: "Compact badge displayed next to a paywall plan title when the active intro discount saves the user 30% or more on the first period. %lld is the integer percent saved (e.g. 50)."
-                            ))
-                                .font(.caption2).bold()
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.green)
-                                .foregroundColor(.black)
-                                .clipShape(Capsule())
-                        }
+                HStack(spacing: 8) {
+                    Text(plan.title)
+                        .font(.body)
+                        .bold()
+                        .foregroundColor(.white)
+                    // Trial rows carry no badge: the duration text on the
+                    // right already says "Free for 7 days". The HStack stays
+                    // because the DISCOUNT badge below still needs it, and a
+                    // title-only row is not a new layout state — it is what
+                    // already rendered whenever neither badge applied.
+                    if let intro, intro.savingsPercent >= 30 {
+                        Text(String(
+                            localized: "paywall.intro.savingsBadge",
+                            defaultValue: "\(intro.savingsPercent)% OFF",
+                            comment: "Compact badge displayed next to a paywall plan title when the active intro discount saves the user 30% or more on the first period. %lld is the integer percent saved (e.g. 50)."
+                        ))
+                            .font(.caption2).bold()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.green)
+                            .foregroundColor(.black)
+                            .clipShape(Capsule())
                     }
-                    if let secondary = trial?.secondary ?? intro?.secondary {
+                }
+                Spacer()
+                // The value and the line qualifying it stack on the RIGHT.
+                // The secondary used to sit under the plan TITLE, on the far
+                // side of the row from the value it refers to, so the left
+                // column read "Annual" / "then $79.99/year" — as though the
+                // yearly price followed the plan name rather than the trial.
+                // Applies to both presentations: the discount case is the same
+                // sentence ("$X first year" / "then $79.99/year"), so the two
+                // layouts must not diverge.
+                //
+                // `spacing: 4` is the rhythm the left column already used for
+                // exactly this pairing — no new constant.
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(displayPrice)
+                        .font(.body)
+                        .foregroundColor(.white)
+                    // Omitted entirely rather than rendered empty, so a row with
+                    // no intro collapses to a single line at exactly its
+                    // previous height.
+                    // Priority: trial "then …" > intro "then …" > billing
+                    // cadence. The third arm is what makes the line present on
+                    // every row, so no row is a line shorter than its neighbours.
+                    if let secondary = trial?.secondary
+                        ?? intro?.secondary
+                        ?? billingPeriodText(for: plan) {
                         Text(secondary)
                             .font(.footnote)
                             .foregroundColor(.secondary)
                     }
                 }
-                Spacer()
-                Text(displayPrice)
-                    .font(.body)
-                    .foregroundColor(.white)
+                // Trailing alignment for wrapped lines, and ideal-height sizing
+                // so long strings at large Dynamic Type WRAP instead of
+                // truncating — a truncated price is worse than a tall row.
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -2879,6 +2879,126 @@
         }
       }
     },
+    "paywall.v2.billing.annually" : {
+      "comment" : "Paywall plan row secondary line stating the billing cadence. Shown beneath the price when the plan has no free trial and no introductory offer.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "billed annually"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobro anual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobrança anual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "списание ежегодно"
+          }
+        }
+      }
+    },
+    "paywall.v2.billing.monthly" : {
+      "comment" : "Paywall plan row secondary line stating the billing cadence. Shown beneath the price when the plan has no free trial and no introductory offer.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "billed monthly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobro mensual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobrança mensal"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "списание ежемесячно"
+          }
+        }
+      }
+    },
+    "paywall.v2.billing.oneTime" : {
+      "comment" : "Paywall plan row secondary line for the lifetime plan, which is a single purchase rather than a recurring subscription. Shown beneath the price.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "one-time payment"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pago único"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pagamento único"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "разовый платёж"
+          }
+        }
+      }
+    },
+    "paywall.v2.billing.weekly" : {
+      "comment" : "Paywall plan row secondary line stating the billing cadence. Shown beneath the price when the plan has no free trial and no introductory offer.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "billed weekly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobro semanal"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cobrança semanal"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "списание еженедельно"
+          }
+        }
+      }
+    },
     "paywall.v2.cta.continue" : {
       "comment" : "Paywall primary CTA label. Source key for the default `paywall_cta_key` Remote Config value. Variant CTAs may be added under `paywall.v2.cta.<variant>` keys; the active key is selected per-user via Remote Config so marketing can A/B test copy without an app update.",
       "extractionState" : "manual",
@@ -3647,126 +3767,6 @@
         }
       }
     },
-    "paywall.v2.priceLifetime" : {
-      "comment" : "Paywall v2 lifetime plan price label. %@ is the localized currency amount.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ one-time"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ pago único"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ pagamento único"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ единоразово"
-          }
-        }
-      }
-    },
-    "paywall.v2.pricePerMonth" : {
-      "comment" : "Paywall v2 monthly plan price label. %@ is the localized currency amount.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ / month"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / mes"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / mês"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / мес."
-          }
-        }
-      }
-    },
-    "paywall.v2.pricePerWeek" : {
-      "comment" : "Paywall v2 weekly plan price label. %@ is the localized currency amount.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ / week"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / semana"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / semana"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / нед"
-          }
-        }
-      }
-    },
-    "paywall.v2.pricePerYear" : {
-      "comment" : "Paywall v2 annual plan price label. %@ is the localized currency amount.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%@ / year"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / año"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / ano"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ / год"
-          }
-        }
-      }
-    },
     "paywall.v2.showLess" : {
       "comment" : "Paywall v2 collapse-link below the Continue button when the plan-list is expanded.",
       "extractionState" : "extracted_with_value",
@@ -3913,36 +3913,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Специальное предложение — скидка %lld%%"
-          }
-        }
-      }
-    },
-    "paywall.v2.trial.badge" : {
-      "comment" : "Compact badge shown next to a paywall plan title when that plan's product carries a free trial. Kept very short: the duration line beside it states the trial length explicitly.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FREE"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GRATIS"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GRÁTIS"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "БЕСПЛАТНО"
           }
         }
       }

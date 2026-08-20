@@ -450,6 +450,12 @@ struct ScriptEditorView: View {
     /// TRIAL MODE, entitlement inactive: AI optimisation is unavailable
     /// entirely and the freemium once-per-day allowance does not apply.
     ///
+    /// HYBRID MODE is deliberately excluded, which is why this reads
+    /// `== .trial` and not `!= .default`. A lapsed `.hybrid` install falls back
+    /// to freemium gating and keeps its one optimisation per calendar day;
+    /// matching it here would take that away and make `.hybrid` indistinguish-
+    /// able from `.trial`. Mirrors `SubscriptionManager.canRecord`.
+    ///
     /// Evaluated at the call sites rather than folded into
     /// `SubscriptionManager.canOptimizeToday`, because that property is what
     /// freemium depends on and it also backs a DEV diagnostics readout — a third

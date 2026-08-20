@@ -221,7 +221,20 @@ enum PaywallMode: String {
     /// Today's live freemium presentation. The fallback for every failure path.
     case `default`
     /// Free-trial presentation, backed by the RevenueCat offering named `trial`.
+    /// Once the entitlement lapses, the gates lock recording and AI
+    /// optimisation entirely — see `SubscriptionManager.canRecord`.
     case trial
+    /// Free-trial presentation, IDENTICAL to `.trial` in every presentational
+    /// respect and backed by the same `trial` offering. The two diverge only
+    /// AFTER the entitlement lapses: `.hybrid` falls back to freemium gating
+    /// (watermarked recording, one AI optimisation per calendar day, the
+    /// 50-word script limit) where `.trial` locks the user out.
+    ///
+    /// This split is what every call site keys on, and the two tests are not
+    /// interchangeable:
+    ///  - PRESENTATION reads `!= .default`, so `.hybrid` is carried along.
+    ///  - ENTITLEMENT GATING reads `== .trial`, so `.hybrid` is excluded.
+    case hybrid
 
     /// Parses a raw Remote Config value. ANYTHING unrecognised — including an
     /// empty string, a typo, or a value from a newer app version — resolves to
