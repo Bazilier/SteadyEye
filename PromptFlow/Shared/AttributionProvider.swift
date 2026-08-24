@@ -80,9 +80,11 @@ final class AppsFlyerAttributionProvider: AttributionProvider {
 
     /// App event name → AppsFlyer event name. `af_`-prefixed names are
     /// AppsFlyer's standard events; anything else is a custom event.
+    /// `trial_started` is intentionally absent: RevenueCat's server-side
+    /// AppsFlyer integration sends `rc_trial_started` for every trial, so the
+    /// client-side `af_start_trial` this used to map was a duplicate.
     private static let eventNameMap: [String: String] = [
         "paywall_shown": AFEventContentView,
-        "trial_started": AFEventStartTrial,
         "first_recording_completed": "first_recording_completed"
     ]
 

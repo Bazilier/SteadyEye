@@ -109,6 +109,27 @@ struct PaywallView: View {
     /// throughout one.
     @State private var isPurchaseInFlight: Bool = false
 
+    /// Re-entrancy lock for `purchase(_:)`. Deliberately SEPARATE state from
+    /// `isPurchaseInFlight`, because the two have different lifetimes and
+    /// merging them would break one of them:
+    ///
+    ///  - `isPurchaseInFlight` must clear the INSTANT the store call returns,
+    ///    so `onDisappear` can tell a real dismissal from the payment sheet
+    ///    covering this view (see the comment there). It cannot stay set across
+    ///    `dismiss()`.
+    ///  - This flag must stay set ACROSS `dismiss()`. The success path clears
+    ///    `isPurchaseInFlight` and then runs ~60 lines before calling
+    ///    `dismiss()`, whose `fullScreenCover` animation takes ~0.35s more —
+    ///    and the CTA is mounted and hit-testable that whole time. A second tap
+    ///    in that window re-purchased an already-owned product, StoreKit
+    ///    returned the existing transaction, and the entire `.succeeded` branch
+    ///    ran twice: duplicate `purchase_succeeded`, `trial_started` and, on the
+    ///    paid branch, a second `af_purchase` carrying revenue.
+    ///
+    /// Cleared on `.userCancelled` and `.failed` so a retry works; deliberately
+    /// NOT cleared on `.succeeded`, where this presentation is on its way out.
+    @State private var isPurchaseLocked: Bool = false
+
     // MARK: - Packages from offerings
 
     /// SINGLE SOURCE OF TRUTH for which offering is displayed and whether trial
@@ -1223,6 +1244,12 @@ struct PaywallView: View {
     // MARK: - Purchase action
 
     private func purchase(_ plan: PaywallPlan) {
+        // Re-entrancy guard, FIRST statement: a second tap while a purchase is
+        // already locked does nothing at all — no store call, no events, not
+        // even `purchase_initiated`. Enforced here rather than by disabling the
+        // CTA so every present and future caller of this method is covered by
+        // one authoritative check.
+        guard !isPurchaseLocked else { return }
         guard let pkg = package(for: plan) else {
             // RC offerings haven't loaded yet (DEV mode short-circuits, network
             // failure, or RC config error). No in-app fallback — the user can
@@ -1245,6 +1272,9 @@ struct PaywallView: View {
         // the store call cannot begin before this line has run, so there is no
         // scheduling order in which the payment sheet's `onDisappear` beats it.
         isPurchaseInFlight = true
+        // Same synchronous main-actor write, but this one outlives the store
+        // call — see the property's own comment.
+        isPurchaseLocked = true
         AppAnalytics.log("purchase_initiated", params: [
             "plan": planName,
             "source": source
@@ -1286,9 +1316,17 @@ struct PaywallView: View {
                         "plan": planName,
                         "source": source
                     ])
-                    // MMP trial event. Carries no revenue by construction: the
-                    // provider's `trackEvent` seam has no revenue parameter.
-                    AppServices.attribution?.trackEvent("trial_started")
+                    // NO MMP trial event here. RevenueCat's own AppsFlyer
+                    // integration delivers `rc_trial_started` server-side for
+                    // every trial, and the client-side `af_start_trial` that
+                    // used to fire on this line was a duplicate of it — an
+                    // unreliable one. Over four organic trials the server-side
+                    // event fired exactly once each time while the client-side
+                    // one fired 0, 1, 1 and 2 times. The client path also
+                    // structurally cannot see a trial that starts by restore,
+                    // offer-code redemption, Ask to Buy, a network error after
+                    // Apple completed the transaction, or app termination
+                    // during the StoreKit sheet — all of which the server sees.
                 } else {
                     // Money received. Report the product's full recurring price
                     // rather than the first-period amount, so a paid
@@ -1304,6 +1342,15 @@ struct PaywallView: View {
                         AnalyticsParameterCurrency: purchaseCurrency
                     ])
                     // MMP revenue event, from the identical values.
+                    //
+                    // SUSPECTED DUPLICATE, deliberately kept. RevenueCat's
+                    // AppsFlyer integration is configured to send `af_purchase`
+                    // server-side for an initial purchase, which would make this
+                    // the same duplication `af_start_trial` had. Unlike that one
+                    // the server-side counterpart has NOT yet been observed in
+                    // AppsFlyer raw data, so removing this now risks losing the
+                    // event outright. Confirm in raw data first, then drop
+                    // whichever side is redundant.
                     AppServices.attribution?.trackPurchase(
                         revenue: recurringPrice,
                         currency: purchaseCurrency,
@@ -1317,11 +1364,16 @@ struct PaywallView: View {
                 onPurchaseSuccess?()
                 dismiss()
             case .userCancelled:
+                // Released here, not in a `defer`: the presentation stays on
+                // screen after a cancel, so the CTA must be live again for the
+                // retry. The success case above deliberately keeps the lock.
+                isPurchaseLocked = false
                 AppAnalytics.log("purchase_cancelled_by_user", params: [
                     "plan": planName,
                     "source": source
                 ])
             case .failed(let reason):
+                isPurchaseLocked = false
                 AppAnalytics.log("purchase_failed", params: [
                     "plan": planName,
                     "source": source,
