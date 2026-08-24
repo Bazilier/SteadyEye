@@ -4,18 +4,51 @@
 <dict>
     <!-- The app requests ATT and forwards the IDFA to an MMP (AppsFlyer) and
          to RevenueCat's attribution integrations, so it does use data for
-         tracking as Apple defines it. NSPrivacyTrackingDomains stays EMPTY on
-         purpose: first-party code contacts no tracking domain of its own (the
-         Railway backend serves chat and an ASA attribution proxy, neither of
-         which is advertising tracking). AppsFlyer's own bundled
-         PrivacyInfo.xcprivacy declares its 16 att.* tracking domains, and
-         Xcode aggregates every SDK manifest with this one at build time.
-         Duplicating them here would risk drifting from the SDK's list — and a
-         wrong entry makes iOS block real traffic once ATT is denied. -->
+         tracking as Apple defines it.
+
+         The rule is BIDIRECTIONAL: NSPrivacyTracking=true also requires a
+         NON-EMPTY NSPrivacyTrackingDomains. Leaving the array empty is what
+         App Store Connect rejects with ITMS-91064, whose message only states
+         the converse. First-party code contacts no tracking domain of its own
+         (the Railway backend serves chat and an ASA attribution proxy, neither
+         of which is advertising tracking), so every host below is AppsFlyer's.
+
+         KEEP THIS LIST IN SYNC WITH THE APPSFLYER SDK ON EVERY UPDATE.
+         The source of truth is the manifest inside the SHIPPED framework, NOT
+         the SPM checkout copy — the two have carried different spellings of
+         the same hosts (checkout: "att-attr.…", framework: "att.attr.…"), and
+         the framework is what ends up in the bundle. Read it from a built
+         product with:
+
+             plutil -convert xml1 -o - \
+               "<App>.app/Frameworks/AppsFlyerLib.framework/PrivacyInfo.xcprivacy"
+
+         A stale or mistyped entry is NOT harmless: iOS blocks connections to
+         any listed domain once ATT is denied, so a wrong host silently kills
+         live attribution traffic rather than failing loudly.
+
+         Copied verbatim from AppsFlyerLib 6.18.1. -->
     <key>NSPrivacyTracking</key>
     <true/>
     <key>NSPrivacyTrackingDomains</key>
-    <array/>
+    <array>
+        <string>att.attr.whappsflyer.com</string>
+        <string>att.attr.appsflyer-cn.com</string>
+        <string>att.attr.hevents.appsflyer-cn.com</string>
+        <string>att.launches.whappsflyer.com</string>
+        <string>att.launches.appsflyer-cn.com</string>
+        <string>att.launches.hevents.appsflyer-cn.com</string>
+        <string>att.conversions.hevents.appsflyer-cn.com</string>
+        <string>att.conversions.appsflyer-cn.com</string>
+        <string>att.conversions.whappsflyer.com</string>
+        <string>att.dlsdk.hevents.appsflyer-cn.com</string>
+        <string>att.dlsdk.appsflyer-cn.com</string>
+        <string>att.dlsdk.whappsflyer.com</string>
+        <string>att.dlsdk.appsflyersdk.com</string>
+        <string>att.conversions.appsflyersdk.com</string>
+        <string>att.launches.appsflyersdk.com</string>
+        <string>att.attr.appsflyersdk.com</string>
+    </array>
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
         <dict>
@@ -70,6 +103,21 @@
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- FirebaseCrashlytics is linked and called directly (CameraManager,
+                 VideoPreviewView). Crashlytics' own bundled manifest declares no
+                 collected types, so nothing else covers this. -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeCrashData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
         <dict>
