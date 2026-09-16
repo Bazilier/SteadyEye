@@ -1,1 +1,1 @@
-Hi guys, I want to share 3 tips that helped me grow from 0 to 25k followers in 6 months. First, consistency: I posted 4 times a week. Second, hooks: 30% of my time on the first 3 seconds. Third, engagement: I replied to every comment.
+Hi! This is a sample script to show how AI optimization works in SteadyEye. It turns numbers like 25k or 3x into words, expands abbreviations like e.g. and etc., and splits long sentences like this one so they're easy to read aloud on camera without stumbling. Try it with this text or replace it with your own.

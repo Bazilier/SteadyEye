@@ -1,13 +1,15 @@
-Hi guys.
-I want to share three tips. //
+Hi!
+This is a sample script. //
 
-These helped me grow from zero to twenty-five thousand followers in six months.
+It shows how AI optimization works in SteadyEye.
 
-First: consistency.
-I posted four times a week.
+It turns numbers like twenty-five thousand or three times into words.
 
-Second: hooks.
-Thirty percent of my time on the first three seconds.
+It expands abbreviations, like "for example" and "and so on".
 
-Third: engagement.
-I replied to every comment.
+And it splits long sentences.
+So they're easy to read aloud on camera.
+Without stumbling.
+
+Try it with this text.
+Or replace it with your own.

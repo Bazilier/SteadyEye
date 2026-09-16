@@ -46,6 +46,11 @@ struct ScriptEditorView: View {
     /// `fakeOptimizeForDemo` to unlock for normal editing of the
     /// optimized text.
     @State private var isDemoLocked: Bool = false
+    /// The demo "After" text as loaded by `fakeOptimizeForDemo`. Save is
+    /// disabled while the "Before" text is locked, so this is the only sample
+    /// text a script can be saved with. Compared in `performSave` to mark an
+    /// unmodified save as `isSample`.
+    @State private var demoSampleContent: String?
 
     private let maxChars = 5000
 
@@ -442,6 +447,11 @@ struct ScriptEditorView: View {
             script.update(title: finalTitle, content: trimmedContent)
         } else {
             let newScript = Script(title: finalTitle, content: trimmedContent)
+            if isDemoMode,
+               let demoSampleContent,
+               trimmedContent == demoSampleContent.trimmingCharacters(in: .whitespacesAndNewlines) {
+                newScript.isSample = true
+            }
             modelContext.insert(newScript)
             if !hasSavedFirstScript {
                 AppAnalytics.log("first_script_saved")
@@ -471,6 +481,7 @@ struct ScriptEditorView: View {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_800_000_000)
             content = DemoContent.load("DemoEditorAfter", subdirectory: "EditorDemo")
+            demoSampleContent = content
             isFakeOptimizing = false
             // Lift the read-only lock so the user can edit the
             // optimized text, name it, and save it. `isDemoMode`

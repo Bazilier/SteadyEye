@@ -316,6 +316,7 @@ struct BulkImportView: View {
             // @Query-sorted list alongside any other user scripts.
             for mock in mocks {
                 let script = Script(title: mock.title, content: mock.content)
+                script.isSample = true
                 modelContext.insert(script)
             }
             try? modelContext.save()

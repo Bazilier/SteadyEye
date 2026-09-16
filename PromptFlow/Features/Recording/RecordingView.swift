@@ -51,8 +51,6 @@ struct RecordingView: View {
     @State private var showMicPermissionAlert: Bool = false
     @State private var cameraAuthStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
-    @State private var showFirstRecordingPaywall: Bool = false
-    @AppStorage("postFirstRecordingPaywallShown") private var postFirstRecordingPaywallShown: Bool = false
     /// First-run explainer for the long-press-and-drag gesture that
     /// repositions the prompter text vertically against the camera lens.
     /// One-shot per install. Suppressed for demo-script mounts (which
@@ -217,22 +215,19 @@ struct RecordingView: View {
             VideoPreviewView(recording: recording, onDismiss: {
                 previewRecording = nil
                 resetDisplay()
-                // Read UserDefaults directly here rather than the @AppStorage
-                // wrapper to avoid the stale-capture bug that caused the paywall
-                // to fire twice in testing.
-                let alreadyShown = UserDefaults.standard.bool(forKey: "postFirstRecordingPaywallShown")
-                if !alreadyShown && !subscriptionManager.isSubscribed {
-                    UserDefaults.standard.set(true, forKey: "postFirstRecordingPaywallShown")
-                    postFirstRecordingPaywallShown = true
-                    showFirstRecordingPaywall = true
-                }
+            }, shouldShowPaywallAfterSave: {
+                // First successful Camera Roll save of a user-written script
+                // (not the onboarding demo, not an app-provided sample), once
+                // per install. Reads UserDefaults directly rather than through
+                // an @AppStorage wrapper to avoid a stale captured value.
+                !script.isDemo
+                    && !script.isSample
+                    && !subscriptionManager.isSubscribed
+                    && !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown")
             })
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "record_button", onPurchaseSuccess: { startCountdown() })
-        }
-        .fullScreenCover(isPresented: $showFirstRecordingPaywall) {
-            PaywallView(source: "first_recording")
         }
         .alert(
             Text("recording.error.title", comment: "Title of the camera error alert on the recording screen"),
@@ -1044,7 +1039,18 @@ struct RecordingView: View {
                 // prompts on exactly the 2nd successful recording (cooldown +
                 // one-shot enforced inside). Only the auto-persist success path
                 // reaches here — cancel/failure and screen-open do not.
-                ReviewPromptManager.handleSuccessfulRecording()
+                //
+                // Skipped for a recording expected to trigger the first-own-
+                // recording paywall, so the review dialog and the paywall never
+                // stack. Skipping leaves the counter untouched, which postpones
+                // the prompt to a later successful recording rather than losing it.
+                let expectsFirstOwnRecordingPaywall = !script.isDemo
+                    && !script.isSample
+                    && !subscriptionManager.isSubscribed
+                    && !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown")
+                if !expectsFirstOwnRecordingPaywall {
+                    ReviewPromptManager.handleSuccessfulRecording()
+                }
                 previewRecording = recording
             case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,

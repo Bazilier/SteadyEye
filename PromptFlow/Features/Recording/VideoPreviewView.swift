@@ -9,6 +9,10 @@ import FirebaseCrashlytics
 struct VideoPreviewView: View {
     let recording: Recording
     let onDismiss: () -> Void
+    /// Asked after a successful save to Camera Roll. Returning true presents
+    /// the first-own-recording paywall on top of the preview. `nil` (the
+    /// Recordings tab) never shows it.
+    var shouldShowPaywallAfterSave: (() -> Bool)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -24,6 +28,18 @@ struct VideoPreviewView: View {
     /// deep link into the Photos app at the just-saved asset.
     @State private var savedAssetLocalIdentifier: String?
     @State private var videoSize: CGSize = CGSize(width: 9, height: 16)
+    @State private var showPostSavePaywall = false
+    /// Tracks whether the preview is on screen, so the delayed post-save
+    /// paywall is not presented after the user has already left.
+    @State private var isVisible = false
+    /// Set when the post-save paywall came due while the app was not active;
+    /// presented once the scene becomes active again.
+    @State private var pendingPostSavePaywall = false
+    @Environment(\.scenePhase) private var scenePhase
+    /// Identifies the latest scheduled hide of the success toast. The toast's
+    /// built-in timer is effectively disabled (see its `duration`), so this
+    /// view owns the hide: a new token invalidates any earlier scheduled hide.
+    @State private var successToastHideToken = UUID()
 
     var body: some View {
         ZStack {
@@ -134,6 +150,9 @@ struct VideoPreviewView: View {
                 comment: "Toast shown after the recording is successfully saved to the Photos library."
             ),
             style: .success,
+            // Hidden by `scheduleSuccessToastHide` instead, so it can stay up
+            // while the post-save paywall is on screen.
+            duration: 3600,
             tapAction: openSavedAssetInPhotos,
             showsChevron: true
         )
@@ -167,8 +186,45 @@ struct VideoPreviewView: View {
                 }
             }
         )
-        .onAppear { setupPlayer() }
-        .onDisappear { teardownPlayer() }
+        .fullScreenCover(isPresented: $showPostSavePaywall, onDismiss: {
+            scheduleSuccessToastHide(after: 2)
+        }) {
+            PaywallView(source: "first_own_recording")
+                .onAppear {
+                    // Written only once the paywall actually appears.
+                    UserDefaults.standard.set(true, forKey: "postFirstOwnRecordingPaywallShown")
+                }
+        }
+        .onAppear {
+            isVisible = true
+            setupPlayer()
+        }
+        .onDisappear {
+            isVisible = false
+            pendingPostSavePaywall = false
+            successToastHideToken = UUID()
+            teardownPlayer()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active, pendingPostSavePaywall else { return }
+            guard isVisible,
+                  !showPostSavePaywall,
+                  shouldShowPaywallAfterSave?() == true
+            else {
+                // Pending paywall dropped: let the held-back toast hide.
+                pendingPostSavePaywall = false
+                scheduleSuccessToastHide(after: 2)
+                return
+            }
+            // Short delay so the scene finishes becoming active first. Pending
+            // stays set until then so a scheduled toast hide cannot fire in
+            // between.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                pendingPostSavePaywall = false
+                guard isVisible else { return }
+                showPostSavePaywall = true
+            }
+        }
     }
 
     // MARK: - Top bar
@@ -275,6 +331,21 @@ struct VideoPreviewView: View {
         }
     }
 
+    /// Hides the success toast after `delay`, unless a newer hide was scheduled
+    /// since, the preview went away, or the post-save paywall is pending or on
+    /// screen (its dismissal schedules a fresh hide).
+    private func scheduleSuccessToastHide(after delay: TimeInterval) {
+        let token = UUID()
+        successToastHideToken = token
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard token == successToastHideToken,
+                  !pendingPostSavePaywall,
+                  !showPostSavePaywall
+            else { return }
+            withAnimation { showSaveSuccess = false }
+        }
+    }
+
     private func teardownPlayer() {
         playback.teardown()
     }
@@ -377,6 +448,25 @@ struct VideoPreviewView: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     savedAssetLocalIdentifier = capturedAssetID
                     showSaveSuccess = true
+                    scheduleSuccessToastHide(after: 2.5)
+                    if shouldShowPaywallAfterSave?() == true {
+                        // Let the success toast show first. Re-check on fire:
+                        // the user may have left the preview, or another save
+                        // may already have shown the paywall.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            guard isVisible,
+                                  !showPostSavePaywall,
+                                  shouldShowPaywallAfterSave?() == true
+                            else { return }
+                            if scenePhase == .active {
+                                showPostSavePaywall = true
+                            } else {
+                                // Presenting while inactive may be dropped;
+                                // defer until the scene is active again.
+                                pendingPostSavePaywall = true
+                            }
+                        }
+                    }
                 } else {
                     AppAnalytics.log("recording_export_failed", params: [
                         "duration_sec": Int(recording.duration.rounded()),

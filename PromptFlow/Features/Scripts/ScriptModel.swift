@@ -11,6 +11,10 @@ final class Script {
     var wordCount: Int
     var estimatedReadTime: TimeInterval  // seconds, based on ~150 WPM
     var isDemo: Bool = false
+    /// App-provided sample content saved as a regular script (editor-demo text
+    /// saved unmodified, bulk-import demo scripts). Distinct from `isDemo`,
+    /// which marks only the seeded onboarding demo script.
+    var isSample: Bool = false
 
     init(title: String, content: String) {
         self.id = UUID()

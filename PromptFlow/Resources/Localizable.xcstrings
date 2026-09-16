@@ -5877,25 +5877,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 tips that grew my account"
+            "value" : "Sample: see how AI optimization works"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 tips que hicieron crecer mi cuenta"
+            "value" : "Ejemplo: así funciona la optimización con IA"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 dicas que fizeram minha conta crescer"
+            "value" : "Exemplo: veja como funciona a otimização com IA"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3 совета, которые подняли мой аккаунт"
+            "value" : "Пример: как работает AI-оптимизация"
           }
         }
       }
