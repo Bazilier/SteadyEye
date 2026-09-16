@@ -335,6 +335,9 @@ struct SettingsView: View {
                         Text("\(UserDefaults.standard.integer(forKey: "apiCallsToday")) / 20")
                             .foregroundStyle(.secondary)
                     }
+                    NavigationLink("Camera Diagnostics") {
+                        CameraDiagnosticsView()
+                    }
                     Text("Build: DEV")
                         .font(.caption)
                         .foregroundStyle(.orange)

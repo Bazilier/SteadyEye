@@ -1,4 +1,6 @@
 import AVFoundation
+import CoreImage
+import Metal
 import UIKit
 import SwiftUI
 import Combine
@@ -44,6 +46,19 @@ final class CameraManager: NSObject, ObservableObject {
     var audioBufferBroadcast: ((CMSampleBuffer) -> Void)?
     private var assetWriterRecorder: AssetWriterRecorder?
     private var watermarkComposer: RealtimeWatermarkComposer?
+    /// Writer geometry frozen at record start by `startWriterPipeline`. Read on
+    /// `sampleBufferQueue` by the orientation correction in `captureOutput`.
+    private var recordingWriterAngle: CGFloat = 90
+    private var recordingWriterSize: CGSize = .zero
+    /// What the video connection actually held at record start, frozen for the
+    /// take. The correction rotates by the difference against
+    /// `recordingWriterAngle`, never by the desired angle alone.
+    private var recordingConnectionAngle: CGFloat = 90
+    /// Created on the first mis-oriented buffer only — never allocated on the
+    /// normal path. Touched only on `sampleBufferQueue`.
+    private var orientationCIContext: CIContext?
+    /// `orientation_corrected` fires once per recording; reset at record start.
+    private var orientationCorrectionLogged = false
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
     private(set) var lastRecordingDuration: TimeInterval = 0
@@ -80,6 +95,18 @@ final class CameraManager: NSObject, ObservableObject {
     /// buffer mismatch guard still fires. Default nil (off). Flip in code only:
     /// no UI, no settings, no remote config.
     static var debugForcedRotationAngle: CGFloat?
+
+    /// DIAGNOSTIC BUILD ONLY — the product default is `false`. When true,
+    /// `captureOutput` skips the orientation backstop entirely: a mis-oriented
+    /// buffer goes to the composer as delivered, so a failure of the PRIMARY
+    /// rotation path is visible in the recorded video instead of being silently
+    /// rescued. `orientation_backstop_skipped` is still logged with the fields
+    /// the correction would have produced.
+    ///
+    /// Flip to `true` only for a build whose purpose is to expose a
+    /// primary-path failure, and set it back afterwards. Never ship it enabled
+    /// on the release branch.
+    static var disableOrientationBackstopForDiagnostics = false
     #endif
 
     /// Hardware model identifier (e.g. "iPhone16,1") for diagnostics.
@@ -93,11 +120,24 @@ final class CameraManager: NSObject, ObservableObject {
         }
     }
 
-    /// Clamps `reported` to a portrait angle (90 or 270) and applies it to
+    /// True when applying `angle` to a sensor whose readout is
+    /// `sensorWidth`x`sensorHeight` produces a portrait-shaped frame. A 90/270
+    /// rotation swaps the readout's axes, 0/180 preserve them — so a landscape
+    /// readout is portrait at 90/270, while a portrait readout (iPhone 17 front
+    /// camera) is portrait at 0/180. Derived from the active format on every
+    /// device; never keyed on a model identifier.
+    private static func producesPortrait(angle: CGFloat, sensorWidth: Int32, sensorHeight: Int32) -> Bool {
+        let swapsAxes = Int(angle.rounded()) % 180 != 0
+        let readoutIsPortrait = sensorHeight > sensorWidth
+        return swapsAxes ? !readoutIsPortrait : readoutIsPortrait
+    }
+
+    /// Selects a portrait-producing angle for `reported` and applies it to
     /// `connection`, updating `appliedRotationAngle`. Portrait-locked product:
-    /// 0/180 are never applied (keep last portrait angle, log the clamp); if
-    /// the chosen angle isn't supported, fall back to 90 and log it. Returns
-    /// the angle actually applied.
+    /// an angle that would produce a landscape frame on this sensor is not
+    /// applied (keep the angle already in use); if the chosen angle isn't
+    /// supported, fall back to 90 and log it. Returns the angle the connection
+    /// actually holds afterwards.
     @discardableResult
     private func applyClampedRotation(reported: CGFloat, to connection: AVCaptureConnection) -> CGFloat {
         #if DEV
@@ -116,21 +156,36 @@ final class CameraManager: NSObject, ObservableObject {
             return appliedRotationAngle
         }
         #endif
+        // Accept `reported` only when it yields a portrait frame on THIS
+        // sensor, otherwise keep the angle already in use. The qualifying
+        // angles come from the active format's readout shape, not from a
+        // hardcoded 90/270 pair, so a sensor whose readout is already portrait
+        // (iPhone 17 front) selects 0/180 and one whose readout is landscape
+        // selects 90/270.
+        let dims = currentCamera.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         var target = appliedRotationAngle
-        if reported == 90 || reported == 270 {
+        if let dims, Self.producesPortrait(angle: reported, sensorWidth: dims.width, sensorHeight: dims.height) {
             target = reported
-        } else {
-            camLog.error("event=rotation_clamp reported=\(Int(reported)) applied=\(Int(target)) clamped=true")
         }
         if !connection.isVideoRotationAngleSupported(target) {
             camLog.error("event=rotation_fallback requested=\(Int(target)) applied=90 supported=false")
             target = 90
         }
-        if connection.isVideoRotationAngleSupported(target) {
+        let supported = connection.isVideoRotationAngleSupported(target)
+        if supported {
             connection.videoRotationAngle = target
         }
-        appliedRotationAngle = target
-        return target
+        // Cache what the connection ACTUALLY holds, not what was intended: a
+        // skipped assignment must not leave the cache lying about the buffers
+        // the writer is going to receive.
+        appliedRotationAngle = connection.videoRotationAngle
+        camLog.notice(
+            "event=rotation_selected reported=\(Int(reported)) selected=\(Int(target)) connection_angle_after=\(Int(connection.videoRotationAngle)) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)"
+        )
+        #if DEV
+        CameraDiagnosticsLog.record("event=rotation_selected reported=\(Int(reported)) selected=\(Int(target)) connection_angle_after=\(Int(connection.videoRotationAngle)) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)")
+        #endif
+        return appliedRotationAngle
     }
 
     /// RotationCoordinator KVO handler. Freezes the applied angle while a
@@ -141,7 +196,14 @@ final class CameraManager: NSObject, ObservableObject {
         guard let connection = videoDataOutput?.connection(with: .video) else { return }
         let old = appliedRotationAngle
         if isRecordingActive {
-            pendingRotationAngle = (reported == 90 || reported == 270) ? reported : old
+            // Same portrait test as `applyClampedRotation` — a legitimate
+            // mid-take value is stashed, not discarded; only the APPLICATION
+            // stays frozen until the take ends.
+            let dims = currentCamera.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+            let producesPortrait = dims.map {
+                Self.producesPortrait(angle: reported, sensorWidth: $0.width, sensorHeight: $0.height)
+            } ?? false
+            pendingRotationAngle = producesPortrait ? reported : old
             camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true")
             return
         }
@@ -368,6 +430,9 @@ final class CameraManager: NSObject, ObservableObject {
             camLog.notice(
                 "event=session_config_complete device_model=\(Self.deviceModelIdentifier, privacy: .public) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue, privacy: .public) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))"
             )
+            #if DEV
+            CameraDiagnosticsLog.record("event=session_config_complete device_model=\(Self.deviceModelIdentifier) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))")
+            #endif
         }
 
         session.startRunning()
@@ -560,7 +625,10 @@ final class CameraManager: NSObject, ObservableObject {
         if let dims = currentCamera.map({ CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }) {
             let w = CGFloat(dims.width)
             let h = CGFloat(dims.height)
-            if recordingAngle == 90 || recordingAngle == 270 {
+            // Same derivation as `applyClampedRotation`: whether the selected
+            // angle yields a portrait frame depends on the sensor's readout
+            // shape, not on the angle alone.
+            if Self.producesPortrait(angle: recordingAngle, sensorWidth: dims.width, sensorHeight: dims.height) {
                 videoSize = CGSize(width: min(w, h), height: max(w, h))
             } else {
                 videoSize = CGSize(width: max(w, h), height: min(w, h))
@@ -605,10 +673,20 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=recording_start writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) applied_angle=\(Int(recordingAngle)) quality=\(quality, privacy: .public) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue, privacy: .public) stabilization=\(stabMode?.rawValue ?? -1)"
         )
+        #if DEV
+        CameraDiagnosticsLog.record("event=recording_start writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) applied_angle=\(Int(recordingAngle)) quality=\(quality) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue) stabilization=\(stabMode?.rawValue ?? -1)")
+        #endif
 
         if let pool = recorder.pixelBufferPool {
             composer.setPixelBufferPool(pool)
         }
+
+        // Assigned before the recorder so the first frame of the take sees the
+        // new writer geometry.
+        self.recordingConnectionAngle = videoDataOutput?.connection(with: .video)?.videoRotationAngle ?? recordingAngle
+        self.recordingWriterAngle = recordingAngle
+        self.recordingWriterSize = videoSize
+        self.orientationCorrectionLogged = false
 
         self.watermarkComposer = composer
         self.assetWriterRecorder = recorder
@@ -769,10 +847,115 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             audioBufferBroadcast?(sampleBuffer)
             return
         }
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard var pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        // Orientation correction. Runs before the watermark composer so it
+        // covers both the free path and the pro path (where the composer
+        // passes buffers through untouched). Normal case: two dimension reads
+        // and a comparison, no allocation. Triggered purely on dimensions: a
+        // buffer that does not match the writer canvas is rotated into it
+        // first, so the watermark is still drawn in canvas coordinates. After
+        // the connection-side selection this should never fire.
+        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        let writerSize = recordingWriterSize
+        if writerSize.width > 0,
+           bufferWidth != Int(writerSize.width) || bufferHeight != Int(writerSize.height) {
+            #if DEV
+            if Self.disableOrientationBackstopForDiagnostics {
+                logBackstopSkipped(bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+            } else {
+                pixelBuffer = orientedToWriter(pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+            }
+            #else
+            pixelBuffer = orientedToWriter(pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+            #endif
+        }
         let processed = watermarkComposer?.process(pixelBuffer) ?? pixelBuffer
         assetWriterRecorder?.appendVideo(processed, pts: pts)
     }
+
+    /// Slow path of the orientation correction in `captureOutput`: rotates
+    /// `pixelBuffer` by the orientation matching the frozen recording angle
+    /// and renders it into a buffer from the writer's pool. Returns the input
+    /// unchanged when no writer is recording or allocation fails — a degraded
+    /// frame beats a dropped one, and the recorder reports it as
+    /// `frame_dims_mismatch_uncorrected`.
+    nonisolated private func orientedToWriter(_ pixelBuffer: CVPixelBuffer, bufferWidth: Int, bufferHeight: Int) -> CVPixelBuffer {
+        guard let recorder = assetWriterRecorder,
+              case .recording = recorder.state,
+              let pool = recorder.pixelBufferPool else { return pixelBuffer }
+
+        // Rotate by the DIFFERENCE between what the writer canvas requires and
+        // what the connection already applied — never by the desired angle
+        // alone, which would double-apply the connection's own rotation.
+        // Normalised to [0, 360); 0 means the connection already did the work,
+        // so the buffer passes through with no allocation and no CIImage.
+        let difference = ((Int((recordingWriterAngle - recordingConnectionAngle).rounded()) % 360) + 360) % 360
+        guard difference != 0 else { return pixelBuffer }
+        let orientation: CGImagePropertyOrientation
+        switch difference {
+        case 90: orientation = .right
+        case 180: orientation = .down
+        case 270: orientation = .left
+        default: return pixelBuffer
+        }
+
+        var output: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &output) == kCVReturnSuccess,
+              let outputBuffer = output else { return pixelBuffer }
+
+        let context: CIContext
+        if let existing = orientationCIContext {
+            context = existing
+        } else {
+            // Same construction as RealtimeWatermarkComposer's context.
+            if let device = MTLCreateSystemDefaultDevice() {
+                context = CIContext(mtlDevice: device)
+            } else {
+                context = CIContext(options: nil)
+            }
+            orientationCIContext = context
+        }
+
+        let rotated = CIImage(cvPixelBuffer: pixelBuffer).oriented(orientation)
+        // Pin the rotated extent to the origin so the render fills the buffer.
+        let pinned = rotated.transformed(by: CGAffineTransform(
+            translationX: -rotated.extent.minX,
+            y: -rotated.extent.minY
+        ))
+        context.render(pinned, to: outputBuffer)
+
+        if !orientationCorrectionLogged {
+            orientationCorrectionLogged = true
+            let writerSize = recordingWriterSize
+            let connectionAngle = videoDataOutput?.connection(with: .video).map { Int($0.videoRotationAngle) } ?? -1
+            camLog.error(
+                "event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) connection_angle=\(connectionAngle) difference=\(difference)"
+            )
+            #if DEV
+            CameraDiagnosticsLog.record("event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) connection_angle=\(connectionAngle) difference=\(difference)")
+            #endif
+        }
+        return outputBuffer
+    }
+
+    #if DEV
+    /// DIAGNOSTIC BUILD ONLY. Emits exactly what `orientedToWriter` would have
+    /// logged, without correcting the buffer, so a primary-path failure shows
+    /// up in the recorded video rather than being silently rescued. Once per
+    /// recording, sharing the correction's own guard flag.
+    nonisolated private func logBackstopSkipped(bufferWidth: Int, bufferHeight: Int) {
+        guard !orientationCorrectionLogged else { return }
+        orientationCorrectionLogged = true
+        let difference = ((Int((recordingWriterAngle - recordingConnectionAngle).rounded()) % 360) + 360) % 360
+        let writerSize = recordingWriterSize
+        let connectionAngle = videoDataOutput?.connection(with: .video).map { Int($0.videoRotationAngle) } ?? -1
+        camLog.error(
+            "event=orientation_backstop_skipped buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) connection_angle=\(connectionAngle) difference=\(difference)"
+        )
+        CameraDiagnosticsLog.record("event=orientation_backstop_skipped buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) connection_angle=\(connectionAngle) difference=\(difference)")
+    }
+    #endif
 }
 #endif
