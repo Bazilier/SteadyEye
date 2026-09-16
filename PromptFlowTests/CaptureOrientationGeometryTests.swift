@@ -2,20 +2,22 @@ import XCTest
 import CoreImage
 import CoreVideo
 import ImageIO
+@testable import PromptFlow
 
 /// Geometry tests for the capture orientation correction added to
 /// `CameraManager.captureOutput` / `CameraManager.orientedToWriter`.
 ///
 /// WHAT THESE TESTS DO NOT DO — read before trusting a green run:
 ///
-/// 1. They do NOT call the production code. `orientedToWriter` is `private`
-///    and lives inside `#if !targetEnvironment(simulator)`, so it is not even
-///    compiled for the simulator — the only destination available without
-///    hardware. The helpers below (`orientation(forRecordingAngle:)`,
-///    `rotate(_:to:context:pool:)`, `correctIfNeeded`) are a hand-copy of the
-///    production logic. They can drift from it. Making the real symbol
-///    testable would require extracting it out of that platform-gated
-///    extension, which is a production change and was out of scope here.
+/// 1. They mostly do NOT call the production code. `orientedToWriter` is
+///    `private` and lives inside `#if !targetEnvironment(simulator)`, so it is
+///    not even compiled for the simulator — the only destination available
+///    without hardware. `orientation(forRecordingAngle:)` now delegates to the
+///    production `CaptureRotationGeometry` table; `rotate(_:to:context:pool:)`
+///    and `correctIfNeeded` are still a hand-copy and can drift. In particular
+///    `correctIfNeeded` keys on a writer angle, whereas production decides the
+///    rotation from the coordinator's angle minus the connection's — that
+///    decision is covered by `CaptureRotationGeometryTests`.
 ///
 /// 2. They cover rotation geometry ONLY. Front-camera mirroring is applied by
 ///    AVCaptureConnection before a buffer ever reaches the app, so a synthetic
@@ -31,14 +33,11 @@ final class CaptureOrientationGeometryTests: XCTestCase {
 
     // MARK: - Mirror of the production logic (see caveat 1 above)
 
-    /// Mirrors the `switch Int(angle)` in `CameraManager.orientedToWriter`.
+    /// Production mapping from `CaptureRotationGeometry`, so the pixel tests
+    /// below pin the real clockwise-degrees-to-orientation table rather than a
+    /// copy of it. `.up` stands in for "no rotation".
     private func orientation(forRecordingAngle angle: CGFloat) -> CGImagePropertyOrientation {
-        switch Int(angle) {
-        case 90: return .right
-        case 180: return .down
-        case 270: return .left
-        default: return .up
-        }
+        CaptureRotationGeometry.orientation(forClockwiseDegrees: Int(angle)) ?? .up
     }
 
     /// Mirrors the rotate-and-render step of `CameraManager.orientedToWriter`.
