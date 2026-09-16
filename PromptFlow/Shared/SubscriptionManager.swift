@@ -222,7 +222,6 @@ final class SubscriptionManager: ObservableObject {
     var canBulkImport: Bool { isSubscribed }
     var canRecord4K: Bool { isSubscribed }
     var canUseStabilization: Bool { isSubscribed }
-    var maxScriptWords: Int { isSubscribed ? .max : 50 }
     var showWatermark: Bool { !isSubscribed }
 
     private init() {}

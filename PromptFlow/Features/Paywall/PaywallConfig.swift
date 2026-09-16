@@ -227,8 +227,8 @@ enum PaywallMode: String {
     /// Free-trial presentation, IDENTICAL to `.trial` in every presentational
     /// respect and backed by the same `trial` offering. The two diverge only
     /// AFTER the entitlement lapses: `.hybrid` falls back to freemium gating
-    /// (watermarked recording, one AI optimisation per calendar day, the
-    /// 50-word script limit) where `.trial` locks the user out.
+    /// (watermarked recording, one AI optimisation per calendar day) where
+    /// `.trial` locks the user out.
     ///
     /// This split is what every call site keys on, and the two tests are not
     /// interchangeable:

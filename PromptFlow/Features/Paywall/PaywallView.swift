@@ -865,19 +865,6 @@ struct PaywallView: View {
                 )
             )
             featureRow(
-                icon: "text.alignleft",
-                title: String(
-                    localized: "paywall.v2.feature.unlimitedLength",
-                    defaultValue: "Long-form scripts",
-                    comment: "Paywall v2 feature row title."
-                ),
-                subtitle: String(
-                    localized: "paywall.v2.feature.unlimitedLength.subtitle",
-                    defaultValue: "Up to 5,000 characters per script",
-                    comment: "Paywall v2 feature row subtitle for the long-form-scripts feature. The 5,000-character limit is the actual product cap for paying users — keep the number verbatim, localize the surrounding phrasing."
-                )
-            )
-            featureRow(
                 icon: "sparkles",
                 title: String(
                     localized: "paywall.v2.feature.unlimitedAI",
@@ -965,11 +952,6 @@ struct PaywallView: View {
                 icon: "drop.fill",
                 title: String(localized: "paywall.v2.feature.noWatermark", defaultValue: "No watermark on recordings", comment: "Paywall v2 feature card title."),
                 subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without 'Made with SteadyEye'", comment: "Paywall v2 feature card subtitle.")
-            ),
-            Feature(
-                icon: "text.alignleft",
-                title: String(localized: "paywall.v2.feature.unlimitedLength", defaultValue: "Long-form scripts", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.unlimitedLength.subtitle", defaultValue: "Up to 5,000 characters per script", comment: "Paywall v2 feature card subtitle.")
             ),
             Feature(
                 icon: "sparkles",

@@ -16,11 +16,7 @@ struct ScriptEditorView: View {
     @State private var optimizeError: String?
     @State private var showRateLimitAlert = false
     @State private var paywallPresentation: PaywallPresentation?
-    @State private var showWordLimitAlert = false
-    @State private var showPasteLimitAlert = false
     @State private var showProDailyLimitAlert = false
-    @State private var pendingPasteText: String = ""
-    @State private var pendingPasteWordCount: Int = 0
     @State private var showEditorTip = false
     @AppStorage("hasSeenEditorTip") private var hasSeenEditorTip = false
     @State private var didLogOpen = false
@@ -193,83 +189,6 @@ struct ScriptEditorView: View {
             } message: {
                 Text("common.dailyLimit.message", comment: "Daily limit alert message in editor")
             }
-            .alert(
-                Text(String(
-                    localized: "scripts.editor.wordLimit.title",
-                    defaultValue: "Script too long",
-                    comment: "Title of the alert shown to free users on Save when their script exceeds 50 words."
-                )),
-                isPresented: $showWordLimitAlert
-            ) {
-                Button {
-                    content = content.trimmedToFirstWords(50)
-                    performSave()
-                } label: {
-                    Text(String(
-                        localized: "scripts.editor.wordLimit.trim",
-                        defaultValue: "Trim to 50 words",
-                        comment: "Word-limit alert primary action: trim the script to its first 50 words and save."
-                    ))
-                }
-                Button {
-                    paywallPresentation = PaywallPresentation(source: "word_limit")
-                } label: {
-                    Text(String(
-                        localized: "scripts.editor.wordLimit.upgrade",
-                        defaultValue: "Upgrade",
-                        comment: "Word-limit alert action that opens the paywall."
-                    ))
-                }
-                Button(role: .cancel) {} label: {
-                    Text("common.cancel", comment: "Cancel button on word-limit alert")
-                }
-            } message: {
-                Text(String(
-                    localized: "scripts.editor.wordLimit.body",
-                    defaultValue: "Your script is \(content.wordCount) words. Free version supports up to 50 words. Trim to 50 words or upgrade for unlimited length.",
-                    comment: "Body of the word-limit alert. %1$lld is the current word count of the script."
-                ))
-            }
-            .alert(
-                Text(String(
-                    localized: "scripts.editor.pasteLimit.title",
-                    defaultValue: "Pasted text too long",
-                    comment: "Title of the alert shown to free users when pasting text would exceed the 50-word limit."
-                )),
-                isPresented: $showPasteLimitAlert
-            ) {
-                Button {
-                    let appended = (content.isEmpty ? "" : content + "\n\n") + pendingPasteText
-                    content = appended.trimmedToFirstWords(50)
-                    pendingPasteText = ""
-                } label: {
-                    Text(String(
-                        localized: "scripts.editor.pasteLimit.useFirst50",
-                        defaultValue: "Use first 50 words",
-                        comment: "Paste-limit alert primary action: trim the combined existing+pasted text to 50 words."
-                    ))
-                }
-                Button {
-                    paywallPresentation = PaywallPresentation(source: "word_limit")
-                } label: {
-                    Text(String(
-                        localized: "scripts.editor.wordLimit.upgrade",
-                        defaultValue: "Upgrade",
-                        comment: "Paste-limit alert action that opens the paywall."
-                    ))
-                }
-                Button(role: .cancel) {
-                    pendingPasteText = ""
-                } label: {
-                    Text("common.cancel", comment: "Cancel button on paste-limit alert")
-                }
-            } message: {
-                Text(String(
-                    localized: "scripts.editor.pasteLimit.body",
-                    defaultValue: "Pasted text is \(pendingPasteWordCount) words. Free version supports up to 50. Use first 50 words or upgrade?",
-                    comment: "Body of the paste-limit alert. %1$lld is the word count of the pasted text."
-                ))
-            }
             .fullScreenCover(item: $paywallPresentation) { presentation in
                 PaywallView(source: presentation.source)
             }
@@ -381,13 +300,6 @@ struct ScriptEditorView: View {
         return .secondary
     }
 
-    private var wordCountColor: Color {
-        if subscriptionManager.isSubscribed { return .secondary }
-        if wordCount >= 50 { return .red }
-        if wordCount >= 40 { return .orange }
-        return .secondary
-    }
-
     @ViewBuilder
     private var aiOptimizeCaption: some View {
         if subscriptionManager.isSubscribed {
@@ -416,25 +328,14 @@ struct ScriptEditorView: View {
         HStack(spacing: 8) {
             Image(systemName: "text.word.spacing")
                 .foregroundStyle(.secondary)
-            // Show the limit that actually applies to this user — never both.
-            // Free users have a 50-word cap; paid users have a 5000-char cap.
-            // Surfacing the other tier's limit was confusing and leaked premium
-            // info to free users.
-            if subscriptionManager.isSubscribed {
-                Text(String(
-                    localized: "script.charCount",
-                    defaultValue: "\(content.count.formatted()) / \(maxChars.formatted()) chars",
-                    comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
-                ))
-                    .foregroundStyle(charCountColor)
-            } else {
-                Text(String(
-                    localized: "script.wordCountLimited",
-                    defaultValue: "\(wordCount) / 50 words",
-                    comment: "Word count display in the editor stats bar with the free-tier 50-word limit. %1$lld is the current word count; 50 is the cap."
-                ))
-                    .foregroundStyle(wordCountColor)
-            }
+            // All users (free and paid) share the same 5000-char cap; there is
+            // no word limit.
+            Text(String(
+                localized: "script.charCount",
+                defaultValue: "\(content.count.formatted()) / \(maxChars.formatted()) chars",
+                comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
+            ))
+                .foregroundStyle(charCountColor)
             Spacer()
             aiOptimizeCaption
         }
@@ -524,10 +425,6 @@ struct ScriptEditorView: View {
     // MARK: - Actions
 
     private func save() {
-        if content.wordCount > subscriptionManager.maxScriptWords {
-            showWordLimitAlert = true
-            return
-        }
         performSave()
     }
 
@@ -655,13 +552,6 @@ struct ScriptEditorView: View {
 
     private func pasteFromClipboard() {
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
-        let combined = (content.isEmpty ? "" : content + "\n\n") + text
-        if combined.wordCount > subscriptionManager.maxScriptWords {
-            pendingPasteText = text
-            pendingPasteWordCount = text.wordCount
-            showPasteLimitAlert = true
-            return
-        }
         if content.isEmpty {
             content = text
         } else {
