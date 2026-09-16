@@ -69,11 +69,16 @@ enum PaywallConfig {
     /// future variant string) to `.annual` so a misconfigured RC
     /// value never leaves the user on a blank selection.
     static var defaultPlan: PaywallPlan {
-        switch RemoteConfigManager.shared.string("paywall_default_plan") {
-        case "monthly":  return .monthly
-        case "lifetime": return .lifetime
-        default:         return .annual
+        let raw = RemoteConfigManager.shared.string("paywall_default_plan")
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            .lowercased()
+        if let plan = PaywallPlan(rawValue: normalized) { return plan }
+        if !normalized.isEmpty {
+            PaywallDiagnostics.unrecognisedDefaultPlan(raw)
         }
+        return .annual
     }
 
     /// Active presentation mode, from the `paywall_mode` Remote Config key.
@@ -252,6 +257,7 @@ enum PaywallMode: String {
 /// these are read from computed properties inside `body`.
 enum PaywallDiagnostics {
     private static var loggedUnrecognisedMode = false
+    private static var loggedUnrecognisedDefaultPlan = false
     private static var loggedTrialOfferingUnresolved = false
     private static var loggedNonAnnualTrialPlans: Set<String> = []
 
@@ -262,6 +268,16 @@ enum PaywallDiagnostics {
         ⚠️ PAYWALL MISCONFIGURATION: unrecognised paywall_mode value \"\(raw)\". \
         Recognised values are \"default\" and \"trial\". Falling back to default \
         (freemium) presentation. Check the paywall_mode parameter in Firebase Remote Config.
+        """)
+    }
+
+    static func unrecognisedDefaultPlan(_ raw: String) {
+        guard !loggedUnrecognisedDefaultPlan else { return }
+        loggedUnrecognisedDefaultPlan = true
+        print("""
+        ⚠️ PAYWALL MISCONFIGURATION: unrecognised paywall_default_plan value \"\(raw)\". \
+        Recognised values are \"weekly\", \"monthly\", \"annual\" and \"lifetime\". Falling back to annual. \
+        Check the paywall_default_plan parameter in Firebase Remote Config.
         """)
     }
 

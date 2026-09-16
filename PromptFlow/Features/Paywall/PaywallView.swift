@@ -70,6 +70,10 @@ struct PaywallView: View {
     @ObservedObject private var remoteConfig = RemoteConfigManager.shared
 
     @State private var selectedPlan: PaywallPlan = PaywallConfig.defaultPlan
+    /// Set only by an explicit plan row tap. Until then, `selectedPlan` keeps
+    /// catching up to `resolvedDefaultPlan` as offerings load and Remote
+    /// Config activates.
+    @State private var userDidPickPlan = false
     @State private var errorMessage: String?
     @State private var bottomSheetHeight: CGFloat = 320
     @State private var isExpanded: Bool = false
@@ -717,7 +721,15 @@ struct PaywallView: View {
             // re-render. If the newly activated `paywall_plans` no longer
             // contains it, the CTA would stay bound to a plan that is not on
             // screen — so re-clamp to the configured default.
-            if !renderablePlans.contains(selectedPlan) {
+            if !userDidPickPlan || !renderablePlans.contains(selectedPlan) {
+                selectedPlan = resolvedDefaultPlan
+            }
+        }
+        // Offerings can land after `onAppear` already picked a selection from
+        // the fallback plan list. Catch up to the configured default unless the
+        // user has already chosen a plan themselves.
+        .onChange(of: manager.offerings) { _, _ in
+            if !userDidPickPlan {
                 selectedPlan = resolvedDefaultPlan
             }
         }
@@ -1087,6 +1099,7 @@ struct PaywallView: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     if isExpanded {
                         selectedPlan = resolvedDefaultPlan
+                        userDidPickPlan = false
                     }
                     isExpanded.toggle()
                 }
@@ -1140,6 +1153,7 @@ struct PaywallView: View {
         let displayPrice = trial?.duration ?? intro?.primary ?? basePrice
         let isSelected = selectedPlan == plan
         return Button(action: {
+            userDidPickPlan = true
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 selectedPlan = plan
             }
