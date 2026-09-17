@@ -77,6 +77,9 @@ struct ScriptListView: View {
     /// chance under the better timing.
     @AppStorage("hasShownNotificationSoftAsk") private var hasShownNotificationSoftAsk: Bool = false
     @State private var showNotificationSoftAsk: Bool = false
+    /// In-memory, per-process: `.onAppear` can re-fire when a cover above this
+    /// view dismisses, and the soft-ask decision must run at most once a launch.
+    private static var didCheckSoftAskThisLaunch = false
 
     private var filteredScripts: [Script] {
         if searchText.isEmpty { return scripts }
@@ -143,6 +146,15 @@ struct ScriptListView: View {
             SoftAskNotificationView {
                 Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
             }
+            .onAppear {
+                // The one-shot flag is burned HERE, once the sheet is really on
+                // screen — a soft-ask the arbiter denied must be retryable.
+                hasShownNotificationSoftAsk = true
+                PromptArbiter.shared.didPresent(.notificationSoftAsk)
+            }
+            .onDisappear {
+                PromptArbiter.shared.didDismiss()
+            }
         }
         .onAppear {
             // Notification soft-ask trigger. Fires on the SECOND
@@ -157,13 +169,21 @@ struct ScriptListView: View {
             // navigation that may still be settling.
             if hasSeenOnboarding,
                !hasShownNotificationSoftAsk,
+               !Self.didCheckSoftAskThisLaunch,
                coldStartCountAfterOnboarding >= 2 {
+                Self.didCheckSoftAskThisLaunch = true
                 let countAtTrigger = coldStartCountAfterOnboarding
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    // 1.5s, not 0.5s: the cold-start paywall decides at 0.5s, so
+                    // on a launch where both are due the paywall goes first and
+                    // the arbiter's gap then defers the soft-ask to a later
+                    // launch instead of stacking two modals.
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
                     let settings = await UNUserNotificationCenter.current().notificationSettings()
                     guard settings.authorizationStatus == .notDetermined else { return }
-                    hasShownNotificationSoftAsk = true
+                    // No flag write here — `hasShownNotificationSoftAsk` is set
+                    // in the sheet's onAppear, so a denial retries next launch.
+                    guard PromptArbiter.shared.canPresent(.notificationSoftAsk) else { return }
                     showNotificationSoftAsk = true
                     AppAnalytics.log("soft_ask_shown", params: [
                         "cold_start_count": countAtTrigger

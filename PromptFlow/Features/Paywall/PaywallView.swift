@@ -705,7 +705,15 @@ struct PaywallView: View {
             // 1-hour cross-source cooldown. Writing in DEV too so the cooldown
             // can be tested without flipping build configs.
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastAnyPaywallShownAt")
+            // Every paywall — automatic or user-initiated — counts toward the
+            // arbiter's gap and suppresses the review prompt for this session.
+            // Automatic ones have already called `didPresent`; repeating the
+            // note here is harmless.
+            PromptArbiter.shared.noteExternalPresentation(isPaywall: true)
             logPaywallShown()
+        }
+        .onDisappear {
+            PromptArbiter.shared.didDismiss()
         }
         // Re-runs whenever the annual product changes identity — including nil →
         // resolved when offerings finish loading, and on an offering swap after

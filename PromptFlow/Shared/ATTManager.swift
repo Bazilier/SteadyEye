@@ -40,6 +40,9 @@ enum ATTManager {
         guard isEnabled, canRequestAuthorization else { return }
         await settleBeforePrompt()
         _ = await ATTrackingManager.requestTrackingAuthorization()
+        // Counts toward the arbiter's gap so nothing automatic lands on top of
+        // the ATT dialog's dismissal.
+        PromptArbiter.shared.noteExternalPresentation(isPaywall: false)
     }
 
     /// Ensure `.active` (up to ~2s) then a short settle for the prior system

@@ -1035,22 +1035,12 @@ struct RecordingView: View {
                     // MMP funnel event (once, gated by `wasFirst`).
                     AppServices.attribution?.trackEvent("first_recording_completed")
                 }
-                // Usage-based App Store review: counts this confirmed save and
-                // prompts on exactly the 2nd successful recording (cooldown +
-                // one-shot enforced inside). Only the auto-persist success path
-                // reaches here — cancel/failure and screen-open do not.
-                //
-                // Skipped for a recording expected to trigger the first-own-
-                // recording paywall, so the review dialog and the paywall never
-                // stack. Skipping leaves the counter untouched, which postpones
-                // the prompt to a later successful recording rather than losing it.
-                let expectsFirstOwnRecordingPaywall = !script.isDemo
-                    && !script.isSample
-                    && !subscriptionManager.isSubscribed
-                    && !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown")
-                if !expectsFirstOwnRecordingPaywall {
-                    ReviewPromptManager.handleSuccessfulRecording()
-                }
+                // Counter only. The prompt itself is requested from the
+                // post-save slot in VideoPreviewView, where it can be ordered
+                // against the first-own-recording paywall; counting every
+                // successful recording here means a recording that yields to a
+                // paywall still moves the user toward the prompt.
+                ReviewPromptManager.recordSuccessfulRecording()
                 previewRecording = recording
             case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,

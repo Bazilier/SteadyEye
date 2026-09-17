@@ -193,6 +193,7 @@ struct VideoPreviewView: View {
                 .onAppear {
                     // Written only once the paywall actually appears.
                     UserDefaults.standard.set(true, forKey: "postFirstOwnRecordingPaywallShown")
+                    PromptArbiter.shared.didPresent(.firstOwnRecordingPaywall)
                 }
         }
         .onAppear {
@@ -209,7 +210,8 @@ struct VideoPreviewView: View {
             guard newPhase == .active, pendingPostSavePaywall else { return }
             guard isVisible,
                   !showPostSavePaywall,
-                  shouldShowPaywallAfterSave?() == true
+                  shouldShowPaywallAfterSave?() == true,
+                  PromptArbiter.shared.canPresent(.firstOwnRecordingPaywall)
             else {
                 // Pending paywall dropped: let the held-back toast hide.
                 pendingPostSavePaywall = false
@@ -456,7 +458,10 @@ struct VideoPreviewView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             guard isVisible,
                                   !showPostSavePaywall,
-                                  shouldShowPaywallAfterSave?() == true
+                                  shouldShowPaywallAfterSave?() == true,
+                                  // Denied: present nothing and burn no flag —
+                                  // the next own-script save tries again.
+                                  PromptArbiter.shared.canPresent(.firstOwnRecordingPaywall)
                             else { return }
                             if scenePhase == .active {
                                 showPostSavePaywall = true
@@ -465,6 +470,14 @@ struct VideoPreviewView: View {
                                 // defer until the scene is active again.
                                 pendingPostSavePaywall = true
                             }
+                        }
+                    } else {
+                        // No paywall due for this save, so the same slot is the
+                        // review prompt's moment. Eligibility, the 120-day
+                        // cooldown and the arbiter are all checked inside.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            guard isVisible, scenePhase == .active else { return }
+                            ReviewPromptManager.requestIfEligible()
                         }
                     }
                 } else {

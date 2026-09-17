@@ -21,22 +21,30 @@ enum ReviewPromptManager {
 
     private static let cooldownBetweenPrompts: TimeInterval = 120 * 86400
 
-    /// Call once per SUCCESSFUL recording (finished + saved). Increments the
-    /// persistent counter and, on exactly the 2nd successful recording,
-    /// requests an App Store review — subject to the shared 120-day cooldown
-    /// and the foreground-active-scene requirement in `requestReview`. Counts
-    /// other than 2 (1st, or 3rd+) do nothing, so this fires at most once.
-    static func handleSuccessfulRecording() {
+    /// Call once per SUCCESSFUL recording (finished + saved). Counting only —
+    /// never presents. Every successful recording counts, including ones that
+    /// yield their moment to a paywall.
+    static func recordSuccessfulRecording() {
         let newCount = UserDefaults.standard.integer(forKey: successfulRecordingCountKey) + 1
         UserDefaults.standard.set(newCount, forKey: successfulRecordingCountKey)
+    }
 
-        guard newCount == 2 else { return }
+    /// Requests the review prompt if every condition holds: at least 2
+    /// successful recordings, the 120-day cooldown elapsed, the arbiter
+    /// allows it, and a foreground-active scene exists.
+    ///
+    /// A missing active scene returns WITHOUT touching `lastReviewPromptAt`,
+    /// so the prompt is retried at the next save rather than being consumed by
+    /// a request iOS never rendered.
+    static func requestIfEligible() {
+        guard UserDefaults.standard.integer(forKey: successfulRecordingCountKey) >= 2 else { return }
 
-        // Respect the shared cooldown (e.g. if another trigger prompted recently).
         if let lastPrompted = lastPromptedTimestamp() {
             let now = Date().timeIntervalSince1970
             guard (now - lastPrompted) >= cooldownBetweenPrompts else { return }
         }
+
+        guard PromptArbiter.shared.canPresent(.reviewPrompt) else { return }
 
         requestReview(trigger: "second_successful_recording")
     }
@@ -53,6 +61,13 @@ enum ReviewPromptManager {
         }
         SKStoreReviewController.requestReview(in: scene)
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastPromptedKey)
+        PromptArbiter.shared.didPresent(.reviewPrompt)
         AppAnalytics.log("review_prompt_requested", params: ["trigger": trigger])
+        // The system dialog reports nothing back, so release the arbiter after
+        // a short window rather than leaving it latched for the session.
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            PromptArbiter.shared.didDismiss()
+        }
     }
 }

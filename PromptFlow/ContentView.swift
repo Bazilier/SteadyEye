@@ -108,8 +108,12 @@ struct ContentView: View {
             // this one. 500ms is also enough for RC's checkAccess to populate
             // isSubscribedReal in the typical case.
             try? await Task.sleep(nanoseconds: 500_000_000)
-            if shouldShowColdStartPaywall() {
+            // The arbiter runs last, after this trigger's own rules, so a
+            // denial here does not consume the once-per-day slot.
+            if shouldShowColdStartPaywall(),
+               PromptArbiter.shared.canPresent(.coldStartPaywall) {
                 lastColdStartPaywallDateInterval = Date().timeIntervalSince1970
+                PromptArbiter.shared.didPresent(.coldStartPaywall)
                 showColdStartPaywall = true
             }
         }
