@@ -118,4 +118,71 @@ final class CaptureRotationGeometryTests: XCTestCase {
         XCTAssertEqual(CaptureRotationGeometry.orientation(forClockwiseDegrees: 270), .left)
         XCTAssertEqual(CaptureRotationGeometry.orientation(forClockwiseDegrees: -90), .left)
     }
+
+    // MARK: - Landscape candidates and the lens-on-the-left pick
+
+    /// Landscape angles are the complement of the portrait pair, on either basis.
+    func testLandscapeCandidates() {
+        // iPhone 16 and earlier: portrait 90/270 -> landscape 0/180.
+        XCTAssertEqual(Set(CaptureRotationGeometry.landscapeCandidates(portraitResidue: 90)), [0, 180])
+        // iPhone 17 front: portrait 0/180 -> landscape 90/270.
+        XCTAssertEqual(Set(CaptureRotationGeometry.landscapeCandidates(portraitResidue: 0)), [90, 270])
+    }
+
+    func testProducesLandscapeIsComplementOfProducesPortrait() {
+        for residue in [0, 90] {
+            for angle in [0, 90, 180, 270] {
+                let portrait = CaptureRotationGeometry.producesPortrait(angle: CGFloat(angle), portraitResidue: residue)
+                let landscape = CaptureRotationGeometry.producesLandscape(angle: CGFloat(angle), portraitResidue: residue)
+                XCTAssertNotEqual(portrait, landscape, "angle \(angle) residue \(residue)")
+            }
+        }
+    }
+
+    /// Device already rotated left: the coordinator reports the landscape angle
+    /// itself, so it is used unchanged. Values from the rotation table in
+    /// Apple Developer Forums thread 813548.
+    func testLandscapeLeft_deviceAlreadyRotated_usesReportedAngle() {
+        // iPhone 16 and earlier: landscape-left reports 180, and 180 is landscape there.
+        XCTAssertEqual(CaptureRotationGeometry.landscapeLeftAngle(horizonAngle: 180, portraitResidue: 90), 180)
+        // iPhone 17 front: landscape-left reports 90, and 90 is landscape there.
+        XCTAssertEqual(CaptureRotationGeometry.landscapeLeftAngle(horizonAngle: 90, portraitResidue: 0), 90)
+    }
+
+    /// Device still upright (mode switched while holding the phone in portrait):
+    /// landscape-left is a quarter turn on from the reported portrait angle. The
+    /// same step works on both bases without branching on the device model.
+    func testLandscapeLeft_devicePortrait_takesQuarterTurnFromReported() {
+        // iPhone 16 and earlier: portrait 90 -> landscape-left 180.
+        XCTAssertEqual(CaptureRotationGeometry.landscapeLeftAngle(horizonAngle: 90, portraitResidue: 90), 180)
+        // iPhone 17 front: portrait 0 -> landscape-left 90.
+        XCTAssertEqual(CaptureRotationGeometry.landscapeLeftAngle(horizonAngle: 0, portraitResidue: 0), 90)
+    }
+
+    /// Whatever it returns must be one of the two candidates, and must actually
+    /// produce a landscape buffer — the property the canvas depends on.
+    func testLandscapeLeftAlwaysYieldsALandscapeCandidate() {
+        for residue in [0, 90] {
+            let candidates = Set(CaptureRotationGeometry.landscapeCandidates(portraitResidue: residue))
+            for reported in [0, 90, 180, 270] {
+                let chosen = CaptureRotationGeometry.landscapeLeftAngle(
+                    horizonAngle: CGFloat(reported), portraitResidue: residue
+                )
+                XCTAssertTrue(candidates.contains(chosen), "reported \(reported) residue \(residue) -> \(chosen)")
+                XCTAssertTrue(
+                    CaptureRotationGeometry.producesLandscape(angle: CGFloat(chosen), portraitResidue: residue)
+                )
+            }
+        }
+    }
+
+    /// A landscape connection angle must give the writer a landscape canvas.
+    func testLandscapeCanvasFromObservedPortraitBuffer() {
+        // iPhone 16: observed 1080x1920 at 90 (portrait); canvas at 180 is landscape.
+        let size = CaptureRotationGeometry.expectedDimensions(
+            observedWidth: 1080, observedHeight: 1920, observedAngle: 90, targetAngle: 180
+        )
+        XCTAssertEqual(size.width, 1920)
+        XCTAssertEqual(size.height, 1080)
+    }
 }

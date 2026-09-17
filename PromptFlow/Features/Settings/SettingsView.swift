@@ -13,6 +13,9 @@ struct SettingsView: View {
     @ObservedObject private var remoteConfig = RemoteConfigManager.shared
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
+    /// Raw value of `RecordingOrientation`; the capture pipeline reads the same
+    /// key through `RecordingOrientation.current()`.
+    @AppStorage(RecordingOrientation.appStorageKey) private var recordingOrientation: String = RecordingOrientation.fallback.rawValue
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
 
     @AppStorage("stabilizationEnabled") private var stabilizationEnabled: Bool = true
@@ -210,6 +213,22 @@ struct SettingsView: View {
                         Text(verbatim: "60 fps").tag(60)
                     } label: {
                         Text("settings.video.frameRate", comment: "Picker label for video frame rate")
+                    }
+
+                    // Read when the capture session is configured, so a change
+                    // here reaches the next session rather than the running one.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("settings.video.orientation", comment: "Label above the recording orientation picker")
+                        Picker(selection: $recordingOrientation) {
+                            Text("settings.video.orientation.portrait", comment: "Recording orientation option: portrait")
+                                .tag(RecordingOrientation.portrait.rawValue)
+                            Text("settings.video.orientation.landscape", comment: "Recording orientation option: landscape")
+                                .tag(RecordingOrientation.landscape.rawValue)
+                        } label: {
+                            Text("settings.video.orientation", comment: "Label above the recording orientation picker")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
                 } header: {
                     Text("settings.section.videoQuality", comment: "Settings section header")

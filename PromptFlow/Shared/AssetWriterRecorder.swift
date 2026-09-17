@@ -39,7 +39,13 @@ final class AssetWriterRecorder {
     )
     /// Writer's configured output size, captured at `startRecording` for the
     /// multi-frame dimension sampling and finish diagnostics.
-    private var configuredVideoSize: CGSize = .zero
+    ///
+    /// Readable because it is the ONLY trustworthy statement of this take's
+    /// canvas: it is set inside `startRecording`, before the caller publishes
+    /// the recorder, so any code that can see this recorder necessarily sees the
+    /// right canvas. A canvas held in a separate property alongside the recorder
+    /// carries no such guarantee across queues.
+    private(set) var configuredVideoSize: CGSize = .zero
     /// Active composer path ("pro" pass-through vs "free" render-to-pool),
     /// supplied by the caller. Reported on a sampled `buffer_dims` mismatch: on
     /// the pro path a mismatch is unrecoverable (the encoder silently rescales

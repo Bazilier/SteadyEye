@@ -283,9 +283,14 @@ struct RecordingView: View {
     @ViewBuilder
     private var cameraZStack: some View {
         ZStack {
-            // 1. Camera preview
+            // 1. Camera preview. Kept mounted and fed at all times — the opacity
+            // is a presentation gate only, so the session, `startRunning` and the
+            // landscape pin are unaffected. Portrait reveals immediately;
+            // landscape waits for the angle to be pinned so the first thing the
+            // user sees is already landscape.
             CameraPreviewView(session: cameraManager.session)
                 .ignoresSafeArea()
+                .opacity(cameraManager.isPreviewRevealed ? 1 : 0)
 
             // 1b. Dim overlay during recording / countdown
             if dimDuringRecording {

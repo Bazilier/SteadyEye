@@ -19,6 +19,15 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var saveDirectlyOnStop = false
     @Published var isSessionReady = false
     @Published var isAudioReady = false
+    /// Whether the camera preview should be visible.
+    ///
+    /// PRESENTATION ONLY — nothing in the capture path consults this. Portrait
+    /// sets it the moment the session starts, exactly as before. Landscape holds
+    /// it until the landscape angle is pinned, because the session necessarily
+    /// runs briefly on the provisional angle first (the residue is not knowable
+    /// until a buffer arrives) and the user would otherwise see a portrait frame
+    /// flip to landscape.
+    @Published var isPreviewRevealed = false
     @Published var audioSourceName: String = String(
         localized: "camera.audio.iPhoneMic",
         defaultValue: "iPhone Microphone",
@@ -62,6 +71,49 @@ final class CameraManager: NSObject, ObservableObject {
     /// mirrored buffer has no reliable rotation correction (see
     /// `CaptureRotationGeometry.correctionDegrees`).
     private var recordingConnectionMirrored = false
+    /// Orientation mode frozen at record start. The canvas is fixed then, so a
+    /// mid-take change must not reach the pipeline.
+    private var recordingOrientationMode: RecordingOrientation = .portrait
+
+    /// Orientation mode this session was CONFIGURED with. Read once in
+    /// `setupSession` so a change made while the recording screen is open does
+    /// not alter a running session — it takes effect the next time the session
+    /// is configured.
+    private var sessionOrientationMode: RecordingOrientation = .portrait
+    /// Landscape candidates and the chosen angle from the most recent selection,
+    /// carried into `rotation_selected` / `recording_start` so one device run
+    /// shows which of the two was picked and what the alternative was.
+    private var lastLandscapeCandidates: [Int] = []
+    /// When the landscape preview warmup began, for `landscape_warmup`'s
+    /// `elapsed_ms`, and the token identifying which warmup a scheduled timeout
+    /// belongs to. Dated just before `startRunning()`, so it measures the whole
+    /// wait the user sees. Nil outside a warmup — which is what makes a timeout
+    /// still in flight inert once the warmup resolved or the session stopped.
+    private var landscapeWarmupStartedAt: Date?
+    /// One-shot guard so the warmup resolves exactly once per session
+    /// configuration — whichever of the pin or the timeout gets there first.
+    /// Cleared in `resetLandscapeWarmup()` and nowhere else: clearing it at the
+    /// arm instead would re-arm a warmup the pin had already resolved.
+    private var landscapeWarmupResolved = false
+    /// Ceiling on how long the preview stays hidden waiting for the pin.
+    ///
+    /// 1.2s: this screen already assumes the camera is up well inside a second
+    /// (`RecordingView` stages its own UI at 0.5s, `ContentView` waits 0.5s for
+    /// the session to settle), so this is roughly double that headroom for a
+    /// cold session on an older device — while short enough that a camera that
+    /// never delivers a buffer does not strand the user on a dark screen.
+    /// `elapsed_ms` in the log is what should replace this estimate with a
+    /// measured value.
+    private static let landscapeWarmupTimeout: TimeInterval = 1.2
+
+    /// The landscape angle pinned for the life of this session configuration.
+    ///
+    /// Landscape is a FIXED orientation, not a gravity-following one: the angle
+    /// is derived once — from this device's own basis, which differs between
+    /// generations and so cannot be hardcoded — and then held. Without the pin,
+    /// rotating the device changed the output orientation even though the
+    /// setting had not. Cleared in `setupSession`; never consulted in portrait.
+    private var pinnedLandscapeAngle: CGFloat?
 
     /// A buffer the video connection actually delivered, with the connection
     /// state it was delivered under. The single source of truth for which
@@ -90,6 +142,28 @@ final class CameraManager: NSObject, ObservableObject {
     private var orientationCIContext: CIContext?
     /// `orientation_corrected` fires once per recording; reset at record start.
     private var orientationCorrectionLogged = false
+    /// Whether this take has handed at least one canvas-shaped frame to the
+    /// writer. Only frames BEFORE that can be leftovers from the previous
+    /// configuration, so the leading-frame drop is confined to them. Touched
+    /// only on `sampleBufferQueue`; reset when a new recorder is first seen.
+    private var recordingHasAppendedVideo = false
+    /// Leading mis-shaped frames dropped in this take. Touched only on
+    /// `sampleBufferQueue`; reset when a new recorder is first seen.
+    private var droppedLeadingMismatchCount = 0
+    /// The recorder the two counters above belong to. They reset when a
+    /// different recorder is first seen on `sampleBufferQueue`, so a take's
+    /// state is keyed to its own recorder object rather than published as
+    /// separate stores from the camera queue — which is what let the previous
+    /// take's values describe this one.
+    private var currentTakeRecorder: ObjectIdentifier?
+    /// Ceiling on leading frames dropped for shape. The stale window is the
+    /// buffers already in flight when the take began — one or two, with
+    /// `alwaysDiscardsLateVideoFrames` keeping the queue shallow. Past this
+    /// ceiling a shape disagreement is no longer a stale leftover but a canvas
+    /// that is wrong for the whole take, and dropping every frame would leave an
+    /// empty file; those fall through to the backstop and are reported exactly
+    /// as before.
+    private static let maxLeadingMismatchDrops = 3
     private var durationTimer: Timer?
     private var recordingStartTime: Date?
     private(set) var lastRecordingDuration: TimeInterval = 0
@@ -201,10 +275,53 @@ final class CameraManager: NSObject, ObservableObject {
         // whose dimensions are landscape on iPhone 17 front cameras even though
         // portrait is 0 there.
         let residue = observedPortraitResidue
-        let accepted = residue.map {
-            CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: $0)
-        } ?? true
-        let target = accepted ? reported : connection.videoRotationAngle
+        let wantsLandscape = sessionOrientationMode.wantsLandscapeBuffer
+        var candidates: [Int] = []
+        let accepted: Bool
+        let target: CGFloat
+        // Whether this evaluation set the pin, held one set earlier, or ran
+        // before any buffer made the residue knowable. Portrait leaves it "none".
+        var pinState = "none"
+        if wantsLandscape {
+            // Landscape is a fixed orientation. The angle is derived ONCE and
+            // then held for the life of this session configuration: gravity must
+            // not move it, or rotating the device would change the output
+            // orientation while the setting stayed the same.
+            if let pinned = pinnedLandscapeAngle {
+                target = pinned
+                accepted = true
+                pinState = "held"
+                if let residue {
+                    candidates = CaptureRotationGeometry.landscapeCandidates(portraitResidue: residue)
+                }
+            } else if let residue {
+                // First evaluation with a delivered buffer in hand: the residue
+                // makes landscape-left derivable on this device's own basis.
+                candidates = CaptureRotationGeometry.landscapeCandidates(portraitResidue: residue)
+                let derived = CGFloat(CaptureRotationGeometry.landscapeLeftAngle(
+                    horizonAngle: reported, portraitResidue: residue
+                ))
+                pinnedLandscapeAngle = derived
+                target = derived
+                accepted = true
+                pinState = "set"
+            } else {
+                // No buffer yet, so the residue — and with it which angle is
+                // landscape-left — is unknowable. Apply the coordinator's angle
+                // provisionally WITHOUT pinning; the first delivered buffer
+                // re-evaluates and pins, rather than guessing here.
+                target = reported
+                accepted = true
+                pinState = "provisional"
+            }
+        } else {
+            let producesPortrait = residue.map {
+                CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: $0)
+            } ?? true
+            accepted = producesPortrait
+            target = producesPortrait ? reported : connection.videoRotationAngle
+        }
+        lastLandscapeCandidates = candidates
         let supported = connection.isVideoRotationAngleSupported(target)
         if supported {
             connection.videoRotationAngle = target
@@ -219,13 +336,101 @@ final class CameraManager: NSObject, ObservableObject {
         let observed = observedBuffer.withLock { $0 }
         let observedField = observed.map { "\($0.width)x\($0.height)@\(Int($0.connectionAngle))" } ?? "none"
         let residueField = residue.map(String.init) ?? "unknown"
+        // Both landscape candidates and the pick, so a single device run shows
+        // which was chosen and what the alternative was if the video comes out
+        // rotated the wrong way. Empty in portrait.
+        let candidatesField = candidates.isEmpty ? "none" : candidates.map(String.init).joined(separator: "/")
+        // `pin=held` is the proof the angle did not follow the device: a
+        // rotation report arrived and changed nothing.
+        let pinnedField = pinnedLandscapeAngle.map { String(Int($0)) } ?? "none"
         camLog.notice(
-            "event=rotation_selected reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField, privacy: .public) observed_buffer=\(observedField, privacy: .public) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)"
+            "event=rotation_selected mode=\(self.sessionOrientationMode.rawValue, privacy: .public) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState, privacy: .public) pinned_angle=\(pinnedField, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField, privacy: .public) observed_buffer=\(observedField, privacy: .public) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)"
         )
         #if DEV
-        CameraDiagnosticsLog.record("event=rotation_selected reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField) observed_buffer=\(observedField) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)")
+        CameraDiagnosticsLog.record("event=rotation_selected mode=\(self.sessionOrientationMode.rawValue) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState) pinned_angle=\(pinnedField) landscape_candidates=\(candidatesField) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField) observed_buffer=\(observedField) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)")
         #endif
         return appliedRotationAngle
+    }
+
+    /// Landscape only. The first delivered buffer is what establishes
+    /// `portraitResidue`, and with it which angle is landscape-left on this
+    /// device. Session configuration runs before any buffer exists, so it
+    /// applied the coordinator's angle provisionally without pinning; this
+    /// re-evaluates once and pins.
+    ///
+    /// Guarded against running mid-take: the writer canvas is fixed at record
+    /// start, so a connection angle that changed under it would contradict the
+    /// canvas. In practice buffers flow from session start and a take needs a
+    /// deliberate tap, so the pin is long since set by then.
+    private func pinLandscapeAngleAfterFirstBuffer() {
+        guard sessionOrientationMode.wantsLandscapeBuffer,
+              pinnedLandscapeAngle == nil,
+              !isRecordingActive,
+              let connection = videoDataOutput?.connection(with: .video),
+              let reported = lastReportedHorizonAngle else { return }
+        applyClampedRotation(reported: reported, to: connection)
+        // The connection now holds the landscape angle, so what the preview
+        // shows from here on is the orientation the file will have.
+        resolveLandscapeWarmup(outcome: "pinned")
+    }
+
+    // MARK: - Landscape preview warmup (presentation only)
+
+    /// Clears the warmup state for a session configuration that is about to be
+    /// built. Called on main from `start` / `switchCamera`, before any camera
+    /// work is dispatched, so it can never race the pin of the configuration it
+    /// is resetting.
+    private func resetLandscapeWarmup() {
+        landscapeWarmupResolved = false
+        landscapeWarmupStartedAt = nil
+    }
+
+    /// Starts the window during which the landscape preview stays hidden. Does
+    /// not delay `startRunning`, the pin, or anything in the capture path — the
+    /// preview layer stays mounted and fed throughout, only invisible.
+    ///
+    /// `startedAt` is dated on the camera queue just before `startRunning()`, so
+    /// the window covers the whole wait rather than only the part after the
+    /// session came up.
+    private func beginLandscapePreviewWarmup(startedAt: Date) {
+        // Already resolved means this configuration's pin got here first, which
+        // the arm-before-`startRunning` ordering rules out. Arming anyway would
+        // hide a preview that is already showing the pinned orientation and
+        // leave a second timeout live to fire against it — exactly the double
+        // `landscape_warmup` this guard exists to prevent.
+        guard !landscapeWarmupResolved else { return }
+        landscapeWarmupStartedAt = startedAt
+        isPreviewRevealed = false
+        // Deadline measured from `startedAt`, so the preview is never hidden for
+        // longer than the constant however long the session took to come up, and
+        // a timeout's `elapsed_ms` reads at the constant rather than past it.
+        let remaining = max(0, Self.landscapeWarmupTimeout - Date().timeIntervalSince(startedAt))
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { [weak self] in
+            // A timeout resolves only the warmup that armed it. `resolve` and
+            // `stop` clear the token and a later configuration mints a new one,
+            // so a stale timeout finds no match and does nothing.
+            guard let self, self.landscapeWarmupStartedAt == startedAt else { return }
+            self.resolveLandscapeWarmup(outcome: "timeout")
+        }
+    }
+
+    /// Reveals the preview and logs the outcome, exactly once per session
+    /// configuration — whichever of the pin or the timeout arrives first.
+    private func resolveLandscapeWarmup(outcome: String) {
+        guard !landscapeWarmupResolved else { return }
+        landscapeWarmupResolved = true
+        // The token is minted before the session runs, so it is always present
+        // for a landscape configuration. -1 would mean a warmup resolved without
+        // ever having been armed, which the ordering in `setupSession` rules out.
+        let elapsedMs = landscapeWarmupStartedAt.map { Int(Date().timeIntervalSince($0) * 1000) } ?? -1
+        landscapeWarmupStartedAt = nil
+        isPreviewRevealed = true
+        camLog.notice(
+            "event=landscape_warmup outcome=\(outcome, privacy: .public) elapsed_ms=\(elapsedMs)"
+        )
+        #if DEV
+        CameraDiagnosticsLog.record("event=landscape_warmup outcome=\(outcome) elapsed_ms=\(elapsedMs)")
+        #endif
     }
 
     /// RotationCoordinator KVO handler. Freezes the applied angle while a
@@ -240,10 +445,17 @@ final class CameraManager: NSObject, ObservableObject {
             // mid-take value is stashed, not discarded; only the APPLICATION
             // stays frozen until the take ends. A buffer has always been
             // observed by the time a take is running.
-            let producesPortrait = observedPortraitResidue.map {
-                CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: $0)
+            // Same shape test as `applyClampedRotation`, in whichever mode this
+            // session was configured for — a legitimate mid-take value is
+            // stashed, not discarded; only the APPLICATION stays frozen until
+            // the take ends.
+            let wantsLandscape = sessionOrientationMode.wantsLandscapeBuffer
+            let shapeMatches = observedPortraitResidue.map { residue in
+                wantsLandscape
+                    ? CaptureRotationGeometry.producesLandscape(angle: reported, portraitResidue: residue)
+                    : CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: residue)
             } ?? false
-            pendingRotationAngle = producesPortrait ? reported : old
+            pendingRotationAngle = shapeMatches ? reported : old
             camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true")
             return
         }
@@ -278,11 +490,18 @@ final class CameraManager: NSObject, ObservableObject {
 
     func start(position: AVCaptureDevice.Position = .front) {
         cameraPosition = position
+        // On main, before any camera work is dispatched — and so before any
+        // buffer, and any pin, can exist for the configuration about to be
+        // built. That ordering is what lets the arm treat an already-resolved
+        // warmup as this configuration's own and leave it alone.
+        resetLandscapeWarmup()
         if Self.isChromakeyActive {
             // No real camera (Simulator) or chromakey mockup mode — mark
-            // session ready immediately so UI is fully interactive.
+            // session ready immediately so UI is fully interactive. No buffers
+            // will ever arrive, so the preview is revealed outright.
             isSessionReady = true
             isAudioReady = true
+            isPreviewRevealed = true
             return
         }
         #if !targetEnvironment(simulator)
@@ -322,6 +541,14 @@ final class CameraManager: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 self.isSessionReady = false
                 self.isAudioReady = false
+                // The next session configuration decides afresh whether to gate;
+                // a pending warmup must not reveal against a torn-down session.
+                // Clearing the token is what neutralises a timeout still in
+                // flight. `landscapeWarmupResolved` is deliberately NOT set here:
+                // this block can land after a rapid re-entry has already called
+                // `start`, and setting it would suppress the new gate.
+                self.isPreviewRevealed = false
+                self.landscapeWarmupStartedAt = nil
             }
         }
         #endif
@@ -449,6 +676,14 @@ final class CameraManager: NSObject, ObservableObject {
         // A new output (and possibly a different camera, whose sensor may be
         // mounted differently) — nothing observed so far applies to it.
         observedBuffer.withLock { $0 = nil }
+        // The orientation mode is read HERE and nowhere else in the session's
+        // life: a change made while the recording screen is open reaches the
+        // next configuration, never the running one.
+        sessionOrientationMode = RecordingOrientation.current()
+        // A new configuration (or a different camera, whose sensor may be
+        // mounted differently) must re-derive the landscape angle rather than
+        // inherit a pin that belonged to the previous one.
+        pinnedLandscapeAngle = nil
         if let connection = videoDataOutput?.connection(with: .video) {
             if connection.isVideoStabilizationSupported {
                 connection.preferredVideoStabilizationMode = stabilize ? .cinematic : .off
@@ -481,6 +716,18 @@ final class CameraManager: NSObject, ObservableObject {
             #endif
         }
 
+        // Arm the landscape gate BEFORE the session runs. Two reasons: the wait
+        // the user experiences starts here, so `elapsed_ms` measures all of it;
+        // and this block reaches the main queue before any buffer exists, so the
+        // pin cannot resolve a warmup that has not been armed yet — the ordering
+        // that previously produced `elapsed_ms=-1` and then a stray timeout.
+        if sessionOrientationMode.wantsLandscapeBuffer {
+            let warmupStartedAt = Date()
+            DispatchQueue.main.async { [weak self] in
+                self?.beginLandscapePreviewWarmup(startedAt: warmupStartedAt)
+            }
+        }
+
         session.startRunning()
 
         // Exposure needs a running session
@@ -488,7 +735,14 @@ final class CameraManager: NSObject, ObservableObject {
         if exposure != 0 { setExposureCompensation(Float(exposure)) }
 
         DispatchQueue.main.async { [weak self] in
-            self?.isSessionReady = true
+            guard let self else { return }
+            self.isSessionReady = true
+            // Portrait reveals exactly as it always has: its angle is right from
+            // the first frame, so gating would cost startup time for nothing.
+            // Landscape is already gated by the warmup armed above.
+            if !self.sessionOrientationMode.wantsLandscapeBuffer {
+                self.isPreviewRevealed = true
+            }
         }
         // Phase 2: enable Bluetooth audio routing (non-blocking, no session reconfig)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -605,6 +859,9 @@ final class CameraManager: NSObject, ObservableObject {
         #if !targetEnvironment(simulator)
         let newPosition: AVCaptureDevice.Position = (cameraPosition == .front) ? .back : .front
         cameraPosition = newPosition
+        // Same reset as `start`: this reconfigures the session, so warmup state
+        // from the previous configuration must not carry into the new one.
+        resetLandscapeWarmup()
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
             self.setupSession(position: newPosition)
@@ -729,14 +986,17 @@ final class CameraManager: NSObject, ObservableObject {
         let recDims = currentCamera.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         let stabMode = connection?.preferredVideoStabilizationMode
         let mirrored = connection?.isVideoMirrored ?? false
+        let candidatesField = lastLandscapeCandidates.isEmpty
+            ? "none"
+            : lastLandscapeCandidates.map(String.init).joined(separator: "/")
         // No coordinator report yet (not expected): target the connection's own
         // angle, so the backstop computes a zero correction rather than a guess.
         let frozenHorizonAngle = horizonAngle ?? connectionAngle
         camLog.notice(
-            "event=recording_start writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource, privacy: .public) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality, privacy: .public) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue, privacy: .public) stabilization=\(stabMode?.rawValue ?? -1)"
+            "event=recording_start mode=\(self.sessionOrientationMode.rawValue, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource, privacy: .public) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality, privacy: .public) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue, privacy: .public) stabilization=\(stabMode?.rawValue ?? -1)"
         )
         #if DEV
-        CameraDiagnosticsLog.record("event=recording_start writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue) stabilization=\(stabMode?.rawValue ?? -1)")
+        CameraDiagnosticsLog.record("event=recording_start mode=\(self.sessionOrientationMode.rawValue) landscape_candidates=\(candidatesField) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue) stabilization=\(stabMode?.rawValue ?? -1)")
         #endif
 
         if let pool = recorder.pixelBufferPool {
@@ -750,7 +1010,14 @@ final class CameraManager: NSObject, ObservableObject {
         self.recordingConnectionMirrored = mirrored
         self.recordingWriterAngle = recordingAngle
         self.recordingWriterSize = videoSize
+        // Frozen for the take: the canvas is fixed now, so a mode change from
+        // Settings mid-recording cannot reach the pipeline.
+        self.recordingOrientationMode = self.sessionOrientationMode
         self.orientationCorrectionLogged = false
+        // The leading-drop counters are deliberately NOT reset here. Publishing
+        // them from this queue is what made them unreliable: `sampleBufferQueue`
+        // could see the new recorder before these stores landed. They reset
+        // instead on that queue, the first time it sees a new recorder.
 
         self.watermarkComposer = composer
         self.assetWriterRecorder = recorder
@@ -942,6 +1209,11 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             }
             if let firstObservation {
                 logFirstBuffer(firstObservation)
+                // The residue is now known, so landscape-left is derivable.
+                // Pin it once, on main where the angle state lives.
+                Task { @MainActor [weak self] in
+                    self?.pinLandscapeAngleAfterFirstBuffer()
+                }
             }
         }
         // Orientation correction. Runs before the watermark composer so it
@@ -951,21 +1223,118 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         // match the writer canvas is rotated into it first, so the watermark is
         // still drawn in canvas coordinates. The canvas is sized from delivered
         // buffers, so this fires only if the delivered shape changes mid-take.
-        let writerSize = recordingWriterSize
+        // Leading-frame drop. Every fact it needs — whether a take is running,
+        // that take's canvas, and whether this is its first frame — is read off
+        // the recorder object, so none of them can disagree with the others.
+        //
+        // It previously tested against `recordingWriterSize`, which
+        // `startWriterPipeline` publishes in a different store from the one that
+        // makes the recorder visible, on the camera queue, with nothing ordering
+        // them against this queue. So this queue could see the NEW recorder
+        // beside the PREVIOUS take's canvas — and a buffer left in flight by a
+        // mode switch has exactly the previous take's shape, so the test read
+        // "match" and skipped the block entirely, drop and backstop alike. That
+        // is why a sideways first frame reached the writer with no
+        // `stale_leading_frame_dropped` and no `orientation_uncorrectable`.
+        // `configuredVideoSize` is set inside `startRecording`, before the
+        // recorder is published, so it is right the instant the recorder exists.
+        // THE single read of `assetWriterRecorder` for this invocation, and the
+        // only one any decision below is allowed to use.
+        //
+        // Measured, not reasoned: reading this property twice in one invocation
+        // returned DIFFERENT objects — `take_id=11dffc9c0` (the previous take,
+        // already `finished`) when the shape was checked, against
+        // `append_take_id=11d950a80` (the new take) when the frame was appended.
+        // The frame was therefore validated against one take and written into
+        // another, and because the first read was `finished` the check resolved
+        // `takeCanvas` to nil and was skipped entirely. Every consumer below —
+        // canvas, identity reset, drop decision, append, has-appended — now reads
+        // this one value.
+        let takeRecorder = assetWriterRecorder
+        let liveTake: AssetWriterRecorder?
+        let takeCanvas: CGSize?
+        if let recorder = takeRecorder, case .recording = recorder.state {
+            let takeID = ObjectIdentifier(recorder)
+            if currentTakeRecorder != takeID {
+                // Still required with a single read, and doing different work
+                // from it: the single read fixes WHICH recorder is consulted,
+                // this fixes WHEN the per-take counters start over. It remains
+                // the only signal on this queue that the take changed, since the
+                // camera queue's own stores cannot be ordered against it.
+                currentTakeRecorder = takeID
+                droppedLeadingMismatchCount = 0
+                recordingHasAppendedVideo = false
+            }
+            liveTake = recorder
+            takeCanvas = recorder.configuredVideoSize
+        } else {
+            liveTake = nil
+            takeCanvas = nil
+        }
+        if let canvas = takeCanvas,
+           bufferWidth != Int(canvas.width) || bufferHeight != Int(canvas.height),
+           !recordingHasAppendedVideo,
+           droppedLeadingMismatchCount < Self.maxLeadingMismatchDrops {
+            // A buffer contradicting the canvas at the very start of a take was
+            // captured under the previous configuration and was still in flight
+            // when this one was fixed — in either direction, since a mode switch
+            // changes the delivered shape both ways. Nothing describes that
+            // buffer's own orientation: the connection angle it would be
+            // attributed to has already moved, and shape alone cannot separate
+            // two angles a half turn apart. The direction is unknowable, so the
+            // frame is dropped rather than written sideways. The writer starts
+            // its session on the first frame it actually receives, so this costs
+            // one frame time. A mismatch later in the take is a different
+            // condition and still goes to the backstop below.
+            droppedLeadingMismatchCount += 1
+            logStaleLeadingFrameDropped(
+                bufferWidth: bufferWidth, bufferHeight: bufferHeight, canvas: canvas
+            )
+            return
+        }
+        // Same canvas the drop just used, so the two cannot contradict each
+        // other. Without this the backstop would keep reading the property that
+        // can lag: inside that window a CORRECTLY shaped buffer matches the real
+        // canvas — so it is not dropped — yet looks mismatched against the stale
+        // value, and would be handed to a correction it does not need. Identical
+        // to the previous behaviour everywhere else: outside a take `takeCanvas`
+        // is nil, and once the stores land the two values are equal. The
+        // backstop's own refusal conditions are untouched.
+        let writerSize = takeCanvas ?? recordingWriterSize
         if writerSize.width > 0,
            bufferWidth != Int(writerSize.width) || bufferHeight != Int(writerSize.height) {
             #if DEV
             if Self.disableOrientationBackstopForDiagnostics {
                 logBackstopSkipped(bufferWidth: bufferWidth, bufferHeight: bufferHeight)
             } else {
-                pixelBuffer = orientedToWriter(pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+                pixelBuffer = orientedToWriter(
+                    pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight, recorder: liveTake
+                )
             }
             #else
-            pixelBuffer = orientedToWriter(pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+            pixelBuffer = orientedToWriter(
+                pixelBuffer, bufferWidth: bufferWidth, bufferHeight: bufferHeight, recorder: liveTake
+            )
             #endif
         }
         let processed = watermarkComposer?.process(pixelBuffer) ?? pixelBuffer
-        assetWriterRecorder?.appendVideo(processed, pts: pts)
+        // Appended through the SAME object every check above used. When that read
+        // yielded no live take the frame belongs to no take that has validated
+        // it, and it is not written at all — where previously a second read found
+        // the newly published recorder and wrote it in unchecked.
+        //
+        // Refusing it is correct: `appendVideo` starts the writer's session on
+        // the first frame it actually receives, so the session simply begins at
+        // the next frame's PTS, and `appendAudio` withholds audio until that
+        // session exists, so the tracks stay aligned. The cost is one frame time
+        // and no truncation. The window is narrow in any case — before the camera
+        // queue publishes the new recorder BOTH reads returned the finished one,
+        // and an append to a finished recorder was already a no-op.
+        if let recorder = liveTake {
+            recorder.appendVideo(processed, pts: pts)
+            // Only a frame that actually reached the writer ends the leading run.
+            recordingHasAppendedVideo = true
+        }
     }
 
     /// One line per session configuration: the first buffer the connection
@@ -978,11 +1347,13 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             bufferHeight: observation.height,
             connectionAngle: observation.connectionAngle
         )
+        let candidatesField = CaptureRotationGeometry.landscapeCandidates(portraitResidue: residue)
+            .map(String.init).joined(separator: "/")
         camLog.notice(
-            "event=first_buffer buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue)"
+            "event=first_buffer mode=\(self.sessionOrientationMode.rawValue, privacy: .public) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField, privacy: .public)"
         )
         #if DEV
-        CameraDiagnosticsLog.record("event=first_buffer buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue)")
+        CameraDiagnosticsLog.record("event=first_buffer mode=\(self.sessionOrientationMode.rawValue) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField)")
         #endif
     }
 
@@ -992,10 +1363,26 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
     /// recording, allocation fails, or no reliable direction exists — a
     /// degraded frame beats a dropped one or an upside-down one, and the
     /// recorder reports it as `frame_dims_mismatch_uncorrected`.
-    nonisolated private func orientedToWriter(_ pixelBuffer: CVPixelBuffer, bufferWidth: Int, bufferHeight: Int) -> CVPixelBuffer {
-        guard let recorder = assetWriterRecorder,
-              case .recording = recorder.state,
-              let pool = recorder.pixelBufferPool else { return pixelBuffer }
+    nonisolated private func orientedToWriter(
+        _ pixelBuffer: CVPixelBuffer,
+        bufferWidth: Int,
+        bufferHeight: Int,
+        recorder: AssetWriterRecorder?
+    ) -> CVPixelBuffer {
+        // `recorder` is the SAME object the single read in `captureOutput`
+        // validated, passed in rather than re-read here. This was the last
+        // independent read of `assetWriterRecorder` on the video path: it could
+        // return a different recorder than the one the append targeted, so the
+        // correction rendered into one take's pixel buffer pool while the frame
+        // was written into another's.
+        //
+        // The state check that stood here is not relaxed, only moved: `liveTake`
+        // is non-nil precisely when `case .recording` already held at the single
+        // read. Nil means no live take, exactly as a failed state check meant
+        // before — return the buffer untouched and log nothing. Every refusal
+        // condition below (mirrored, quarter-turn, `orientation_uncorrectable`)
+        // is unchanged.
+        guard let recorder, let pool = recorder.pixelBufferPool else { return pixelBuffer }
 
         // Rotate by Apple's correction: the coordinator's horizon-level angle
         // minus what the connection already applied, both frozen at record
@@ -1067,6 +1454,25 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         )
         #if DEV
         CameraDiagnosticsLog.record("event=orientation_uncorrectable reason=\(reason) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) difference=\(difference)")
+        #endif
+    }
+
+    /// A leading frame whose shape contradicted the canvas was dropped rather
+    /// than written sideways. One line per dropped frame, so at most
+    /// `maxLeadingMismatchDrops` per take — the count is the point, since it
+    /// says how deep the in-flight window actually was on this device.
+    /// `canvas` is the recorder's own `configuredVideoSize` — the size the drop
+    /// actually tested against. `writer_size` is the separate
+    /// `recordingWriterSize` property: logged alongside it precisely so the two
+    /// can be compared on device. Whenever they differ, this queue was holding a
+    /// stale canvas, which is the condition that let a sideways frame through.
+    nonisolated private func logStaleLeadingFrameDropped(bufferWidth: Int, bufferHeight: Int, canvas: CGSize) {
+        let writerSize = recordingWriterSize
+        camLog.error(
+            "event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue, privacy: .public) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))"
+        )
+        #if DEV
+        CameraDiagnosticsLog.record("event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))")
         #endif
     }
 

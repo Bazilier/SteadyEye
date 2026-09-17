@@ -40,6 +40,49 @@ nonisolated enum CaptureRotationGeometry {
         normalized(angle) % 180 == portraitResidue
     }
 
+    /// True when `angle` yields a landscape buffer on a device whose portrait
+    /// angles share `portraitResidue`. The exact complement of
+    /// `producesPortrait`, spelled out so landscape call sites read as intent
+    /// rather than as a negation.
+    static func producesLandscape(angle: CGFloat, portraitResidue: Int) -> Bool {
+        !producesPortrait(angle: angle, portraitResidue: portraitResidue)
+    }
+
+    /// The two connection angles that yield a landscape buffer on this device.
+    ///
+    /// Both are returned because shape alone cannot choose between them: they
+    /// differ by a half turn, which preserves a buffer's dimensions. Deciding
+    /// which one puts the front lens on a particular side needs gravity, not
+    /// geometry — see `landscapeLeftAngle(horizonAngle:portraitResidue:)`.
+    static func landscapeCandidates(portraitResidue: Int) -> [Int] {
+        let first = (portraitResidue + 90) % 180
+        return [first, (first + 180) % 360]
+    }
+
+    /// The connection angle for the one supported landscape grip: device rotated
+    /// LEFT, so the front lens sits on the left of the frame.
+    ///
+    /// When the device is already held that way, the coordinator reports that
+    /// angle itself, so it is used unchanged. When the device is still upright —
+    /// the mode was changed while holding the phone in portrait — the reported
+    /// angle is a portrait one, and landscape-left is a quarter turn on from it.
+    /// That step holds on both rotation bases without branching on the device:
+    /// iPhone 16 and earlier report portrait 90 and landscape-left 180; iPhone 17
+    /// front cameras report portrait 0 and landscape-left 90 (Apple Developer
+    /// Forums thread 813548).
+    ///
+    /// CONTRACT, NOT OBSERVATION. Which of the two candidates corresponds to
+    /// lens-on-the-left rests on Apple's definition of the horizon-level angle,
+    /// not on anything this codebase has measured. Callers log both candidates
+    /// and the choice so a single device run confirms or refutes it.
+    static func landscapeLeftAngle(horizonAngle: CGFloat, portraitResidue: Int) -> Int {
+        let reported = normalized(horizonAngle)
+        if producesLandscape(angle: CGFloat(reported), portraitResidue: portraitResidue) {
+            return reported
+        }
+        return (reported + 90) % 360
+    }
+
     /// Dimensions a connection at `targetAngle` will deliver, given a buffer
     /// observed at `observedAngle`: swapped for an odd number of quarter turns
     /// between the two, unchanged otherwise.
