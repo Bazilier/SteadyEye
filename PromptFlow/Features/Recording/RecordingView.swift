@@ -164,13 +164,36 @@ struct RecordingView: View {
     /// which, with the interface portrait-locked, is the view's bottom.
     private static let landscapeTransportInset: CGFloat = 24
 
+    /// Tappable size of the gear in the landscape bar. 44 is the documented
+    /// minimum touch target, not a value tuned until taps started landing: the
+    /// glyph alone measures ~22x20, which the bar's quarter turn presents as a
+    /// ~20pt band in view x with dead row margin either side of it.
+    ///
+    /// Landscape only. Portrait shares `settingsGearButton`, and framing it
+    /// there would grow portrait's row by the same amount.
+    private static let landscapeGearHitTarget: CGFloat = 44
+
+    /// Height of the scrub bar, and therefore of the landscape bar's lower
+    /// slot. ONE constant with two consumers rather than two literals that have
+    /// to agree: the slot exists precisely to hold this height constant across
+    /// the exposure swap, so a drift between the two would be the very bug it
+    /// is there to prevent. Shared with portrait, like the transport sizes.
+    private static let scrubBarHeight: CGFloat = 44
+
     /// Thickness of the landscape bottom bar — how far it reaches up from the
     /// physical bottom edge. Aesthetic, not derived: sized to clear the two
-    /// rows (the status/gear/slider row, then the 44pt scrub bar) with slack,
-    /// since the content is framed to this height rather than measuring itself.
+    /// rows (the status/gear/slider row, then the `scrubBarHeight` lower slot)
+    /// with slack, since the content is framed to this height rather than
+    /// measuring itself.
+    ///
+    /// CONSTANT, and now trivially so: the gear SWAPS the lower slot's occupant
+    /// rather than inserting a third row, so there is nothing to make room for.
+    /// An earlier attempt grew this 120 → 184 on disclosure, which looked
+    /// reasonable and was wrong — the bar is pinned at the physical bottom edge
+    /// and therefore grows AWAY from it, so the growth travelled up through the
+    /// content and moved the status row ~66pt, the very row whose gear had just
+    /// been tapped, while the scrub bar stayed put.
     private static let landscapeBarThickness: CGFloat = 120
-    /// Thickness while the exposure panel is disclosed, which adds a third row.
-    private static let landscapeBarThicknessExpanded: CGFloat = 184
     /// Inset from the physical bottom edge — the view's leading edge.
     private static let landscapeBarInset: CGFloat = 8
     /// Inset at each end of the bar, along the physical horizontal.
@@ -197,6 +220,14 @@ struct RecordingView: View {
     @State private var exposureCompensation: Double = 0
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
     @State private var showCameraSettings = false
+
+    /// Idle delay before the exposure control hides itself, in both
+    /// orientations.
+    private static let exposureAutoHideSeconds: TimeInterval = 3
+    /// The pending auto-hide. Held so it can be CANCELLED rather than left to
+    /// fire and be ignored — a timer outliving its panel, or its view, is the
+    /// failure this exists to avoid.
+    @State private var exposureAutoHideTask: Task<Void, Never>?
 
     // Drag state
     @State private var dragOffsetX: CGFloat = 0
@@ -292,6 +323,21 @@ struct RecordingView: View {
         }
         .onChange(of: exposureCompensation) { _, newVal in
             cameraManager.setExposureCompensation(Float(newVal))
+            // Dragging the slider is the one interaction that restarts the
+            // countdown. Guarded so a programmatic change cannot resurrect a
+            // timer for a panel that is not open.
+            if showCameraSettings { scheduleExposureAutoHide() }
+        }
+        // Single choke point for the timer's lifetime. Every route that opens
+        // or closes the panel — the gear, the recording side effect below, the
+        // auto-hide itself — passes through this one `onChange`, so no call
+        // site has to remember to cancel and none can be missed.
+        .onChange(of: showCameraSettings) { _, isOpen in
+            if isOpen {
+                scheduleExposureAutoHide()
+            } else {
+                cancelExposureAutoHide()
+            }
         }
         .onChange(of: cameraManager.isRecording) { _, recording in
             if recording {
@@ -308,6 +354,10 @@ struct RecordingView: View {
             cameraManager.stop()
             showTextContent = false
             isExpanded = false
+            // Teardown: `showCameraSettings` is not reset here, so the
+            // `onChange` choke point never fires on dismissal. Cancel directly
+            // or a pending task outlives the view.
+            cancelExposureAutoHide()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background || newPhase == .inactive else { return }
@@ -676,10 +726,17 @@ struct RecordingView: View {
                     .transition(.opacity.animation(.easeIn(duration: 0.15)))
             }
         }
-        // Recording timer, holding the relationship portrait's stack gives for
-        // free: immediately alongside the panel, centred on its long axis, on
-        // the side away from the lens (view-leading is physically downward,
-        // while `landscapeLensOffset` carries the panel physically upward).
+        // Recording timer, immediately alongside the panel and centred on its
+        // long axis, mirroring the gap portrait's VStack gives for free.
+        //
+        // TRAILING, physically ABOVE the panel. `Alignment.trailing` is the
+        // large-view-x edge, and view +X is physically up with the device
+        // turned left — the same mapping that puts `landscapeBottomBar`, which
+        // is pinned at view-LEADING, along the physical bottom. So a positive
+        // x offset carries the badge off the panel's upper side. It used to be
+        // `.leading` with a negative offset, the mirror image of this, which
+        // placed it physically below the panel — directly in the band the
+        // bottom bar occupies, over the status line's mic name.
         //
         // An OVERLAY rather than a stack. A stack cannot work here: the badge's
         // unrotated box would reserve its width along the panel's thickness
@@ -687,11 +744,12 @@ struct RecordingView: View {
         // the panel when the badge appears, so starting a take would knock the
         // panel off the lens. Portrait escapes that only because its stack is
         // anchored on the panel's side. An overlay is outside layout flow, so
-        // it cannot move the panel, and it still follows it.
-        .overlay(alignment: .leading) {
+        // it cannot move the panel, and — being inside the pill's subtree,
+        // above the `.offset` below — it still travels with the panel.
+        .overlay(alignment: .trailing) {
             if cameraManager.isRecording {
                 landscapeTimerBadge
-                    .offset(x: -(Self.landscapeBadgeFootprint.width + 8))
+                    .offset(x: Self.landscapeBadgeFootprint.width + 8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -1086,7 +1144,7 @@ struct RecordingView: View {
                     }
             )
         }
-        .frame(height: 44)
+        .frame(height: Self.scrubBarHeight)
         // Horizontal inset is deliberately a CALL-SITE concern. It used to be a
         // built-in `.padding(.horizontal, 24)` here, which portrait wanted but
         // which left the landscape bar's scrub track 12pt shy at each end of the
@@ -1184,21 +1242,53 @@ struct RecordingView: View {
         }
     }
 
-    /// The exposure disclosure, shown when the gear is toggled.
+    /// The exposure row itself — label, slider, EV readout — with no chrome.
+    /// Shared, so the two orientations differ only in what surrounds it:
+    /// portrait wraps it in the card below, landscape drops it bare into the
+    /// bar's lower slot, where the card's vertical padding would not fit.
+    private var exposureControl: some View {
+        HStack {
+            Text("camera.exposure.label", comment: "Label for the exposure compensation slider")
+                .font(.caption)
+                .foregroundStyle(.white)
+            Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
+                .tint(.orange)
+            Text(String(format: "%+.1f EV", exposureCompensation))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: 55, alignment: .trailing)
+        }
+    }
+
+    /// Schedules the idle auto-hide, replacing any pending one.
+    ///
+    /// Restarted ONLY by a touch on the exposure control. Interaction elsewhere
+    /// deliberately does not restart it: the neighbouring controls — speed,
+    /// transport, and in portrait the scrub bar — have nothing to do with
+    /// exposure, so letting them hold it open would mean a user scrubbing
+    /// through a script keeps an exposure slider on screen indefinitely, which
+    /// is the situation auto-hide exists to prevent.
+    private func scheduleExposureAutoHide() {
+        cancelExposureAutoHide()
+        exposureAutoHideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.exposureAutoHideSeconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
+        }
+    }
+
+    private func cancelExposureAutoHide() {
+        exposureAutoHideTask?.cancel()
+        exposureAutoHideTask = nil
+    }
+
+    /// The exposure disclosure, shown when the gear is toggled. PORTRAIT only —
+    /// landscape swaps `exposureControl` into its bar instead, without this
+    /// card, so this view and its position are exactly what they were.
     private var cameraSettingsPanel: some View {
         VStack(spacing: 12) {
             // Exposure
-            HStack {
-                Text("camera.exposure.label", comment: "Label for the exposure compensation slider")
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
-                    .tint(.orange)
-                Text(String(format: "%+.1f EV", exposureCompensation))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(width: 55, alignment: .trailing)
-            }
+            exposureControl
 
         }
         .padding(.horizontal, 16)
@@ -1259,9 +1349,7 @@ struct RecordingView: View {
     private var landscapeBottomBar: some View {
         GeometryReader { geo in
             let length = max(0, geo.size.height - Self.landscapeBarEndInset * 2)
-            let thickness = showCameraSettings
-                ? Self.landscapeBarThicknessExpanded
-                : Self.landscapeBarThickness
+            let thickness = Self.landscapeBarThickness
             HStack {
                 landscapeBottomBarContent
                     .frame(width: length, height: thickness)
@@ -1289,17 +1377,57 @@ struct RecordingView: View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
                 statusLine
-                if !cameraManager.isRecording { settingsGearButton }
+                if !cameraManager.isRecording {
+                    // Explicit hit region — the one interactive control in this
+                    // bar that lacked one. Nothing intercepts these taps: the
+                    // file's only other hit-testing participants are the dim
+                    // overlay (hit testing off), the prompter pill's gestures
+                    // (bounded by the pill, and a lower ZStack layer than this
+                    // bar), the scrub bar's contentShape (the slot below), and
+                    // statusLine's two buttons. There was simply very little to
+                    // hit: a ~22x20 glyph, which the quarter turn renders as a
+                    // ~20pt band in view x.
+                    //
+                    // `contentShape` so the whole frame is tappable rather than
+                    // just where the symbol's strokes fall.
+                    settingsGearButton
+                        .frame(
+                            width: Self.landscapeGearHitTarget,
+                            height: Self.landscapeGearHitTarget
+                        )
+                        .contentShape(Rectangle())
+                }
                 speedSliderRow
             }
             .padding(.horizontal, Self.landscapeBarRowInset)
 
-            if showCameraSettings { cameraSettingsPanel }
-
+            // One slot, two occupants. The gear SWAPS the scrub bar for the
+            // exposure row rather than inserting anything, so the content is
+            // the same height either way: nothing is pushed, nothing needs
+            // reserving, and the row above cannot move.
+            //
+            // The slot is pinned to `scrubBarHeight` because the two occupants
+            // are NOT the same height — the scrub bar declares 44, the exposure
+            // row is ~33 of slider. Without the frame the bar would shrink by
+            // 11 on every swap and the row would drift ~5.5. The shorter
+            // occupant centres in the slot; the taller one, portrait's ~57pt
+            // card, never enters this path.
+            //
+            // Hidden by conditional insertion, not opacity: the occupant that
+            // is not showing is not mounted, so it leaves the accessibility
+            // tree rather than lurking in it as a silent, swipeable control.
+            //
             // The same inset as the row above, from the same constant, so the
             // two span identical extents and cannot drift apart again.
-            scrubBar
-                .padding(.horizontal, Self.landscapeBarRowInset)
+            Group {
+                if showCameraSettings {
+                    exposureControl
+                } else {
+                    scrubBar
+                }
+            }
+            .frame(height: Self.scrubBarHeight)
+            .padding(.horizontal, Self.landscapeBarRowInset)
         }
     }
 
@@ -1419,6 +1547,14 @@ struct RecordingView: View {
                 .foregroundStyle(.white)
                 .shadow(radius: 10)
                 .contentTransition(.numericText())
+                // No `.frame` after this one, deliberately. The frame-after-
+                // rotation pattern used elsewhere here exists to keep a hit
+                // area axis-aligned, or to make a parent's layout box match the
+                // drawn result. The countdown has no hit area, and nothing
+                // sizes to it: the ZStack takes its size from the full-screen
+                // Color, and the numeral is centred, so turning it about its
+                // own centre leaves that centre exactly where it was.
+                .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
         }
     }
 

@@ -723,6 +723,36 @@
     "Clears the frozen paywall_mode so the next resolution re-reads Remote Config. Non-production Firebase projects only." : {
 
     },
+    "common.beta" : {
+      "comment" : "Badge shown beside the Recording Orientation setting, marking the landscape recording mode as a beta feature.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бета"
+          }
+        }
+      }
+    },
     "common.cancel" : {
       "comment" : "Generic Cancel button used in alerts and toolbars.",
       "extractionState" : "manual",

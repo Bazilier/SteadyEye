@@ -218,7 +218,22 @@ struct SettingsView: View {
                     // Read when the capture session is configured, so a change
                     // here reaches the next session rather than the running one.
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("settings.video.orientation", comment: "Label above the recording orientation picker")
+                        HStack(spacing: 8) {
+                            Text("settings.video.orientation", comment: "Label above the recording orientation picker")
+                            // Same treatment as the DEV toolbar marker further
+                            // down this file — the app's only status-badge
+                            // precedent — so this reads as the same kind of
+                            // label rather than introducing a second style.
+                            //
+                            // On the section label, not the two options: the
+                            // MODE is beta, not one of its values.
+                            Text("common.beta", comment: "Badge beside the Recording Orientation label, marking landscape recording as a beta feature")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.orange.opacity(0.2), in: Capsule())
+                        }
                         Picker(selection: $recordingOrientation) {
                             Text("settings.video.orientation.portrait", comment: "Recording orientation option: portrait")
                                 .tag(RecordingOrientation.portrait.rawValue)
