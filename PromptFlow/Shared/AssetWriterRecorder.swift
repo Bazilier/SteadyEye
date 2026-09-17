@@ -58,6 +58,9 @@ final class AssetWriterRecorder {
     private var mismatchedSampleCount = 0
     /// Total video frames appended to the writer, for the finish diagnostic.
     private var framesWritten = 0
+    /// `frame_dims_mismatch_uncorrected` fires once per recording (one
+    /// recorder instance per take).
+    private var uncorrectedMismatchLogged = false
 
     /// Pool the composer should use for output BGRA frames. Available only
     /// after `startRecording` returns successfully.
@@ -237,6 +240,25 @@ final class AssetWriterRecorder {
             }
         }
 
+        // Checked on every frame until the first hit. After CameraManager's
+        // orientation correction a mismatch here should be unreachable; if it
+        // happens, report it once and still append — a degraded recording
+        // beats a truncated one.
+        if !uncorrectedMismatchLogged {
+            let bw = CVPixelBufferGetWidth(pixelBuffer)
+            let bh = CVPixelBufferGetHeight(pixelBuffer)
+            let cw = Int(configuredVideoSize.width)
+            let ch = Int(configuredVideoSize.height)
+            if bw != cw || bh != ch {
+                uncorrectedMismatchLogged = true
+                let frame = videoFrameIndex
+                let path = composerPath
+                camLog.error(
+                    "event=frame_dims_mismatch_uncorrected buffer=\(bw)x\(bh) writer_size=\(cw)x\(ch) frame=\(frame) path=\(path, privacy: .public)"
+                )
+            }
+        }
+
         guard adaptor.assetWriterInput.isReadyForMoreMediaData else { return }
         adaptor.append(pixelBuffer, withPresentationTime: pts)
         framesWritten += 1
@@ -276,6 +298,9 @@ final class AssetWriterRecorder {
             self.camLog.notice(
                 "event=recording_finish status=\(writer.status.rawValue) error=\(writer.error?.localizedDescription ?? "none", privacy: .public) final_size=\(Int(self.configuredVideoSize.width))x\(Int(self.configuredVideoSize.height)) frames_written=\(self.framesWritten) mismatched_frames=\(self.mismatchedSampleCount)"
             )
+            #if DEV
+            CameraDiagnosticsLog.record("event=recording_finish status=\(writer.status.rawValue) error=\(writer.error?.localizedDescription ?? "none") final_size=\(Int(self.configuredVideoSize.width))x\(Int(self.configuredVideoSize.height)) frames_written=\(self.framesWritten) mismatched_frames=\(self.mismatchedSampleCount)")
+            #endif
             switch writer.status {
             case .completed:
                 self.state = .finished
