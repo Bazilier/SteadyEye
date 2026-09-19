@@ -486,6 +486,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PromptFlow/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
@@ -529,6 +530,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PromptFlow/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
@@ -637,6 +639,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PromptFlow/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
