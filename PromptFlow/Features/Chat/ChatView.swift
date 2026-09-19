@@ -2,6 +2,18 @@ import SwiftUI
 import SwiftData
 
 struct ChatView: View {
+    /// Which pinned founder message sits at the top of the thread. The chat is
+    /// reached from two places that want to open on different words.
+    enum PinnedMessage {
+        /// Settings — the standing welcome.
+        case welcome
+        /// The satisfaction prompt's No branch — Kirill asking what went wrong.
+        case satisfactionFollowUp
+    }
+
+    /// Defaults to `.welcome` so the Settings call site stays unchanged.
+    var pinnedMessage: PinnedMessage = .welcome
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var allRecordings: [Recording]
@@ -45,7 +57,10 @@ struct ChatView: View {
         .preferredColorScheme(.dark)
         .task {
             messages = ChatStorage.load()
-            AppAnalytics.log("chat_opened", params: ["message_count": messages.count])
+            AppAnalytics.log("chat_opened", params: [
+                "message_count": messages.count,
+                "source": pinnedMessage == .welcome ? "settings" : "satisfaction_prompt"
+            ])
             await fetchAndMerge()
             startPolling()
         }
@@ -62,7 +77,7 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
-                    welcomeMessage
+                    pinnedBubble
                         .padding(.top, 12)
 
                     if messages.isEmpty {
@@ -97,17 +112,23 @@ struct ChatView: View {
         }
     }
 
-    private var welcomeMessage: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("chat.welcome", comment: "Pinned welcome message at the top of the chat from the founder")
-                .font(.callout)
-                .foregroundStyle(.primary)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(.secondarySystemBackground))
-                )
+    /// Pinned founder message. Rendered through `ChatBubbleSurface`, the same
+    /// surface a real message uses, and laid out like an outbound (founder →
+    /// user) row so it reads as an incoming message rather than a card. No
+    /// timestamp line: it is static copy, not a dated message.
+    private var pinnedBubble: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            ChatBubbleSurface(content: pinnedText, isInbound: false)
+            Spacer(minLength: 40)
+        }
+    }
+
+    private var pinnedText: Text {
+        switch pinnedMessage {
+        case .welcome:
+            return Text("chat.welcome", comment: "Pinned welcome message at the top of the chat from the founder")
+        case .satisfactionFollowUp:
+            return Text("chat.pinned.feedback", comment: "Pinned message at the top of the chat when it is opened from the satisfaction prompt's No branch. The founder introduces himself by name and asks what went wrong. Keep it short, personal and first-person.")
         }
     }
 

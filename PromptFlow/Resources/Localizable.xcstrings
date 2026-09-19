@@ -630,6 +630,36 @@
         }
       }
     },
+    "chat.pinned.feedback" : {
+      "comment" : "Pinned message at the top of the chat when it is opened from the satisfaction prompt's No branch. Mirrors chat.welcome's voice and structure. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated. The 👋 emoji is intentional.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi 👋 I'm Cyril. I built SteadyEye.\n\nSorry that one didn't go well. Tell me what went wrong and I'll fix it — I read every message."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hola 👋 Soy Cyril. Creé SteadyEye.\n\nLamento que no haya salido bien. Cuéntame qué pasó y lo soluciono — leo cada mensaje."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oi 👋 Sou Cyril. Criei o SteadyEye.\n\nDesculpa, essa não deu certo. Me conta o que aconteceu que eu resolvo — leio cada mensagem."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye.\n\nЖаль, что не получилось. Расскажи, что пошло не так, и я исправлю — я читаю каждое сообщение."
+          }
+        }
+      }
+    },
     "chat.status.failed" : {
       "comment" : "Tappable caption shown under a failed outgoing chat bubble. Tapping retries the send.",
       "extractionState" : "manual",
@@ -691,31 +721,31 @@
       }
     },
     "chat.welcome" : {
-      "comment" : "Pinned welcome message at the top of the chat from the founder. Three short paragraphs separated by blank lines. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated. The 🤘 emoji at the end is intentional.",
+      "comment" : "Pinned welcome message at the top of the chat from the founder. Two short paragraphs separated by a blank line. 'Cyril' is a proper noun (rendered 'Кирилл' in Russian). 'SteadyEye' is the brand name and must not be translated. The 👋 emoji is intentional.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hi 👋 I'm Cyril. I built SteadyEye.\n\nMessage me directly — I read every message.\n\nI don't know anything about you — not your name, not your email, nothing. If you'd like, you can introduce yourself. Otherwise just say hi 🤘"
+            "value" : "Hi 👋 I'm Cyril. I built SteadyEye.\n\nMessage me directly — I read every message."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hola 👋 Soy Cyril. Creé SteadyEye.\n\nEscríbeme directamente — leo cada mensaje.\n\nNo sé nada de ti — ni tu nombre, ni tu correo, nada. Si quieres, puedes presentarte. Si no, solo di hola 🤘"
+            "value" : "Hola 👋 Soy Cyril. Creé SteadyEye.\n\nEscríbeme directamente — leo cada mensaje."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oi 👋 Sou Cyril. Criei o SteadyEye.\n\nEscreva diretamente — leio cada mensagem.\n\nNão sei nada sobre você — nem seu nome, nem seu email, nada. Se quiser, pode se apresentar. Caso contrário, é só dizer oi 🤘"
+            "value" : "Oi 👋 Sou Cyril. Criei o SteadyEye.\n\nEscreva diretamente — leio cada mensagem."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye.\n\nНапиши мне напрямую — я читаю каждое сообщение.\n\nЯ о тебе ничего не знаю — ни имени, ни почты, ничего. Если хочешь — представься. А не хочешь — просто скажи привет 🤘"
+            "value" : "Привет 👋 Я Кирилл. Я создал SteadyEye.\n\nНапиши мне напрямую — я читаю каждое сообщение."
           }
         }
       }
@@ -5479,6 +5509,126 @@
     },
     "Reset Paywall Mode" : {
 
+    },
+    "review.satisfaction.body" : {
+      "comment" : "Body copy on the satisfaction prompt shown after the first Camera Roll save of a user-written script. Names both branches honestly: a rating if it went well, a message to the founder if it did not.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it went well, a quick review helps other creators find SteadyEye. If not, tell me and I'll fix it."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si salió bien, una reseña rápida ayuda a otros creadores a descubrir SteadyEye. Si no, cuéntame y lo soluciono."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se deu certo, uma avaliação rápida ajuda outros criadores a descobrir o SteadyEye. Se não, me conta que eu resolvo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если всё получилось, короткий отзыв поможет другим авторам найти SteadyEye. Если нет — напиши мне, и я исправлю."
+          }
+        }
+      }
+    },
+    "review.satisfaction.no" : {
+      "comment" : "Secondary button on the satisfaction prompt. Opens the founder chat. Must not read as a dismissal — the user is choosing to say something went wrong.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not really"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La verdad, no"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na verdade, não"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не совсем"
+          }
+        }
+      }
+    },
+    "review.satisfaction.title" : {
+      "comment" : "Title on the satisfaction prompt shown after the first Camera Roll save of a user-written script. Informal second person, matching the app's voice.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Happy with your recording?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Te gustó tu grabación?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gostou da sua gravação?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как тебе запись?"
+          }
+        }
+      }
+    },
+    "review.satisfaction.yes" : {
+      "comment" : "Primary button on the satisfaction prompt. Opens the App Store review page. Keep it ungendered — Spanish, Portuguese and Russian adjectives would otherwise have to agree with the speaker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yes, it's great"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sí, me gustó"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sim, gostei"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Да, всё отлично"
+          }
+        }
+      }
     },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",

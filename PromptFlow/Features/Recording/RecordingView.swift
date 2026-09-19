@@ -396,7 +396,11 @@ struct RecordingView: View {
                     && !script.isSample
                     && !subscriptionManager.isSubscribed
                     && !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown")
-            })
+            },
+            // The origin bit on its own. The closure above fuses it with
+            // subscription state and the paywall's one-shot flag, so the
+            // satisfaction prompt cannot reuse that answer.
+            isUserWrittenScript: !script.isDemo && !script.isSample)
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "record_button", onPurchaseSuccess: { startCountdown() })

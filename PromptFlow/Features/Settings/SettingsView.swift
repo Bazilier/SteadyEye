@@ -36,6 +36,11 @@ struct SettingsView: View {
     @State private var devNotificationStatus: String = "loading…"
     @State private var devPendingCount: Int = 0
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
+    @State private var devShowSatisfactionPrompt = false
+    @State private var devShowFounderChat = false
+    /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
+    /// `onDismiss`, never stacked on top of it.
+    @State private var devPendingFounderChat = false
     #endif
 
     private var restoreResultTitle: String {
@@ -357,6 +362,13 @@ struct SettingsView: View {
                         UserDefaults.standard.removeObject(forKey: "proOptimizationsResetDate")
                         SubscriptionManager.shared.proOptimizationsCount = 0
                     }
+                    Button("Preview Satisfaction Prompt") {
+                        devShowSatisfactionPrompt = true
+                    }
+                    Button("Reset satisfaction prompt state") {
+                        UserDefaults.standard.removeObject(forKey: "satisfactionPromptAnsweredYes")
+                        UserDefaults.standard.removeObject(forKey: "satisfactionPromptLastShownAt")
+                    }
                     HStack {
                         Text("AI optimize used today")
                         Spacer()
@@ -551,6 +563,27 @@ struct SettingsView: View {
             .sheet(isPresented: $showChat) {
                 ChatView()
             }
+            #if DEV
+            // Bypasses every eligibility rule on purpose, and deliberately
+            // writes NOTHING: no `notePresented`, no `noteAnsweredYes`, no
+            // arbiter `didPresent`. A debug trigger that burned the one-shot
+            // flag or the 14-day timestamp would make the next real test
+            // impossible without a reinstall. Both branches still run for
+            // real — Yes opens the App Store URL, No opens the chat.
+            .sheet(isPresented: $devShowSatisfactionPrompt, onDismiss: {
+                guard devPendingFounderChat else { return }
+                devPendingFounderChat = false
+                devShowFounderChat = true
+            }) {
+                SatisfactionPromptView(
+                    onYes: { ReviewPromptManager.openWriteReviewPage() },
+                    onNo: { devPendingFounderChat = true }
+                )
+            }
+            .sheet(isPresented: $devShowFounderChat) {
+                ChatView(pinnedMessage: .satisfactionFollowUp)
+            }
+            #endif
             .alert(restoreResultTitle, isPresented: $showRestoreAlert) {
                 Button("common.ok", role: .cancel) {}
             } message: {

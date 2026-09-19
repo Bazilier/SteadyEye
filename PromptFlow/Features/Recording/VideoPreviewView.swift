@@ -13,6 +13,18 @@ struct VideoPreviewView: View {
     /// the first-own-recording paywall on top of the preview. `nil` (the
     /// Recordings tab) never shows it.
     var shouldShowPaywallAfterSave: (() -> Bool)? = nil
+    /// Whether this take came from a script the user wrote themselves —
+    /// `!script.isDemo && !script.isSample`, the same definition the
+    /// first-own-recording paywall uses.
+    ///
+    /// Kept as its own value rather than read off `shouldShowPaywallAfterSave`,
+    /// which fuses that origin with subscription state and the paywall's
+    /// one-shot flag and so cannot answer the question on its own.
+    ///
+    /// Defaults to `false`: the Recordings tab reaches this view with no
+    /// script in scope, and a `Recording` carries only a title string, so the
+    /// origin is genuinely unknowable there.
+    var isUserWrittenScript: Bool = false
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -29,6 +41,11 @@ struct VideoPreviewView: View {
     @State private var savedAssetLocalIdentifier: String?
     @State private var videoSize: CGSize = CGSize(width: 9, height: 16)
     @State private var showPostSavePaywall = false
+    @State private var showSatisfactionPrompt = false
+    @State private var showFounderChat = false
+    /// Set when the user answers No, so the chat is presented from the
+    /// satisfaction sheet's `onDismiss` rather than stacked on top of it.
+    @State private var pendingFounderChat = false
     /// Tracks whether the preview is on screen, so the delayed post-save
     /// paywall is not presented after the user has already left.
     @State private var isVisible = false
@@ -195,6 +212,36 @@ struct VideoPreviewView: View {
                     UserDefaults.standard.set(true, forKey: "postFirstOwnRecordingPaywallShown")
                     PromptArbiter.shared.didPresent(.firstOwnRecordingPaywall)
                 }
+        }
+        .sheet(isPresented: $showSatisfactionPrompt, onDismiss: {
+            // Sequenced, not stacked: SwiftUI cannot raise the chat while the
+            // satisfaction sheet is still on screen.
+            guard pendingFounderChat else { return }
+            pendingFounderChat = false
+            showFounderChat = true
+        }) {
+            SatisfactionPromptView(
+                onYes: {
+                    ReviewPromptManager.noteAnsweredYes()
+                    ReviewPromptManager.openWriteReviewPage()
+                },
+                onNo: {
+                    pendingFounderChat = true
+                }
+            )
+            .onAppear {
+                // Burned HERE, once the sheet is really on screen — a prompt
+                // the arbiter denied must stay retryable. Same discipline as
+                // the notification soft-ask.
+                ReviewPromptManager.notePresented()
+                PromptArbiter.shared.didPresent(.reviewPrompt)
+            }
+            .onDisappear {
+                PromptArbiter.shared.didDismiss()
+            }
+        }
+        .sheet(isPresented: $showFounderChat) {
+            ChatView(pinnedMessage: .satisfactionFollowUp)
         }
         .onAppear {
             isVisible = true
@@ -473,11 +520,15 @@ struct VideoPreviewView: View {
                         }
                     } else {
                         // No paywall due for this save, so the same slot is the
-                        // review prompt's moment. Eligibility, the 120-day
-                        // cooldown and the arbiter are all checked inside.
+                        // satisfaction prompt's moment. The origin bit, the
+                        // one-shot Yes flag, the 14-day re-ask window and the
+                        // arbiter are all checked inside.
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             guard isVisible, scenePhase == .active else { return }
-                            ReviewPromptManager.requestIfEligible()
+                            guard ReviewPromptManager.shouldPresentSatisfactionPrompt(
+                                isUserWrittenScript: isUserWrittenScript
+                            ) else { return }
+                            showSatisfactionPrompt = true
                         }
                     }
                 } else {

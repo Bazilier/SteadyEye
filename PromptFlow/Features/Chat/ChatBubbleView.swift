@@ -14,21 +14,8 @@ struct ChatBubbleView: View {
             if isInbound { Spacer(minLength: 40) }
 
             VStack(alignment: isInbound ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .font(.body)
-                    .foregroundStyle(isInbound ? Color.white : Color.primary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        bubbleShape
-                            // Color.orange (literal) instead of Color.accentColor:
-                            // sheets don't inherit the parent TabView's
-                            // .tint(.orange), so accentColor flickers from system
-                            // default → orange on first frame inside a sheet.
-                            .fill(isInbound ? Color.orange : Color(.secondarySystemBackground))
-                    )
+                ChatBubbleSurface(content: Text(message.text), isInbound: isInbound)
                     .opacity(isFailed ? 0.7 : 1.0)
-                    .textSelection(.enabled)
 
                 statusOrTimestampLine
             }
@@ -77,10 +64,6 @@ struct ChatBubbleView: View {
             .padding(.horizontal, 4)
     }
 
-    private var bubbleShape: some Shape {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
-    }
-
     private var timestampText: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -91,5 +74,34 @@ struct ChatBubbleView: View {
         let relative = RelativeDateTimeFormatter()
         relative.unitsStyle = .short
         return relative.localizedString(for: message.createdAt, relativeTo: Date())
+    }
+}
+
+/// The bubble surface itself — text on a rounded, direction-tinted ground.
+///
+/// Extracted from `ChatBubbleView` so the pinned founder message at the top of
+/// `ChatView` renders as a real incoming bubble rather than a card of its own.
+/// Takes a `Text` rather than a `String` so a caller can pass a localized
+/// literal straight through and keep it visible to the String Catalog
+/// extractor.
+struct ChatBubbleSurface: View {
+    let content: Text
+    let isInbound: Bool
+
+    var body: some View {
+        content
+            .font(.body)
+            .foregroundStyle(isInbound ? Color.white : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    // Color.orange (literal) instead of Color.accentColor:
+                    // sheets don't inherit the parent TabView's
+                    // .tint(.orange), so accentColor flickers from system
+                    // default → orange on first frame inside a sheet.
+                    .fill(isInbound ? Color.orange : Color(.secondarySystemBackground))
+            )
+            .textSelection(.enabled)
     }
 }
