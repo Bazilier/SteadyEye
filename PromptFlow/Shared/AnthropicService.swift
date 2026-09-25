@@ -1,4 +1,5 @@
 import Foundation
+import RevenueCat
 
 struct ImportedScript: Decodable {
     let title: String
@@ -6,14 +7,27 @@ struct ImportedScript: Decodable {
 }
 
 enum AnthropicService {
-    
+
+    /// Backend AI proxy. The Anthropic key lives on the server only — this app
+    /// no longer ships one. Same hardcoded-constant pattern as `ChatService`.
+    private static let baseURL = "https://web-production-49244.up.railway.app/api/v1/ai"
+
+    /// Overridable so tests can install a `URLProtocol` stub. Production always
+    /// uses `.shared`.
+    static var session: URLSession = .shared
+
     enum ServiceError: LocalizedError {
         case missingAPIKey
         case networkError(Error)
         case httpError(Int)
         case decodingError
         case emptyResponse
-        
+        case subscriptionRequired
+        case freeQuotaExhausted
+        case rateLimited
+        case aiDisabled
+        case inputTooLong(maxChars: Int?)
+
         // Developer-facing only. The user sees the wrapped message produced by
         // ScriptEditorView (`scripts.editor.error.formatFailed`) — these strings
         // are intentionally not localized.
@@ -24,116 +38,120 @@ enum AnthropicService {
             case .httpError(let code): return "Server returned status \(code)."
             case .decodingError: return "Could not parse response."
             case .emptyResponse: return "Empty response from API."
+            case .subscriptionRequired: return "Subscription required for this feature."
+            case .freeQuotaExhausted: return "Free quota exhausted."
+            case .rateLimited: return "Rate limited. Try again later."
+            case .aiDisabled: return "AI features are temporarily unavailable."
+            case .inputTooLong(let maxChars):
+                if let maxChars {
+                    return "Input too long (max \(maxChars) characters)."
+                }
+                return "Input too long."
             }
         }
     }
-    
+
     private static let systemPrompt: String = loadPrompt("FormatPrompt")
-    
+
     static func optimizeForReading(_ text: String) async throws -> String {
-        guard let apiKey = SecretsManager.anthropicAPIKey() else {
-            throw ServiceError.missingAPIKey
-        }
-        
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 30
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        
-        let body: [String: Any] = [
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 2048,
-            "system": systemPrompt,
-            "messages": [["role": "user", "content": text]]
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
-            throw ServiceError.networkError(error)
-        }
-        
-        guard let http = response as? HTTPURLResponse else {
-            throw ServiceError.decodingError
-        }
-        guard http.statusCode == 200 else {
-            throw ServiceError.httpError(http.statusCode)
-        }
-        
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]],
-              let first = content.first,
-              let text = first["text"] as? String
-        else {
-            throw ServiceError.decodingError
-        }
-        
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let responseText = try await callProxy(path: "/optimize/", text: text)
+
+        let trimmed = responseText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw ServiceError.emptyResponse }
         return trimmed
     }
-    
+
     // MARK: - Bulk script splitting
-    
+
     private static let splitSystemPrompt: String = loadPrompt("SplitPrompt")
-    
+
     static func splitScripts(_ text: String) async throws -> [ImportedScript] {
-        guard let apiKey = SecretsManager.anthropicAPIKey() else {
-            throw ServiceError.missingAPIKey
-        }
-        
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        let responseText = try await callProxy(path: "/split/", text: text)
+        return parseScriptsJSON(responseText)
+    }
+
+    // MARK: - Proxy transport
+
+    /// POSTs `{"text": ...}` to the backend proxy and returns the `text` field
+    /// of a 200 response. The model, system prompt and token limits are fixed
+    /// server-side — this client sends the script and nothing else.
+    private static func callProxy(path: String, text: String) async throws -> String {
+        let url = URL(string: baseURL + path)!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-        
-        let body: [String: Any] = [
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 8192,
-            "system": splitSystemPrompt,
-            "messages": [["role": "user", "content": text]]
-        ]
+        request.timeoutInterval = 100
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(appUserId(), forHTTPHeaderField: "X-App-User-Id")
+
+        let body: [String: Any] = ["text": text]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
+
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             throw ServiceError.networkError(error)
         }
-        
+
         guard let http = response as? HTTPURLResponse else {
             throw ServiceError.decodingError
         }
         guard http.statusCode == 200 else {
-            throw ServiceError.httpError(http.statusCode)
+            throw proxyError(status: http.statusCode, data: data)
         }
-        
+
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]],
-              let first = content.first,
-              let responseText = first["text"] as? String
+              let responseText = json["text"] as? String
         else {
             throw ServiceError.decodingError
         }
-        
-        return parseScriptsJSON(responseText)
+        // `remaining_free` is present for free users on /optimize/; the client
+        // keeps its own gating, so it is deliberately ignored.
+        return responseText
     }
-    
+
+    /// Maps the proxy's `{"error": "<code>"}` body onto a `ServiceError`.
+    /// An unrecognised or unparsable body falls back to `.httpError`, so a new
+    /// server-side code degrades to the existing generic failure path.
+    private static func proxyError(status: Int, data: Data) -> ServiceError {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let code = json["error"] as? String
+        else {
+            return .httpError(status)
+        }
+
+        switch code {
+        case "subscription_required": return .subscriptionRequired
+        case "free_quota_exhausted":  return .freeQuotaExhausted
+        case "rate_limited":          return .rateLimited
+        case "ai_disabled":           return .aiDisabled
+        case "input_too_long":        return .inputTooLong(maxChars: json["max_chars"] as? Int)
+        default:                      return .httpError(status)
+        }
+    }
+
+    /// Identity the proxy checks against RevenueCat. Release builds use the RC
+    /// appUserID; DEV builds never call `Purchases.configure`, and touching
+    /// `Purchases.shared` there is a fatal error, so they fall back to a
+    /// persistent local UUID.
+    private static func appUserId() -> String {
+        if Purchases.isConfigured {
+            return Purchases.shared.appUserID
+        }
+        let key = "aiProxyFallbackUserId"
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
+        }
+        let generated = UUID().uuidString
+        UserDefaults.standard.set(generated, forKey: key)
+        return generated
+    }
+
     /// Parses JSON array from the API response, handling markdown fences and edge cases.
     static func parseScriptsJSON(_ text: String) -> [ImportedScript] {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         // Strip markdown code fences if present
         if cleaned.hasPrefix("```") {
             if let firstNewline = cleaned.firstIndex(of: "\n") {
@@ -144,20 +162,20 @@ enum AnthropicService {
             }
             cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        
+
         // Try to find JSON array boundaries
         if let start = cleaned.firstIndex(of: "["),
            let end = cleaned.lastIndex(of: "]") {
             cleaned = String(cleaned[start...end])
         }
-        
+
         guard let data = cleaned.data(using: .utf8),
               let scripts = try? JSONDecoder().decode([ImportedScript].self, from: data),
               !scripts.isEmpty
         else {
             return []
         }
-        
+
         return scripts.filter { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 

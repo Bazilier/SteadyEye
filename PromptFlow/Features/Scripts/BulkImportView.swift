@@ -424,11 +424,21 @@ struct BulkImportView: View {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 dismiss()
             } catch {
-                errorMessage = String(
-                    localized: "scripts.import.error.processFailed",
-                    defaultValue: "Could not process text. Check connection.",
-                    comment: "Error when bulk import network call fails"
-                )
+                // Quota and entitlement answers from the proxy get the paywall
+                // and rate-limit surfaces this view already has; everything
+                // else keeps the inline failure message.
+                switch error as? AnthropicService.ServiceError {
+                case .some(.subscriptionRequired), .some(.freeQuotaExhausted):
+                    showPaywall = true
+                case .some(.rateLimited):
+                    showRateLimitAlert = true
+                default:
+                    errorMessage = String(
+                        localized: "scripts.import.error.processFailed",
+                        defaultValue: "Could not process text. Check connection.",
+                        comment: "Error when bulk import network call fails"
+                    )
+                }
                 isProcessing = false
             }
         }

@@ -532,14 +532,20 @@ struct ScriptEditorView: View {
                     "duration_ms": Int(Date().timeIntervalSince(startTime) * 1000)
                 ])
             } catch {
+                let svc = error as? AnthropicService.ServiceError
                 let reason: String
-                if let svc = error as? AnthropicService.ServiceError {
+                if let svc {
                     switch svc {
                     case .missingAPIKey: reason = "missing_api_key"
                     case .networkError: reason = "network"
                     case .httpError: reason = "http_error"
                     case .decodingError: reason = "decoding"
                     case .emptyResponse: reason = "empty_response"
+                    case .subscriptionRequired: reason = "subscription_required"
+                    case .freeQuotaExhausted: reason = "free_quota_exhausted"
+                    case .rateLimited: reason = "rate_limited"
+                    case .aiDisabled: reason = "ai_disabled"
+                    case .inputTooLong: reason = "input_too_long"
                     }
                 } else {
                     reason = String(describing: type(of: error))
@@ -548,14 +554,25 @@ struct ScriptEditorView: View {
                     "error_reason": reason,
                     "duration_ms": Int(Date().timeIntervalSince(startTime) * 1000)
                 ])
-                #if !DEV
-                Crashlytics.crashlytics().record(error: error)
-                #endif
-                optimizeError = String(
-                    localized: "scripts.editor.error.formatFailed",
-                    defaultValue: "Could not format script. Check connection.",
-                    comment: "User-facing error when AI optimization fails. Wraps the underlying ServiceError which is developer-only."
-                )
+                // The proxy's quota/entitlement answers are product states, not
+                // failures: route them to the surfaces the CTA already uses and
+                // keep them out of Crashlytics, which should stay a signal of
+                // things actually going wrong.
+                switch svc {
+                case .some(.freeQuotaExhausted), .some(.subscriptionRequired):
+                    paywallPresentation = PaywallPresentation(source: "ai_optimize")
+                case .some(.rateLimited):
+                    showRateLimitAlert = true
+                default:
+                    #if !DEV
+                    Crashlytics.crashlytics().record(error: error)
+                    #endif
+                    optimizeError = String(
+                        localized: "scripts.editor.error.formatFailed",
+                        defaultValue: "Could not format script. Check connection.",
+                        comment: "User-facing error when AI optimization fails. Wraps the underlying ServiceError which is developer-only."
+                    )
+                }
             }
             isOptimizing = false
         }
