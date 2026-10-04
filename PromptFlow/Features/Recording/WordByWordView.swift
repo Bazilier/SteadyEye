@@ -313,10 +313,26 @@ struct WordByWordView: View {
         }
 
         let chunk = player.chunks[idx]
-        withAnimation(.easeInOut(duration: 0.08)) { textOpacity = 0 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        // Scale the crossfade to the chunk's on-screen time so short chunks
+        // still reach full opacity; very short chunks swap instantly.
+        let d = player.chunkDuration(at: idx)
+        let fade = min(0.08, d * 0.25)
+
+        if d < 0.12 {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                displayedText = displayText(for: chunk)
+                textOpacity = displayOpacity(for: chunk)
+            }
+            return
+        }
+
+        withAnimation(.easeInOut(duration: fade)) { textOpacity = 0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + fade) {
+            guard lastIndex == idx else { return }
             displayedText = displayText(for: chunk)
-            withAnimation(.easeInOut(duration: 0.08)) { textOpacity = displayOpacity(for: chunk) }
+            withAnimation(.easeInOut(duration: fade)) { textOpacity = displayOpacity(for: chunk) }
         }
     }
 }
