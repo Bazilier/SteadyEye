@@ -81,6 +81,12 @@ struct SettingsView: View {
         }
     }
 
+    /// Same card as the script list rows; used for the three top cards.
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+            .fill(Color(.secondarySystemGroupedBackground))
+    }
+
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
         let new = AppSettings()
@@ -108,7 +114,7 @@ struct SettingsView: View {
                                         defaultValue: "Chat with Kirill",
                                         comment: "Title of the Settings row that opens the in-app chat with the founder."
                                     ))
-                                        .font(.body.weight(.semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundColor(.primary)
                                     Text(String(
                                         localized: "settings.chat.subtitle",
@@ -138,21 +144,24 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(cardBackground)
+                    .listSectionSpacing(10)
                 }
 
-                // First section: Upgrade entry point + Redeem code.
-                // For free users: shows Upgrade row above Redeem code row.
-                // For Pro users: Upgrade row is hidden; Redeem code remains
+                // Top cards: Upgrade entry point, then Redeem code.
+                // For free users: shows the Upgrade card above the Redeem card.
+                // For Pro users: Upgrade card is hidden; Redeem code remains
                 // visible (Pro users may still hold an offer or transfer
                 // code to redeem against their existing entitlement).
-                Section {
-                    if !subscriptionManager.isSubscribed {
+                if !subscriptionManager.isSubscribed {
+                    Section {
                         Button(action: {
                             showUpgradePaywall = true
                         }) {
                             HStack {
                                 Image(systemName: "crown.fill")
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(Theme.accent)
                                     .font(.system(size: 22))
                                     .frame(width: 30, alignment: .center)
 
@@ -162,7 +171,7 @@ struct SettingsView: View {
                                         defaultValue: "Upgrade to Pro",
                                         comment: "Title of the Settings → Upgrade row that opens the paywall. Hidden for Pro users."
                                     ))
-                                        .font(.body.weight(.semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundColor(.primary)
                                     Text(String(
                                         localized: "settings.upgrade.subtitle",
@@ -183,6 +192,12 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(cardBackground)
+                    .listSectionSpacing(10)
+                }
+
+                Section {
                     Button {
                         Task {
                             await SubscriptionManager.shared.presentCodeRedemption()
@@ -191,16 +206,21 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "ticket")
                                 .foregroundStyle(.tint)
+                                .font(.system(size: 22))
+                                .frame(width: 30, alignment: .center)
                             Text(String(
                                 localized: "settings.subscription.redeem_code",
                                 defaultValue: "Redeem code",
                                 comment: "Settings row that presents Apple's offer-code redemption sheet for App Store offer codes (e.g., promotional, win-back, transfer codes)."
                             ))
+                                .font(.title3.weight(.semibold))
                                 .foregroundColor(.primary)
                             Spacer()
                         }
                     }
                 }
+                .listRowSeparator(.hidden)
+                .listRowBackground(cardBackground)
 
                 Section {
                     Picker(selection: $videoResolution) {
@@ -234,10 +254,10 @@ struct SettingsView: View {
                             // MODE is beta, not one of its values.
                             Text("common.beta", comment: "Badge beside the Recording Orientation label, marking landscape recording as a beta feature")
                                 .font(.caption2.bold())
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.accent)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(.orange.opacity(0.2), in: Capsule())
+                                .background(Theme.accent.opacity(0.2), in: Capsule())
                         }
                         Picker(selection: $recordingOrientation) {
                             Text("settings.video.orientation.portrait", comment: "Recording orientation option: portrait")
@@ -255,6 +275,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("settings.video.qualityFooter", comment: "Footer below the video quality picker")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Picker(selection: Binding(
@@ -284,14 +305,17 @@ struct SettingsView: View {
                     Toggle(isOn: $dimDuringRecording) {
                         Text("settings.recording.dimScreen", comment: "Toggle: dim screen while recording")
                     }
+                    .tint(Theme.accent)
 
                     Toggle(isOn: $stabilizationEnabled) {
                         Text("settings.recording.stabilization", comment: "Toggle: video stabilization")
                     }
+                    .tint(Theme.accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle(isOn: $autoStartPrompting) {
                             Text("settings.recording.autoStart", comment: "Toggle: auto-start the prompter when recording begins")
                         }
+                        .tint(Theme.accent)
                         Text("settings.recording.autoStartFooter", comment: "Helper text below the auto-start toggle")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -300,6 +324,7 @@ struct SettingsView: View {
                         Toggle(isOn: $useBluetoothMic) {
                             Text("settings.allowBluetoothMics", comment: "Toggle: allow Bluetooth microphones (AirPods etc.) as audio input. Off by default because BT forces 16kHz HFP audio.")
                         }
+                        .tint(Theme.accent)
                         Text("settings.allowBluetoothMics.footer", comment: "Helper text below the Bluetooth mic toggle, explaining why it's off by default and that wired mics are unaffected.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -310,6 +335,7 @@ struct SettingsView: View {
                             Toggle(isOn: $fmvEnabled) {
                                 Text("settings.followMyVoice.toggle", comment: "Toggle: Follow my voice. Adapts the prompter pace to the user's actual speech.")
                             }
+                            .tint(Theme.accent)
                             Text("settings.followMyVoice.englishOnly", comment: "Helper text: Follow My Voice supports English scripts only at v2.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -319,18 +345,22 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.recording", comment: "Settings section header")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Toggle(isOn: $orpAlignmentEnabled) {
                         Text("settings.anchor.align", comment: "Toggle: align words by anchor letter")
                     }
+                    .tint(Theme.accent)
                     Toggle(isOn: $orpHighlightAnchor) {
                         Text("settings.anchor.highlight", comment: "Toggle: highlight anchor letter")
                     }
+                    .tint(Theme.accent)
                     .disabled(!orpAlignmentEnabled)
                 } header: {
                     Text("settings.section.anchorAlignment", comment: "Settings section header for ORP toggles")
                 }
+                .listRowSeparator(.hidden)
 
                 #if DEV
                 Section("Debug") {
@@ -386,21 +416,24 @@ struct SettingsView: View {
                     }
                     Text("Build: DEV")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.accent)
 
                     if #available(iOS 26.0, *) {
                         SpeechAnalyzerDiagButton()
                     }
                 }
+                .listRowSeparator(.hidden)
 
                 Section("Chromakey (DEV)") {
                     Toggle(isOn: $devChromakeyEnabled) {
                         Text("Chromakey background (replace camera)")
                     }
+                    .tint(Theme.accent)
                     Text("Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .listRowSeparator(.hidden)
 
                 Section("Notifications (DEV)") {
                     HStack {
@@ -468,6 +501,7 @@ struct SettingsView: View {
                         UserDefaults.standard.set(0, forKey: "coldStartCountAfterOnboarding")
                     }
                 }
+                .listRowSeparator(.hidden)
                 .onAppear {
                     Task { await refreshDevDiagnostics() }
                 }
@@ -488,6 +522,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .listRowSeparator(.hidden)
                 }
 
                 Section {
@@ -500,6 +535,7 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.about", comment: "Settings section header for app metadata")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Button(action: { restoreTapped() }) {
@@ -524,6 +560,7 @@ struct SettingsView: View {
                         comment: "Settings section header for subscription-related actions (restore purchases, etc.)."
                     ))
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Button {
@@ -540,17 +577,19 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.support", comment: "Settings section header for support and legal")
                 }
+                .listRowSeparator(.hidden)
             }
+            .contentMargins(.horizontal, 16, for: .scrollContent)
             .navigationTitle(Text("settings.title", comment: "Settings nav title"))
             #if DEV
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Text("DEV")
                         .font(.caption2.bold())
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.orange.opacity(0.2), in: Capsule())
+                        .background(Theme.accent.opacity(0.2), in: Capsule())
                 }
             }
             #endif
