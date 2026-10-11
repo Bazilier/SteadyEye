@@ -23,6 +23,14 @@ struct ChatView: View {
     @State private var isSending: Bool = false
     @State private var pollTask: Task<Void, Never>? = nil
     @State private var nextLocalId: Int = -1
+    /// Height of the input bar, and how far the end of the thread sits below
+    /// the visible list. Together they keep the last message in view while
+    /// the composer grows, without moving a list the user scrolled up.
+    @State private var composerHeight: CGFloat = 0
+    @State private var distanceFromBottom: CGFloat = 0
+    @State private var listHeight: CGFloat = 0
+    @State private var isBottomMarkerLoaded = false
+    @State private var wasNearBottom = false
 
     private static let pollInterval: UInt64 = 10 * 1_000_000_000
 
@@ -76,7 +84,7 @@ struct ChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
+                LazyVStack(alignment: .leading, spacing: 6) {
                     pinnedBubble
                         .padding(.top, 12)
 
@@ -88,26 +96,55 @@ struct ChatView: View {
                             .padding(.top, 24)
                     }
 
-                    ForEach(messages) { message in
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                         ChatBubbleView(
                             message: message,
                             onRetry: message.sendStatus == .failed
                                 ? { Task { await retry(messageId: message.id) } }
                                 : nil
                         )
+                        // 6 pt inside a run from one sender, 12 pt when the
+                        // sender changes (the pinned bubble counts as founder).
+                        .padding(.top, senderChanged(at: index) ? 6 : 0)
                         .id(message.id)
                     }
 
-                    Color.clear.frame(height: 1).id("bottom")
+                    Color.clear.frame(height: 1)
+                        .onGeometryChange(for: CGFloat.self) { geo in
+                            geo.frame(in: .named("chatList")).maxY
+                        } action: { bottomY in
+                            distanceFromBottom = bottomY - listHeight
+                        }
+                        // The lazy stack unloads the marker once it is far off
+                        // screen; its last position is stale from then on.
+                        .onAppear { isBottomMarkerLoaded = true }
+                        .onDisappear { isBottomMarkerLoaded = false }
+                        // Outermost, so the lazy stack can scroll to it before
+                        // it has been rendered.
+                        .id("bottom")
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
+            .coordinateSpace(name: "chatList")
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             .refreshable { await fetchAndMerge() }
             .onChange(of: messages.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
+            }
+            // "Near the bottom" is decided when the text changes, before the
+            // composer re-lays out: once the list's height changes, the lazy
+            // stack re-measures rows above the viewport and positions read
+            // afterwards are off. Near = the end of the thread loaded and
+            // within 44 pt of the list's bottom edge.
+            .onChange(of: inputText) { _, _ in
+                wasNearBottom = isBottomMarkerLoaded && distanceFromBottom <= 44
+            }
+            .onChange(of: composerHeight) { old, _ in
+                guard old > 0, wasNearBottom else { return }
+                proxy.scrollTo("bottom", anchor: .bottom)
             }
         }
     }
@@ -117,10 +154,14 @@ struct ChatView: View {
     /// user) row so it reads as an incoming message rather than a card. No
     /// timestamp line: it is static copy, not a dated message.
     private var pinnedBubble: some View {
-        HStack(alignment: .bottom, spacing: 6) {
+        ChatBubbleRow(trailing: false) {
             ChatBubbleSurface(content: pinnedText, isInbound: false)
-            Spacer(minLength: 40)
         }
+    }
+
+    private func senderChanged(at index: Int) -> Bool {
+        let previous = index > 0 ? messages[index - 1].direction : .outbound
+        return messages[index].direction != previous
     }
 
     private var pinnedText: Text {
@@ -136,46 +177,67 @@ struct ChatView: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
+            let placeholder = String(
+                localized: "chat.input.placeholder",
+                defaultValue: "Type a message…",
+                comment: "Placeholder in the chat input field"
+            )
             TextField(
-                String(
-                    localized: "chat.input.placeholder",
-                    defaultValue: "Type a message…",
-                    comment: "Placeholder in the chat input field"
-                ),
                 text: $inputText,
+                // Explicit color: a hierarchical `.secondary` here is applied on
+                // top of the system placeholder dimming and nearly vanishes.
+                prompt: Text(placeholder).foregroundColor(Color(.secondaryLabel)),
                 axis: .vertical
-            )
+            ) {
+                Text(placeholder)
+            }
             .lineLimit(1...5)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-            )
+            .frame(minHeight: 44)
+            .background {
+                // Capsule while one line; the medium card radius once it grows.
+                GeometryReader { geo in
+                    let shape = geo.size.height > 44.5
+                        ? AnyShape(RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
+                        : AnyShape(Capsule())
+                    shape.fill(Color(.secondarySystemGroupedBackground))
+                }
+            }
 
             Button {
                 Task { await send() }
             } label: {
-                if isSending {
-                    ProgressView()
-                        .frame(width: 32, height: 32)
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .resizable()
-                        .frame(width: 32, height: 32)
-                        // Color.orange literal — matches the inbound bubble
-                        // (ChatBubbleView). Color.accentColor doesn't work
-                        // here because sheets don't inherit the TabView's
-                        // .tint(.orange), so it would render system blue.
-                        .foregroundStyle(canSend ? Color.orange : Color.secondary.opacity(0.5))
+                Group {
+                    if isSending {
+                        ProgressView()
+                            .tint(Theme.onAccent)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.onAccent)
+                    }
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .disabled(!canSend || isSending)
+            // The circle sits outside `.disabled`: inside it, iOS 17/18 grey
+            // out `Theme.accent` (the accent color). Explicit Theme.accent —
+            // sheets don't inherit the TabView's .tint.
+            .background {
+                Circle()
+                    .fill(Theme.accent)
+                    .frame(width: 36, height: 36)
+            }
+            .opacity(canSend ? 1 : 0.4)
             .accessibilityLabel(Text("chat.input.send", comment: "Accessibility label for the send button"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(.bar)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
     }
 
     private var canSend: Bool {
