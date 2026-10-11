@@ -594,7 +594,14 @@ struct SettingsView: View {
                 }
                 .listRowSeparator(.hidden)
             }
-            .contentMargins(.horizontal, 16, for: .scrollContent)
+            // 16 pt groups, unless the window has side safe-area insets (the
+            // iPhone Duo's camera strip and tab rail): a fixed margin makes the
+            // system section backgrounds ignore those insets and run under the
+            // rail, so there the system margins, which respect them, apply.
+            .contentMargins(.horizontal, hasSideSafeArea ? nil : 16, for: .scrollContent)
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.safeAreaInsets.leading > 0 || proxy.safeAreaInsets.trailing > 0
+            } action: { hasSideSafeArea = $0 }
             .navigationTitle(Text("settings.title", comment: "Settings nav title"))
             #if DEV
             .toolbar {
