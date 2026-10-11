@@ -895,7 +895,7 @@ struct PaywallView: View {
                 ),
                 subtitle: String(
                     localized: "paywall.v2.feature.noWatermark.subtitle",
-                    defaultValue: "Share videos without 'Made with SteadyEye'",
+                    defaultValue: "Share videos without the SteadyEye watermark",
                     comment: "Paywall v2 feature row subtitle for the no-watermark feature."
                 )
             )
@@ -990,7 +990,7 @@ struct PaywallView: View {
             Feature(
                 icon: "drop.fill",
                 title: String(localized: "paywall.v2.feature.noWatermark", defaultValue: "No watermark on recordings", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without 'Made with SteadyEye'", comment: "Paywall v2 feature card subtitle.")
+                subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without the SteadyEye watermark", comment: "Paywall v2 feature card subtitle.")
             ),
             Feature(
                 icon: "sparkles",

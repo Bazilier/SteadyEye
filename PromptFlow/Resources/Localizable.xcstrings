@@ -3336,25 +3336,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Share videos without 'Made with SteadyEye'"
+            "value" : "Share videos without the SteadyEye watermark"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comparte videos sin la marca 'Made with SteadyEye'"
+            "value" : "Comparte videos sin la marca de agua de SteadyEye"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartilhe vídeos sem 'Made with SteadyEye'"
+            "value" : "Compartilhe vídeos sem a marca d'água do SteadyEye"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Делитесь видео без надписи «Made with SteadyEye»"
+            "value" : "Делитесь видео без водяного знака SteadyEye"
           }
         }
       }
