@@ -6,8 +6,11 @@ import UIKit
 /// background in RecordingView. Everything is in window coordinates, the
 /// space `DuoDisplayState` is resolved in.
 struct DuoDebugOverlay: View {
-    /// Master switch. Set to false to hide the overlay without touching call sites.
-    static let isEnabled = true
+    /// Off by default, so chromakey mockups stay clean; switched on from
+    /// Settings → iPhone Duo (DEV). Read on each render of the recording screen.
+    static var isEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "dev_duo_geometry_overlay")
+    }
 
     let state: DuoDisplayState
     /// All occlusion regions, lens included.

@@ -31,12 +31,15 @@ struct SettingsView: View {
     @State private var showRestoreAlert = false
     @State private var showChat = false
     @StateObject private var chatBadgeState = ChatBadgeState.shared
+    /// The window has leading or trailing safe-area insets (iPhone Duo).
+    @State private var hasSideSafeArea = false
 
     #if DEV
     @State private var devNotificationStatus: String = "loading…"
     @State private var devPendingCount: Int = 0
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
+    @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -445,6 +448,13 @@ struct SettingsView: View {
                     }
                     .tint(Theme.accent)
                     Text("What iPhone Duo always does: with the phone held sideways, record the level horizon's vertical middle 9:16 instead of a tipped-over portrait frame. Hold this phone sideways to test it. Takes effect on next Recording open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devDuoGeometryOverlay) {
+                        Text("Geometry overlay (chromakey)")
+                    }
+                    .tint(Theme.accent)
+                    Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
