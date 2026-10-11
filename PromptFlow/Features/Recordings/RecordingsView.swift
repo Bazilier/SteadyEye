@@ -13,8 +13,6 @@ struct RecordingsView: View {
     @State private var playingRecording: Recording?
     @State private var deleteTarget: Recording?
     @State private var showDeleteConfirmation = false
-    @State private var shareItems: [Any]?
-    @State private var showShareSheet = false
     @State private var showSavedToast = false
     @State private var missingRecording: Recording?
     @State private var showMissingFileAlert = false
@@ -25,11 +23,31 @@ struct RecordingsView: View {
         GridItem(.flexible(), spacing: 12)
     ]
 
+    /// Zoom from a card into the preview (iOS 18+).
+    @Namespace private var previewZoom
+
     private var filteredRecordings: [Recording] {
         if searchText.isEmpty { return allRecordings }
         return allRecordings.filter {
             $0.scriptTitle.localizedCaseInsensitiveContains(searchText)
         }
+    }
+
+    /// `filteredRecordings` split into runs that share a calendar day of
+    /// `createdAt`. The query is already newest-first, so each day's
+    /// recordings are contiguous and days with no matches drop out.
+    private var recordingsByDay: [(day: Date, recordings: [Recording])] {
+        let calendar = Calendar.current
+        var groups: [(day: Date, recordings: [Recording])] = []
+        for recording in filteredRecordings {
+            let day = calendar.startOfDay(for: recording.createdAt)
+            if groups.last?.day == day {
+                groups[groups.count - 1].recordings.append(recording)
+            } else {
+                groups.append((day, [recording]))
+            }
+        }
+        return groups
     }
 
     var body: some View {
@@ -144,17 +162,16 @@ struct RecordingsView: View {
             ))
         }
         .fullScreenCover(item: $playingRecording) { recording in
-            VideoPreviewView(recording: recording, onDismiss: {
-                playingRecording = nil
-            })
+            VideoPreviewView(
+                recording: recording,
+                onDismiss: { playingRecording = nil },
+                // The same file the card shows; read, not regenerated.
+                poster: recording.thumbnailURL.flatMap { UIImage(contentsOfFile: $0.path) }
+            )
+            .previewZoomTransition(id: recording.id, in: previewZoom)
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "recordings_crown")
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let items = shareItems {
-                ActivityView(items: items)
-            }
         }
     }
 
@@ -224,49 +241,62 @@ struct RecordingsView: View {
 
     private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(filteredRecordings) { recording in
-                    RecordingThumbnailCard(recording: recording)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if FileManager.default.fileExists(atPath: recording.fileURL.path) {
-                                playingRecording = recording
-                            } else {
-                                missingRecording = recording
-                                showMissingFileAlert = true
-                            }
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(recordingsByDay.enumerated()), id: \.element.day) { index, group in
+                    // Same header as the script list; lines up with the
+                    // cards' text, scrolls with the content.
+                    Text(DayTitle.string(for: group.day))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 12)
+                        .padding(.top, index == 0 ? 0 : 20)
+                        .padding(.bottom, 8)
+
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(group.recordings) { recording in
+                            RecordingThumbnailCard(recording: recording)
+                                .previewZoomSource(id: recording.id, in: previewZoom)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if FileManager.default.fileExists(atPath: recording.fileURL.path) {
+                                        playingRecording = recording
+                                    } else {
+                                        missingRecording = recording
+                                        showMissingFileAlert = true
+                                    }
+                                }
+                                .contextMenu {
+                                    Button {
+                                        saveToCameraRoll(recording)
+                                    } label: {
+                                        Label {
+                                            Text(String(
+                                                localized: "recordings.action.saveToCameraRoll",
+                                                defaultValue: "Save to Camera Roll",
+                                                comment: "Recordings context-menu action that exports the recording to the Photos library."
+                                            ))
+                                        } icon: {
+                                            menuIcon("photo", accent: true)
+                                        }
+                                    }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        deleteTarget = recording
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label {
+                                            Text(String(
+                                                localized: "recordings.action.delete",
+                                                defaultValue: "Delete",
+                                                comment: "Recordings context-menu destructive action that removes the recording."
+                                            ))
+                                        } icon: {
+                                            menuIcon("trash", accent: false)
+                                        }
+                                    }
+                                }
                         }
-                        .contextMenu {
-                            Button {
-                                share(recording)
-                            } label: {
-                                Label(String(
-                                    localized: "recordings.action.share",
-                                    defaultValue: "Share",
-                                    comment: "Recordings context-menu action that opens the system share sheet."
-                                ), systemImage: "square.and.arrow.up")
-                            }
-                            Button {
-                                saveToCameraRoll(recording)
-                            } label: {
-                                Label(String(
-                                    localized: "recordings.action.saveToCameraRoll",
-                                    defaultValue: "Save to Camera Roll",
-                                    comment: "Recordings context-menu action that exports the recording to the Photos library."
-                                ), systemImage: "photo")
-                            }
-                            Divider()
-                            Button(role: .destructive) {
-                                deleteTarget = recording
-                                showDeleteConfirmation = true
-                            } label: {
-                                Label(String(
-                                    localized: "recordings.action.delete",
-                                    defaultValue: "Delete",
-                                    comment: "Recordings context-menu destructive action that removes the recording."
-                                ), systemImage: "trash")
-                            }
-                        }
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -274,13 +304,16 @@ struct RecordingsView: View {
         }
     }
 
-    // MARK: - Actions
-
-    private func share(_ recording: Recording) {
-        guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
-        shareItems = [recording.fileURL]
-        showShareSheet = true
+    /// Context-menu icons are drawn by UIKit, whose tint is system blue: the
+    /// AccentColor asset and the SwiftUI `.tint` don't reach it. Pre-coloured
+    /// images keep their colour (accent, or red for the destructive item).
+    private func menuIcon(_ systemName: String, accent: Bool) -> Image {
+        let color = accent ? (UIColor(named: "AccentColor") ?? .tintColor) : .systemRed
+        guard let image = UIImage(systemName: systemName) else { return Image(systemName: systemName) }
+        return Image(uiImage: image.withTintColor(color, renderingMode: .alwaysOriginal))
     }
+
+    // MARK: - Actions
 
     private func saveToCameraRoll(_ recording: Recording) {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
@@ -307,6 +340,33 @@ struct RecordingsView: View {
                     ])
                 }
             }
+        }
+    }
+}
+
+// MARK: - Zoom transition
+
+private extension View {
+    /// iOS 18+: the card the preview zooms out of, clipped to the card shape.
+    @ViewBuilder
+    func previewZoomSource(id: UUID, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            matchedTransitionSource(id: id, in: namespace) { source in
+                source.clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+            }
+        } else {
+            self
+        }
+    }
+
+    /// iOS 18+: the preview zooms in from its card; iOS 17 keeps the default
+    /// full-screen cover transition.
+    @ViewBuilder
+    func previewZoomTransition(id: UUID, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
         }
     }
 }
