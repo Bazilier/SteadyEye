@@ -410,6 +410,19 @@ struct RecordingView: View {
             cameraManager.stop()
             dismiss()
         }
+        // iPhone Duo: folding or unfolding moves the window to the other
+        // display and its camera, which a running take does not survive.
+        // The hinge crossing the closed boundary leads the switch; the
+        // posture change is the backup. partiallyOpen <-> fullyOpen is
+        // neither, so it never stops a take.
+        .onChange(of: duoMonitor?.isHingeClosed) { old, new in
+            guard let old, let new, old != new else { return }
+            stopTakeForFoldChange()
+        }
+        .onChange(of: duoMonitor?.state?.posture) { old, new in
+            guard let old, let new, old != new else { return }
+            stopTakeForFoldChange()
+        }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
@@ -1950,6 +1963,21 @@ struct RecordingView: View {
             }
             startCountdown()
         }
+    }
+
+    /// Ends a countdown or a take because the Duo is being folded or
+    /// unfolded. A take stops exactly as the record button stops it, so the
+    /// usual Retake / Save flow follows; a countdown is simply cancelled.
+    private func stopTakeForFoldChange() {
+        if isCountingDown {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+            isCountingDown = false
+        }
+        guard cameraManager.isRecording else { return }
+        cameraManager.stopRecording()
+        player.pause()
+        AppAnalytics.log("recording_stopped_by_fold", params: nil)
     }
 
     private func startCountdown() {

@@ -56,6 +56,12 @@ final class DuoDisplayMonitor {
     /// `state` so angle jitter neither changes the state nor logs; read only
     /// by the debug overlay.
     private(set) var hingeAngleDegrees: Double = 0
+    /// Whether the hinge is closed, straight from the hinge callback; nil
+    /// until the first known status. Leads the display switch (opening: by
+    /// 170–440 ms; closing: it flips at about 80°, before the window moves),
+    /// which `state` cannot, since it waits for the new display's regions.
+    /// partiallyOpen and fullyOpen are both "not closed".
+    private(set) var isHingeClosed: Bool?
 
     struct Division: Equatable {
         /// The region's frame, which already includes its margins.
@@ -83,6 +89,10 @@ final class DuoDisplayMonitor {
     func updateHinge(present: Bool, status: DuoDisplayState.HingeStatus?, angleDegrees: Double) {
         hasHinge = present
         if present { Self.hingeLatch.withLock { $0 = true } }
+        if present, let status {
+            let closed = status == .closed
+            if isHingeClosed != closed { isHingeClosed = closed }
+        }
         hingeStatus = status
         if hingeAngleDegrees != angleDegrees { hingeAngleDegrees = angleDegrees }
         resolve()
