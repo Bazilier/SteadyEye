@@ -295,6 +295,10 @@ private struct DuoDisplayMonitorModifier: ViewModifier {
             }
         }
         .environment(monitor)
+        // First sight of each posture and orientation: report it (Duo only).
+        .onChange(of: monitor.state) { _, new in
+            if new != nil { DuoReportService.scheduleDeviceReport(monitor) }
+        }
     }
 }
 

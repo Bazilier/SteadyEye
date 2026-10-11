@@ -270,6 +270,9 @@ struct RecordingView: View {
     @State private var isDragging = false
     @State private var isTextEditMode = false
     @State private var textDragY: CGFloat = 0
+    /// The current take was ended by folding or unfolding the Duo; carried
+    /// into its Duo report.
+    @State private var takeStoppedByFold = false
 
     // Recording countdown
     @State private var countdownValue: Int = 0
@@ -422,6 +425,15 @@ struct RecordingView: View {
         .onChange(of: duoMonitor?.state?.posture) { old, new in
             guard let old, let new, old != new else { return }
             stopTakeForFoldChange()
+        }
+        // Duo report of the live camera, once per posture and orientation.
+        .onChange(of: duoMonitor?.state) { _, _ in
+            if cameraManager.isSessionReady {
+                DuoReportService.scheduleCameraReport(cameraManager, monitor: duoMonitor)
+            }
+        }
+        .onChange(of: cameraManager.isSessionReady) { _, ready in
+            if ready { DuoReportService.scheduleCameraReport(cameraManager, monitor: duoMonitor) }
         }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
@@ -1975,6 +1987,7 @@ struct RecordingView: View {
             isCountingDown = false
         }
         guard cameraManager.isRecording else { return }
+        takeStoppedByFold = true
         cameraManager.stopRecording()
         player.pause()
         AppAnalytics.log("recording_stopped_by_fold", params: nil)
@@ -2012,6 +2025,7 @@ struct RecordingView: View {
     }
 
     private func beginRecording() {
+        takeStoppedByFold = false
         cameraManager.startRecording()
         AppAnalytics.log("recording_started", params: [
             "display_mode": displayMode,
@@ -2063,6 +2077,14 @@ struct RecordingView: View {
                 // successful recording here means a recording that yields to a
                 // paywall still moves the user toward the prompt.
                 ReviewPromptManager.recordSuccessfulRecording()
+                DuoReportService.reportTake(
+                    fileURL: recording.fileURL,
+                    failure: nil,
+                    duration: duration,
+                    stoppedByFold: takeStoppedByFold,
+                    cameraManager: cameraManager,
+                    monitor: duoMonitor
+                )
                 previewRecording = recording
             case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,
@@ -2080,6 +2102,14 @@ struct RecordingView: View {
                     "display_mode": displayMode,
                     "error_reason": "\(nsError.domain)/\(nsError.code)"
                 ])
+                DuoReportService.reportTake(
+                    fileURL: nil,
+                    failure: "\(nsError.domain)/\(nsError.code)",
+                    duration: duration,
+                    stoppedByFold: takeStoppedByFold,
+                    cameraManager: cameraManager,
+                    monitor: duoMonitor
+                )
                 try? FileManager.default.removeItem(at: sourceURL)
                 resetDisplay()
             }

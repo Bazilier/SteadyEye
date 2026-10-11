@@ -1,11 +1,12 @@
-#if DEV
 import Foundation
 
-/// DEV-only in-memory mirror of the `CameraDiagnostic` os.Logger events.
+/// In-memory mirror of the `CameraDiagnostic` os.Logger events.
 ///
 /// Exists so a TestFlight tester without a Mac can read and copy the capture
-/// diagnostics from Settings. The `os.Logger` calls remain the source of truth
-/// and are NOT replaced — every `record(_:)` here sits alongside one.
+/// diagnostics from Settings (DEV), and so an iPhone Duo take report
+/// (`DuoReportService`) can carry them from any build. The `os.Logger` calls
+/// remain the source of truth and are NOT replaced — every `record(_:)` here
+/// sits alongside one. Technical capture events only, no user content.
 ///
 /// Bounded ring buffer. Written from `sampleBufferQueue` and the camera queue,
 /// read from the main thread, serialized on its own queue.
@@ -39,4 +40,3 @@ enum CameraDiagnosticsLog {
         queue.async { entries.removeAll() }
     }
 }
-#endif

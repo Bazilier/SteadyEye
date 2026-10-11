@@ -377,9 +377,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=rotation_selected mode=\(self.sessionOrientationMode.rawValue, privacy: .public) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState, privacy: .public) pinned_angle=\(pinnedField, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField, privacy: .public) observed_buffer=\(observedField, privacy: .public) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=rotation_selected mode=\(self.sessionOrientationMode.rawValue) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState) pinned_angle=\(pinnedField) landscape_candidates=\(candidatesField) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField) observed_buffer=\(observedField) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)")
-        #endif
         return appliedRotationAngle
     }
 
@@ -459,9 +457,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=landscape_warmup outcome=\(outcome, privacy: .public) elapsed_ms=\(elapsedMs)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=landscape_warmup outcome=\(outcome) elapsed_ms=\(elapsedMs)")
-        #endif
     }
 
     /// RotationCoordinator KVO handler. Freezes the applied angle while a
@@ -744,9 +740,7 @@ final class CameraManager: NSObject, ObservableObject {
             camLog.notice(
                 "event=session_config_complete device_model=\(Self.deviceModelIdentifier, privacy: .public) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue, privacy: .public) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=session_config_complete device_model=\(Self.deviceModelIdentifier) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))")
-            #endif
         }
 
         // Arm the landscape gate BEFORE the session runs. Two reasons: the wait
@@ -1036,9 +1030,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=recording_start mode=\(self.sessionOrientationMode.rawValue, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource, privacy: .public) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality, privacy: .public) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue, privacy: .public) stabilization=\(stabMode?.rawValue ?? -1)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=recording_start mode=\(self.sessionOrientationMode.rawValue) landscape_candidates=\(candidatesField) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue) stabilization=\(stabMode?.rawValue ?? -1)")
-        #endif
 
         if let pool = recorder.pixelBufferPool {
             composer.setPixelBufferPool(pool)
@@ -1189,6 +1181,35 @@ final class CameraManager: NSObject, ObservableObject {
         guard backgroundTaskID != .invalid else { return }
         UIApplication.shared.endBackgroundTask(backgroundTaskID)
         backgroundTaskID = .invalid
+    }
+
+    // MARK: - iPhone Duo diagnostics
+
+    /// The current capture configuration, for an iPhone Duo report
+    /// (`DuoReportService`). Reads the same state the rotation logs do.
+    func duoDiagnostics() -> [String: Any] {
+        var info: [String: Any] = [
+            "session_ready": isSessionReady,
+            "preset": session.sessionPreset.rawValue,
+            "orientation_mode": sessionOrientationMode.rawValue,
+            "crops_sideways": sessionCropsSideways,
+            "applied_angle": appliedRotationAngle,
+            "chromakey": Self.isChromakeyActive,
+        ]
+        if let horizon = lastReportedHorizonAngle { info["horizon_angle"] = horizon }
+        if let connection = videoDataOutput?.connection(with: .video) {
+            info["connection_angle"] = connection.videoRotationAngle
+            info["mirrored"] = connection.isVideoMirrored
+            info["stabilization"] = connection.activeVideoStabilizationMode.rawValue
+        }
+        if let observed = observedBuffer.withLock({ $0 }) {
+            info["observed_buffer"] = "\(observed.width)x\(observed.height)@\(Int(observed.connectionAngle))"
+            info["portrait_residue"] = observedPortraitResidue ?? -1
+        }
+        if let device = currentCamera {
+            info["device"] = DuoReportService.describe(device, formats: false)
+        }
+        return info
     }
 
     private func updateAudioSourceName() {
@@ -1411,9 +1432,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.notice(
             "event=first_buffer mode=\(self.sessionOrientationMode.rawValue, privacy: .public) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField, privacy: .public)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=first_buffer mode=\(self.sessionOrientationMode.rawValue) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField)")
-        #endif
     }
 
     /// Slow path of the orientation correction in `captureOutput`: rotates
@@ -1483,9 +1502,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             camLog.error(
                 "event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) mirrored=\(self.recordingConnectionMirrored) difference=\(difference)"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) mirrored=\(self.recordingConnectionMirrored) difference=\(difference)")
-            #endif
         }
         return outputBuffer
     }
@@ -1529,9 +1546,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             camLog.notice(
                 "event=sideways_cropped buffer_w=\(bufferWidth) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=sideways_cropped buffer_w=\(bufferWidth) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))")
-            #endif
         }
         return outputBuffer
     }
@@ -1546,9 +1561,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.error(
             "event=orientation_uncorrectable reason=\(reason, privacy: .public) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) difference=\(difference)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=orientation_uncorrectable reason=\(reason) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) difference=\(difference)")
-        #endif
     }
 
     /// A leading frame whose shape contradicted the canvas was dropped rather
@@ -1565,9 +1578,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.error(
             "event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue, privacy: .public) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))")
-        #endif
     }
 
     #if DEV
