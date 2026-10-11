@@ -106,24 +106,6 @@ struct ScriptListView: View {
         return groups
     }
 
-    /// "Today" / "Yesterday" from the system's relative formatting, otherwise
-    /// day and month (plus year outside the current year). Localized by the OS.
-    private func dayTitle(_ day: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(day) || calendar.isDateInYesterday(day) {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .none
-            formatter.doesRelativeDateFormatting = true
-            formatter.formattingContext = .beginningOfSentence
-            return formatter.string(from: day)
-        }
-        if calendar.isDate(day, equalTo: Date(), toGranularity: .year) {
-            return day.formatted(.dateTime.day().month(.wide))
-        }
-        return day.formatted(.dateTime.day().month(.wide).year())
-    }
-
     /// Trims the system header insets (10/10 pt on iOS 26, 17/6 pt on iOS
     /// 17/18) so that, with the 10 pt section spacing, a date header has 20 pt
     /// above it and 8 pt below. The leading inset stays the system one, which
@@ -378,7 +360,7 @@ struct ScriptListView: View {
                     } header: {
                         // Only the day's first card carries the date header.
                         if script.id == group.scripts.first?.id {
-                            Text(dayTitle(group.day))
+                            Text(DayTitle.string(for: group.day))
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .textCase(nil)
