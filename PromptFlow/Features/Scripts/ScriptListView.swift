@@ -172,8 +172,13 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .fullScreenCover(item: $scriptToRecord, onDismiss: { cardOpener.didClose() }) { script in
+            .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
+                    .onPresentationComplete { cardOpener.resetCard() }
+            }
+            .onChange(of: scriptToRecord) { _, script in
+                // Closed before the presentation completed.
+                if script == nil { cardOpener.resetCard() }
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView(entryPoint: bulkImportEntryPoint)

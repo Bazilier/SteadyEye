@@ -164,7 +164,7 @@ struct RecordingsView: View {
                 comment: "Body of the alert shown when a recording's underlying file is missing on disk."
             ))
         }
-        .fullScreenCover(item: $playingRecording, onDismiss: { cardOpener.didClose() }) { recording in
+        .fullScreenCover(item: $playingRecording) { recording in
             VideoPreviewView(
                 recording: recording,
                 onDismiss: { playingRecording = nil },
@@ -172,6 +172,11 @@ struct RecordingsView: View {
                 poster: recording.thumbnailURL.flatMap { UIImage(contentsOfFile: $0.path) }
             )
             .previewZoomTransition(id: recording.id, in: previewZoom)
+            .onPresentationComplete { cardOpener.resetCard() }
+        }
+        .onChange(of: playingRecording) { _, recording in
+            // Closed before the presentation completed.
+            if recording == nil { cardOpener.resetCard() }
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "recordings_crown")

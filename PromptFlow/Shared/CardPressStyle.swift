@@ -1,13 +1,13 @@
 import SwiftUI
 
 /// Press feedback for the script and recording cards. The card eases down
-/// while touched and stays down, via `opener`, while its destination is
-/// about to open and while it is open, so a zoom starts from, and lands
-/// back on, the pressed size before the card eases back up.
+/// while touched and stays down, via `opener`, until its destination has
+/// covered it, so a zoom starts from the pressed size; it is back at full
+/// size, without animation, before the destination is dismissed.
 struct CardPressStyle: ButtonStyle {
     static let pressedScale: CGFloat = 0.96
     static let pressDuration: Double = 0.3
-    /// Back to full size, after a cancelled press or a closed destination.
+    /// Back to full size after a cancelled press.
     static let releaseDuration: Double = 0.2
 
     let id: UUID
@@ -33,7 +33,7 @@ struct CardPressStyle: ButtonStyle {
 /// rest of it and a long press opens at once. One card at a time.
 @MainActor @Observable
 final class CardOpener {
-    /// The card held at the pressed size: waiting to open, or open.
+    /// The card held at the pressed size: waiting to open, or opening.
     private(set) var openingID: UUID?
     /// The card waiting to open; other cards, its edit button and its
     /// context menu are disabled meanwhile.
@@ -84,13 +84,24 @@ final class CardOpener {
         openingID = nil
     }
 
-    /// The destination was dismissed: the card eases back.
-    func didClose() {
-        openingID = nil
+    /// The destination now covers the card, or is closing before it got
+    /// there: back to full size at once, so the list is uncovered with a
+    /// full-size card and the dismiss lands on it.
+    func resetCard() {
+        guard openingID != nil else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { openingID = nil }
     }
 }
 
 extension View {
+    /// Runs `action` once the view's presentation has finished (UIKit
+    /// `viewDidAppear`), not when it is inserted like `onAppear`.
+    func onPresentationComplete(_ action: @escaping () -> Void) -> some View {
+        background(PresentationCompleteProbe(action: action).frame(width: 0, height: 0))
+    }
+
     /// Cancels a pending card open as soon as the list starts scrolling
     /// (iOS 18+; on iOS 17 the wait is short enough to let it run).
     @ViewBuilder
@@ -101,6 +112,29 @@ extension View {
             }
         } else {
             self
+        }
+    }
+}
+
+private struct PresentationCompleteProbe: UIViewControllerRepresentable {
+    let action: () -> Void
+
+    func makeUIViewController(context: Context) -> Controller {
+        let controller = Controller()
+        controller.action = action
+        return controller
+    }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.action = action
+    }
+
+    final class Controller: UIViewController {
+        var action: (() -> Void)?
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            action?()
         }
     }
 }
