@@ -242,6 +242,8 @@ struct SettingsView: View {
 
                     // Read when the capture session is configured, so a change
                     // here reaches the next session rather than the running one.
+                    // Not offered on iPhone Duo, which records portrait only.
+                    if !DuoDisplayMonitor.deviceHasHinge {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Text("settings.video.orientation", comment: "Label above the recording orientation picker")
@@ -269,6 +271,7 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
+                    }
                     }
                 } header: {
                     Text("settings.section.videoQuality", comment: "Settings section header")

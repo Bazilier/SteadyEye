@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import os
 
 // iPhone Duo display state. Resolved from the hinge plus the window's
 // reserved regions (occlusion = camera, division = crease), all of which are
@@ -69,10 +70,19 @@ final class DuoDisplayMonitor {
     @ObservationIgnored private var occlusions: [CGRect] = []
     @ObservationIgnored private var divisions: [Division] = []
 
+    /// True once any hinge has been reported in this process: the device is a
+    /// foldable. For code without the SwiftUI environment — the capture
+    /// pipeline, Settings — that needs "is this a Duo" rather than the current
+    /// posture. In memory only: a process never moves to another device. False
+    /// for roughly the first 2 s after launch, until the first hinge callback.
+    nonisolated static var deviceHasHinge: Bool { hingeLatch.withLock { $0 } }
+    nonisolated private static let hingeLatch = OSAllocatedUnfairLock(initialState: false)
+
     /// `status` nil with `present` true means a hinge status this build does
     /// not know; resolution treats it as transitional.
     func updateHinge(present: Bool, status: DuoDisplayState.HingeStatus?, angleDegrees: Double) {
         hasHinge = present
+        if present { Self.hingeLatch.withLock { $0 = true } }
         hingeStatus = status
         if hingeAngleDegrees != angleDegrees { hingeAngleDegrees = angleDegrees }
         resolve()
