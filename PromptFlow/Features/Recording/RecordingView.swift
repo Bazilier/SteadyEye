@@ -52,6 +52,9 @@ struct RecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
+    /// Holds the Settings → Countdown choice. Settings creates the row on
+    /// first open; until then the countdown keeps its 3 s default.
+    @Query private var settingsArray: [AppSettings]
     @ObservedObject private var cameraManager = CameraManager.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var player = ChunkPlayerEngine()
@@ -266,7 +269,10 @@ struct RecordingView: View {
     @State private var countdownValue: Int = 0
     @State private var isCountingDown = false
     @State private var countdownTimer: Timer?
-    private let countdownSeconds = 3
+    /// Settings → Countdown: 0 (Off), 3, 5 or 10 seconds.
+    private var countdownSeconds: Int {
+        max(0, settingsArray.first?.countdownDuration ?? 3)
+    }
 
     // UI
 
@@ -1649,7 +1655,14 @@ struct RecordingView: View {
         hasStartedPlayback = true
         // Player stays paused — chunks visible but frozen
 
-        countdownValue = countdownSeconds
+        // Countdown Off: start straight away, no overlay.
+        let seconds = countdownSeconds
+        guard seconds > 0 else {
+            beginRecording()
+            return
+        }
+
+        countdownValue = seconds
         isCountingDown = true
 
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [self] t in
@@ -1660,16 +1673,20 @@ struct RecordingView: View {
                     t.invalidate()
                     countdownTimer = nil
                     isCountingDown = false
-                    cameraManager.startRecording()
-                    AppAnalytics.log("recording_started", params: [
-                        "display_mode": displayMode,
-                        "script_length_words": script.content.split(separator: " ").count
-                    ])
-                    if autoStartPrompting {
-                        player.play()
-                    }
+                    beginRecording()
                 }
             }
+        }
+    }
+
+    private func beginRecording() {
+        cameraManager.startRecording()
+        AppAnalytics.log("recording_started", params: [
+            "display_mode": displayMode,
+            "script_length_words": script.content.split(separator: " ").count
+        ])
+        if autoStartPrompting {
+            player.play()
         }
     }
 
