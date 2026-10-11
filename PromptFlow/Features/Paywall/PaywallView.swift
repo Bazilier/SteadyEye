@@ -134,6 +134,10 @@ struct PaywallView: View {
     /// NOT cleared on `.succeeded`, where this presentation is on its way out.
     @State private var isPurchaseLocked: Bool = false
 
+    /// A purchase or restore is awaiting the store: the CTA shows a spinner
+    /// and the plan controls are disabled. Derived, not stored.
+    private var isTransactionInFlight: Bool { isPurchaseInFlight || isRestoring }
+
     // MARK: - Packages from offerings
 
     /// SINGLE SOURCE OF TRUTH for which offering is displayed and whether trial
@@ -1129,10 +1133,19 @@ struct PaywallView: View {
             }
 
             Button(action: { purchase(selectedPlan) }) {
-                Text(continueButtonLabel)
-                    .frame(maxWidth: .infinity)
+                // Opacity swap, not if/else, so the button keeps the label's
+                // size while the spinner shows (same as the editor's Optimize).
+                ZStack {
+                    Text(continueButtonLabel)
+                        .opacity(isTransactionInFlight ? 0 : 1)
+                    ProgressView()
+                        .tint(Theme.onAccent)
+                        .opacity(isTransactionInFlight ? 1 : 0)
+                }
+                .frame(maxWidth: .infinity)
             }
             .primaryButtonStyle()
+            .disabled(isTransactionInFlight)
 
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -1160,6 +1173,7 @@ struct PaywallView: View {
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .contentShape(Rectangle())
             }
+            .disabled(isTransactionInFlight)
         }
         .padding(20)
         .background {
@@ -1269,6 +1283,7 @@ struct PaywallView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(isTransactionInFlight)
     }
 
     // MARK: - Purchase action
