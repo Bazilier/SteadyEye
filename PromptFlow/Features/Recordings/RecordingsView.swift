@@ -59,7 +59,7 @@ struct RecordingsView: View {
                             showPaywall = true
                         }) {
                             Image(systemName: "crown.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(Theme.accent)
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }
@@ -211,13 +211,9 @@ struct RecordingsView: View {
                     defaultValue: "Go to Scripts",
                     comment: "Empty-state CTA button on the Recordings tab that switches to the Scripts tab."
                 ))
-                    .font(.body.bold())
-                    .foregroundColor(.black)
                     .padding(.horizontal, 32)
-                    .padding(.vertical, 14)
-                    .background(Color.orange)
-                    .cornerRadius(12)
             }
+            .primaryButtonStyle(fullWidth: false)
             Spacer()
             Spacer()
         }
@@ -321,19 +317,18 @@ struct RecordingThumbnailCard: View {
     let recording: Recording
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
                 Color.black
                     .aspectRatio(1, contentMode: .fit)
                     .overlay { thumbnailImage }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipped()
                 Text(formatDuration(recording.duration))
-                    .font(.caption.bold())
+                    .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.black.opacity(0.7))
-                    .cornerRadius(6)
+                    .background(Color.black.opacity(0.6), in: Capsule())
                     .padding(8)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -344,13 +339,19 @@ struct RecordingThumbnailCard: View {
                         comment: "Fallback title shown on a recording card when the source script has no title."
                     )
                     : recording.scriptTitle)
-                    .font(.body.bold())
+                    .font(.headline)
                     .lineLimit(1)
                 Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Same card as the script list rows; the thumbnail is clipped by it.
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
 
     @ViewBuilder
@@ -361,7 +362,7 @@ struct RecordingThumbnailCard: View {
             // No explicit aspect ratio here — `resizable()` + `aspectRatio(contentMode: .fill)`
             // preserves the source image's natural ratio (portrait 9:16) and scales it to
             // fully cover the surrounding square frame. Overflow on top/bottom is clipped
-            // by the outer `.clipShape` in the caller. Adding an explicit `aspectRatio(1, ...)`
+            // by the outer `.clipped()` in the caller. Adding an explicit `aspectRatio(1, ...)`
             // here would override the source ratio and squeeze the pixels.
             Image(uiImage: uiImage)
                 .resizable()

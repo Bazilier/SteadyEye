@@ -75,6 +75,18 @@ struct VideoPreviewView: View {
             if let player = playback.player {
                 CustomVideoPlayer(player: player)
                     .aspectRatio(videoSize.width / videoSize.height, contentMode: .fit)
+                    // Bottom scrim — dark base for the scrubber row, inside the
+                    // video's own frame and ending at its bottom edge.
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(
+                            colors: [.clear, Color.black.opacity(0.6)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 120)
+                        .allowsHitTesting(false)
+                    }
+                    .clipped()
                     .overlay {
                         if !playback.isPlaying && !playback.isScrubbing {
                             Image(systemName: "play.fill")
@@ -102,17 +114,6 @@ struct VideoPreviewView: View {
             .frame(height: 120)
             .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-
-            // Bottom scrim — keeps the orange Save button legible.
-            LinearGradient(
-                colors: [.clear, Color.black.opacity(0.6)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 180)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .ignoresSafeArea(edges: .bottom)
             .allowsHitTesting(false)
 
             // Floating overlay: top bar + Spacer + scrubber row + save CTA.
@@ -329,14 +330,10 @@ struct VideoPreviewView: View {
                     defaultValue: "Save to Camera Roll",
                     comment: "Primary button in the recording preview that exports the (already-persisted) video to the Photos library."
                 ))
-                    .font(.body.bold())
             }
-            .foregroundColor(.black)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(Color.orange)
-            .cornerRadius(14)
+            .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .primaryButtonStyle()
         .disabled(isSavingToCameraRoll)
         .padding(.horizontal, 20)
         .padding(.bottom, 8)
@@ -420,7 +417,9 @@ struct VideoPreviewView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .padding(.bottom, 12)
+        // 20, not 12: lifts the row 8pt so it sits inside the video frame
+        // (78pt above the safe-area bottom) on the bottom scrim.
+        .padding(.bottom, 20)
     }
 
     /// Formats `seconds` as `M:SS` (or `MM:SS` when total length is
