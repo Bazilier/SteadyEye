@@ -3,14 +3,41 @@ import SwiftData
 import AVFoundation
 import UserNotifications
 
+/// Capsule chip for the recording status line.
+private struct StatusChip: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+    }
+}
+
+/// Proposes at most `maxWidth` to its content but, unlike
+/// `.frame(maxWidth:)`, does not grow to fill it — a short name keeps a
+/// short chip.
+private struct CappedWidth: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = min(proposal.width ?? maxWidth, maxWidth)
+        return subviews.first?.sizeThatFits(ProposedViewSize(width: width, height: proposal.height)) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
+}
+
 private struct GlassCircleModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.glassEffect(.regular.interactive())
         } else {
             content
-                .background(Color.white.opacity(0.2))
-                .clipShape(Circle())
+                .background(.ultraThinMaterial, in: Circle())
         }
     }
 }
@@ -475,6 +502,25 @@ struct RecordingView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
+            }
+
+            // 1c. Bottom scrim so the portrait controls stay legible over
+            // bright camera content. A SwiftUI layer only — recorded frames
+            // come from the capture output, never from this view tree.
+            // Portrait only: landscape's bar sits along the view's leading
+            // edge, and sizing a scrim there would need new constants.
+            if !isLandscape {
+                VStack {
+                    Spacer()
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.68), .black.opacity(0.86)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 400)
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             }
 
             // 2. Black container expanding from top cutout area
@@ -1022,12 +1068,9 @@ struct RecordingView: View {
                     }
                 } label: {
                     Text(String(localized: "common.open_settings", defaultValue: "Open Settings"))
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
+                .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button(String(localized: "recording.permission.go_back", defaultValue: "Go back")) {
                     dismiss()
@@ -1111,10 +1154,10 @@ struct RecordingView: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.2))
+                    .fill(Color.white.opacity(0.25))
                     .frame(height: 4)
                 Capsule()
-                    .fill(Color.orange)
+                    .fill(Theme.accent)
                     .frame(width: max(0, geo.size.width * smoothProgress), height: 4)
             }
             .frame(maxHeight: .infinity)
@@ -1169,15 +1212,14 @@ struct RecordingView: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 16) {
-            if !cameraManager.isRecording {
-                HStack {
-                    Spacer()
+            HStack {
+                statusLine
+                Spacer(minLength: 8)
+                if !cameraManager.isRecording {
                     settingsGearButton
                 }
-                .padding(.horizontal, 20)
             }
-
-            statusLine
+            .padding(.horizontal, 20)
 
             if showCameraSettings { cameraSettingsPanel }
 
@@ -1209,7 +1251,8 @@ struct RecordingView: View {
             Image(systemName: "gearshape.fill")
                 .font(.title2)
                 .foregroundStyle(.white)
-                .shadow(radius: 4)
+                .frame(width: 44, height: 44)
+                .modifier(GlassCircleModifier())
         }
     }
 
@@ -1219,28 +1262,28 @@ struct RecordingView: View {
     /// same for video quality. The indicators were previously decorative-only —
     /// users reached for them and nothing happened.
     private var statusLine: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button {
                 showAudioToast = true
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
-                    Text(cameraManager.audioSourceName)
-                        .font(.caption2)
+                    // Long Bluetooth names truncate instead of pushing the row.
+                    CappedWidth(maxWidth: 140) {
+                        Text(cameraManager.audioSourceName)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
-                .foregroundStyle(.white.opacity(0.5))
+                .modifier(StatusChip())
             }
             .buttonStyle(.plain)
-            Text("·")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.5))
             Button {
                 showResolutionToast = true
             } label: {
                 Text("\(videoResolution == "4k" && subscriptionManager.canRecord4K ? "4K" : "1080p") · \(videoFPS)fps")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .modifier(StatusChip())
             }
             .buttonStyle(.plain)
         }
@@ -1256,7 +1299,7 @@ struct RecordingView: View {
                 .font(.caption)
                 .foregroundStyle(.white)
             Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
-                .tint(.orange)
+                .tint(Theme.accent)
             Text(String(format: "%+.1f EV", exposureCompensation))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.7))
@@ -1297,7 +1340,7 @@ struct RecordingView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+        .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
         .padding(.horizontal, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
@@ -1309,13 +1352,13 @@ struct RecordingView: View {
         HStack(spacing: 10) {
             Image(systemName: "tortoise.fill")
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.9))
             Slider(value: $speedSlider, in: 0...1)
-                .tint(.orange)
+                .tint(Theme.accent)
                 .animation(.easeInOut(duration: 0.5), value: player.externalSpeedMultiplier)
             Image(systemName: "hare.fill")
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.9))
         }
         .padding(.horizontal, 24)
         .background {
@@ -1501,7 +1544,7 @@ struct RecordingView: View {
                 // control is never itself rotated.
                 .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .modifier(GlassCircleModifier())
         }
         .disabled(!player.isReady)
     }
@@ -1520,7 +1563,7 @@ struct RecordingView: View {
                     .strokeBorder(.white, lineWidth: 3)
                     .frame(width: Self.recordButtonSize, height: Self.recordButtonSize)
                 RoundedRectangle(cornerRadius: cameraManager.isRecording ? 6 : 28)
-                    .fill(.red)
+                    .fill(Theme.accent)
                     .frame(
                         width: cameraManager.isRecording ? 28 : 52,
                         height: cameraManager.isRecording ? 28 : 52
@@ -1537,7 +1580,7 @@ struct RecordingView: View {
                 .foregroundStyle(.white)
                 .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .modifier(GlassCircleModifier())
         }
     }
 
