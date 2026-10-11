@@ -6,9 +6,9 @@ import SwiftUI
 /// size, without animation, before the destination is dismissed.
 struct CardPressStyle: ButtonStyle {
     static let pressedScale: CGFloat = 0.96
-    static let pressDuration: Double = 0.3
+    static let pressDuration: Double = 0.15
     /// Back to full size after a cancelled press.
-    static let releaseDuration: Double = 0.2
+    static let releaseDuration: Double = 0.1
 
     let id: UUID
     let opener: CardOpener
