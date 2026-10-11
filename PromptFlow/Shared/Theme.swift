@@ -5,7 +5,9 @@ import SwiftUI
 /// system controls that read the accent pick up the brand orange without
 /// a `.tint` being inherited.
 enum Theme {
-    static let accent = Color.accentColor
+    /// Read from the named asset, not `Color.accentColor`: Staging and
+    /// Release builds resolved the global accent to system blue.
+    static let accent = Color("AccentColor")
     /// Tinted fill behind icons and badges.
     static let accentTint = accent.opacity(0.18)
     /// Label color on accent fills. White fails contrast on this orange.
