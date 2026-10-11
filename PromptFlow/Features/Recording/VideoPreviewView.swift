@@ -25,6 +25,10 @@ struct VideoPreviewView: View {
     /// script in scope, and a `Recording` carries only a title string, so the
     /// origin is genuinely unknowable there.
     var isUserWrittenScript: Bool = false
+    /// The card's thumbnail, shown in the video frame until the player
+    /// draws its first frame, so the zoom from the card never shows black.
+    /// `nil` (the recording screen right after a take) keeps today's look.
+    var poster: UIImage? = nil
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -40,6 +44,18 @@ struct VideoPreviewView: View {
     /// deep link into the Photos app at the just-saved asset.
     @State private var savedAssetLocalIdentifier: String?
     @State private var videoSize: CGSize = CGSize(width: 9, height: 16)
+    @State private var didLoadVideoSize = false
+    /// Set by the player view once its layer can display a frame.
+    @State private var isVideoReady = false
+    /// The poster's shape until the track's real size has loaded, so a
+    /// landscape recording doesn't start in the 9:16 default frame.
+    private var frameSize: CGSize {
+        if !didLoadVideoSize, let poster, poster.size.width > 0, poster.size.height > 0 {
+            return poster.size
+        }
+        return videoSize
+    }
+    private var isLandscapeVideo: Bool { frameSize.width > frameSize.height }
     @State private var showPostSavePaywall = false
     @State private var showSatisfactionPrompt = false
     @State private var showFounderChat = false
@@ -62,71 +78,57 @@ struct VideoPreviewView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Video container: scales to fit the available vertical space
-            // between the top bar (~48pt + 16pt gap = 64pt below the safe-area
-            // top) and the Save button (~62pt + 16pt gap = 78pt above the
-            // safe-area bottom). Width is auto-derived from the video's
-            // natural aspect ratio (loaded async into `videoSize`; defaults
-            // to 9:16 portrait if loading fails). The aspect-ratio'd inner
-            // view owns the contentShape + tap gesture, so taps in the
-            // letterbox margins fall through to the background. The paused-
-            // state play glyph is overlaid on the aspect-ratio'd view so it
-            // tracks the video's center, not the screen's.
-            if let player = playback.player {
-                CustomVideoPlayer(player: player)
-                    .aspectRatio(videoSize.width / videoSize.height, contentMode: .fit)
-                    // Bottom scrim — dark base for the scrubber row, inside the
-                    // video's own frame and ending at its bottom edge.
+            VStack(spacing: 0) {
+                // Stage: everything above the scrubber row, from the very top
+                // of the screen. A portrait recording runs full width from the
+                // top edge and may extend behind the controls below; a
+                // landscape one is fitted to the width and centred here.
+                Color.clear
+                    .overlay(alignment: isLandscapeVideo ? .center : .top) {
+                        videoLayer
+                    }
+                    // Top scrim — keeps Back / Delete legible over the video.
+                    .overlay(alignment: .top) {
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.35), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 130)
+                        .allowsHitTesting(false)
+                    }
+                    // Bottom scrim — the video dissolves into the solid black
+                    // behind the controls, so no hard edge near the scrubber.
                     .overlay(alignment: .bottom) {
                         LinearGradient(
-                            colors: [.clear, Color.black.opacity(0.6)],
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: Color.black.opacity(0.55), location: 0.5),
+                                .init(color: .black, location: 1)
+                            ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                         .frame(height: 120)
                         .allowsHitTesting(false)
                     }
-                    .clipped()
-                    .overlay {
-                        if !playback.isPlaying && !playback.isScrubbing {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 56))
-                                .foregroundColor(.white.opacity(0.85))
-                                .shadow(radius: 8)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { playback.togglePlayPause() }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 64)
-                    .padding(.bottom, 78)
+                    .ignoresSafeArea(edges: .top)
+
+                // Bottom block, pinned to the bottom safe area. The scrubber's
+                // DragGesture lives here, not over the video, so it doesn't
+                // conflict with the video's tap gesture.
+                VStack(spacing: 8) {
+                    scrubberRow
+                    saveButton
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+                .background(Color.black.ignoresSafeArea(edges: .bottom))
             }
 
-            // Top scrim — keeps the back/trash buttons legible against bright
-            // video content. Hit-testing disabled so taps fall through to the
-            // video.
-            LinearGradient(
-                colors: [Color.black.opacity(0.5), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 120)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-
-            // Floating overlay: top bar + Spacer + scrubber row + save CTA.
-            // Stays inside the safe area so chevron/trash, the scrubber
-            // thumb, and the orange button aren't clipped. The scrubber
-            // row sits in this bottom chrome layer (NOT over the video
-            // surface), so its DragGesture doesn't conflict with the
-            // video's onTapGesture.
             VStack(spacing: 0) {
                 topBar
                 Spacer()
-                scrubberRow
-                saveButton
             }
         }
         .statusBarHidden()
@@ -277,6 +279,43 @@ struct VideoPreviewView: View {
         }
     }
 
+    // MARK: - Video
+
+    /// Width-driven: the height follows the video's natural aspect ratio
+    /// (loaded async into `videoSize`; the poster's, or 9:16, until then), so
+    /// a portrait video is never cropped horizontally. The poster sits under
+    /// the player in the same frame until the player is ready for display.
+    /// The paused-state play glyph tracks the video's centre, not the screen's.
+    @ViewBuilder
+    private var videoLayer: some View {
+        if poster != nil || playback.player != nil {
+            ZStack {
+                if let poster, !isVideoReady {
+                    Image(uiImage: poster)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                }
+                if let player = playback.player {
+                    CustomVideoPlayer(player: player, isReady: $isVideoReady)
+                }
+            }
+            .aspectRatio(frameSize.width / frameSize.height, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true)
+            .overlay {
+                if playback.player != nil && !playback.isPlaying && !playback.isScrubbing {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 56))
+                        .foregroundColor(.white.opacity(0.85))
+                        .shadow(radius: 8)
+                        .allowsHitTesting(false)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { playback.togglePlayPause() }
+        }
+    }
+
     // MARK: - Top bar
 
     private var topBar: some View {
@@ -287,8 +326,8 @@ struct VideoPreviewView: View {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .modifier(GlassCircleModifier())
             }
             .accessibilityLabel(String(
                 localized: "recordings.preview.back",
@@ -302,8 +341,8 @@ struct VideoPreviewView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.red)
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .modifier(GlassCircleModifier())
             }
             .accessibilityLabel(String(
                 localized: "recordings.preview.delete",
@@ -335,8 +374,6 @@ struct VideoPreviewView: View {
         }
         .primaryButtonStyle()
         .disabled(isSavingToCameraRoll)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Player lifecycle
@@ -369,6 +406,7 @@ struct VideoPreviewView: View {
                 await MainActor.run {
                     if self.playback.player != nil {
                         self.videoSize = displayedSize
+                        self.didLoadVideoSize = true
                     }
                 }
             } catch {
@@ -399,10 +437,9 @@ struct VideoPreviewView: View {
     // MARK: - Scrubber row
 
     /// Compact playback chrome: current-time label, draggable
-    /// scrubber, total-duration label. Sits in the bottom overlay
-    /// VStack between the Spacer and the Save CTA — not over the
-    /// video surface — so its DragGesture doesn't conflict with the
-    /// video's onTapGesture (separate Z-stack layers).
+    /// scrubber, total-duration label. Sits in the bottom block above
+    /// the Save CTA — not over the video surface — so its DragGesture
+    /// doesn't conflict with the video's onTapGesture.
     private var scrubberRow: some View {
         HStack(spacing: 12) {
             Text(Self.formatTime(playback.currentTime))
@@ -415,11 +452,7 @@ struct VideoPreviewView: View {
                 .foregroundColor(.white)
                 .frame(width: 44, alignment: .trailing)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        // 20, not 12: lifts the row 8pt so it sits inside the video frame
-        // (78pt above the safe-area bottom) on the bottom scrim.
-        .padding(.bottom, 20)
+        .frame(height: 44)
     }
 
     /// Formats `seconds` as `M:SS` (or `MM:SS` when total length is
@@ -656,10 +689,15 @@ private struct ScrubberView: View {
 /// in its top chrome.
 private struct CustomVideoPlayer: UIViewRepresentable {
     let player: AVPlayer
+    /// Mirrors `AVPlayerLayer.isReadyForDisplay`.
+    @Binding var isReady: Bool
 
     func makeUIView(context: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.player = player
+        view.onReadyForDisplay = { ready in
+            if isReady != ready { isReady = ready }
+        }
         return view
     }
 
@@ -671,16 +709,35 @@ private struct CustomVideoPlayer: UIViewRepresentable {
 private final class PlayerUIView: UIView {
     override static var layerClass: AnyClass { AVPlayerLayer.self }
     private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    var onReadyForDisplay: ((Bool) -> Void)?
+    private var readyObservation: NSKeyValueObservation?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        // Clear until the first frame can be drawn, so the poster behind the
+        // layer shows through instead of a black rectangle.
+        playerLayer.backgroundColor = UIColor.clear.cgColor
+        readyObservation = playerLayer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
+            let ready = layer.isReadyForDisplay
+            DispatchQueue.main.async { self?.readyForDisplayChanged(ready) }
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    private func readyForDisplayChanged(_ ready: Bool) {
+        // Once a frame can be drawn, paint letterbox bands opaque black so
+        // the layer reaches the device edges itself, independently of how
+        // SwiftUI propagates .ignoresSafeArea() to the representable host.
+        playerLayer.backgroundColor = ready ? UIColor.black.cgColor : UIColor.clear.cgColor
+        onReadyForDisplay?(ready)
+    }
 
     var player: AVPlayer? {
         get { playerLayer.player }
         set {
             playerLayer.player = newValue
             playerLayer.videoGravity = .resizeAspect
-            // Paint letterbox bands opaque black so the layer reaches the
-            // device edges itself, independently of how SwiftUI propagates
-            // .ignoresSafeArea() to the underlying UIViewRepresentable host.
-            playerLayer.backgroundColor = UIColor.black.cgColor
         }
     }
 }

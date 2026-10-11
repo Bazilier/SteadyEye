@@ -31,7 +31,7 @@ private struct CappedWidth: Layout {
     }
 }
 
-private struct GlassCircleModifier: ViewModifier {
+struct GlassCircleModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.glassEffect(.regular.interactive())
