@@ -414,7 +414,7 @@ struct RecordingView: View {
         .withRecordingToasts(
             showAudioToast: $showAudioToast,
             showResolutionToast: $showResolutionToast,
-            onOpenSettings: { selectedTab = .settings; dismiss() }
+            onOpenSettings: { selectedTab = .settings; close() }
         )
         .fullScreenCover(item: $previewRecording) { recording in
             VideoPreviewView(recording: recording, onDismiss: {
@@ -1011,8 +1011,20 @@ struct RecordingView: View {
         }
     }
 
+    /// Stops the camera session before the dismiss animation starts, so the
+    /// preview layer is not released on main while `stopRunning()` still holds
+    /// the session at the end of the animation (a visible freeze on device).
+    /// During a take nothing changes: `onDisappear` finalises it as before.
+    /// `onDisappear` still calls `stop()`, which is safe to repeat.
+    private func close() {
+        if !cameraManager.isRecording {
+            cameraManager.stop()
+        }
+        dismiss()
+    }
+
     private func closeChevron(size: CGFloat) -> some View {
-        Button { dismiss() } label: {
+        Button { close() } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
@@ -1040,7 +1052,7 @@ struct RecordingView: View {
             .ignoresSafeArea()
             VStack(spacing: 16) {
                 HStack {
-                    Button { dismiss() } label: {
+                    Button { close() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.white)
@@ -1079,7 +1091,7 @@ struct RecordingView: View {
                 .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button(String(localized: "recording.permission.go_back", defaultValue: "Go back")) {
-                    dismiss()
+                    close()
                 }
                 .foregroundStyle(.white.opacity(0.7))
                 Spacer()
