@@ -61,7 +61,7 @@ struct ExplainerOverlay: View {
             VStack(spacing: 20) {
                 Image(systemName: icon)
                     .font(.system(size: 56, weight: .light))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.accent)
 
                 Text(title)
                     .font(.title2.bold())
@@ -80,16 +80,15 @@ struct ExplainerOverlay: View {
                     Text(buttonLabel)
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                .primaryButtonStyle()
+                .tint(Theme.accent)
                 .padding(.top, 4)
             }
             .padding(28)
             .frame(maxWidth: 400)
             .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
             .padding(.horizontal, 24)
         }
         .transition(.opacity)

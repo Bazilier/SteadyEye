@@ -7,7 +7,7 @@ import SwiftUI
 struct MiniWBWView: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
                 .fill(Color.black)
             AnimatedRSVPHeadline(
                 text: Self.loadText(),

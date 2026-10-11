@@ -77,12 +77,9 @@ struct OnboardingView: View {
                     Task { await requestPermissionsAndAdvance() }
                 } label: {
                     Text("Continue")
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
+                .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Spacer().frame(height: 8)
                 Text(String(
@@ -121,12 +118,9 @@ struct OnboardingView: View {
                     finishOnboarding(path: "settings_opened")
                 } label: {
                     Text("Open Settings")
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
+                .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button("Skip for now") {
                     AppAnalytics.log("onboarding_skip_for_now_tapped", params: [

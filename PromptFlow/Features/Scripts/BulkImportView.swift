@@ -204,10 +204,9 @@ struct BulkImportView: View {
                         Image(systemName: "wand.and.stars")
                     }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                .primaryButtonStyle()
+                .tint(Theme.accent)
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).count < 50 || inputText.count > maxChars)
             }
             .padding(.horizontal)
@@ -217,7 +216,7 @@ struct BulkImportView: View {
 
     private var bulkCharCountColor: Color {
         if inputText.count >= maxChars { return .red }
-        if inputText.count >= 40000 { return .orange }
+        if inputText.count >= 40000 { return Theme.warning }
         return .secondary
     }
 
@@ -228,7 +227,7 @@ struct BulkImportView: View {
             Spacer()
 
             ProgressView(value: progress)
-                .tint(.orange)
+                .tint(Theme.accent)
                 .padding(.horizontal, 40)
 
             Text(statusText)

@@ -59,7 +59,7 @@ struct ContentView: View {
                 .tag(AppTab.settings)
         }
         .preferredColorScheme(.dark)
-        .tint(.orange)
+        .tint(Theme.accent)
         .onAppear {
             // Stamp install date on the very first app launch ever. Idempotent
             // — only writes when the key is unset (== 0). Read by Rule 0 in

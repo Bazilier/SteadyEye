@@ -301,7 +301,7 @@ struct ScriptEditorView: View {
 
     private var charCountColor: Color {
         if content.count >= maxChars { return .red }
-        if content.count >= 4000 { return .orange }
+        if content.count >= 4000 { return Theme.warning }
         return .secondary
     }
 
@@ -418,10 +418,9 @@ struct ScriptEditorView: View {
                     .opacity((isOptimizing || isFakeOptimizing) ? 1 : 0)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.orange)
+        .primaryButtonStyle()
+        .tint(Theme.accent)
         .disabled(isOptimizing || isFakeOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
         .padding(.horizontal)
         .padding(.bottom, 12)

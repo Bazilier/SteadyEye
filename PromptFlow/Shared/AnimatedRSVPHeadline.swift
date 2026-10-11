@@ -31,7 +31,7 @@ struct AnimatedRSVPHeadline: View {
         text: String,
         font: Font,
         textColor: Color = .white,
-        highlightColor: Color = .orange,
+        highlightColor: Color = Theme.accent,
         tickInterval: Double = 0.28,
         loops: Bool = true,
         endHoldSeconds: Double = 0.6,
