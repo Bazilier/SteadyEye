@@ -17,6 +17,9 @@ struct RecordingsView: View {
     @State private var missingRecording: Recording?
     @State private var showMissingFileAlert = false
     @State private var showPaywall = false
+    /// The card whose preview is open; it stays pressed until the cover is
+    /// dismissed (see `CardPressStyle`).
+    @State private var openingRecordingID: UUID?
 
     private let columns: [GridItem] = [
         GridItem(.flexible(), spacing: 12),
@@ -161,7 +164,7 @@ struct RecordingsView: View {
                 comment: "Body of the alert shown when a recording's underlying file is missing on disk."
             ))
         }
-        .fullScreenCover(item: $playingRecording) { recording in
+        .fullScreenCover(item: $playingRecording, onDismiss: { openingRecordingID = nil }) { recording in
             VideoPreviewView(
                 recording: recording,
                 onDismiss: { playingRecording = nil },
@@ -254,47 +257,52 @@ struct RecordingsView: View {
 
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(group.recordings) { recording in
-                            RecordingThumbnailCard(recording: recording)
-                                .previewZoomSource(id: recording.id, in: previewZoom)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    if FileManager.default.fileExists(atPath: recording.fileURL.path) {
-                                        playingRecording = recording
-                                    } else {
-                                        missingRecording = recording
-                                        showMissingFileAlert = true
+                            Button {
+                                if FileManager.default.fileExists(atPath: recording.fileURL.path) {
+                                    openingRecordingID = recording.id
+                                    playingRecording = recording
+                                } else {
+                                    missingRecording = recording
+                                    showMissingFileAlert = true
+                                }
+                            } label: {
+                                // The zoom source sits inside the press scale,
+                                // so the zoom starts from the pressed frame.
+                                RecordingThumbnailCard(recording: recording)
+                                    .previewZoomSource(id: recording.id, in: previewZoom)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(CardPressStyle(isOpening: openingRecordingID == recording.id))
+                            .contextMenu {
+                                Button {
+                                    saveToCameraRoll(recording)
+                                } label: {
+                                    Label {
+                                        Text(String(
+                                            localized: "recordings.action.saveToCameraRoll",
+                                            defaultValue: "Save to Camera Roll",
+                                            comment: "Recordings context-menu action that exports the recording to the Photos library."
+                                        ))
+                                    } icon: {
+                                        menuIcon("photo", accent: true)
                                     }
                                 }
-                                .contextMenu {
-                                    Button {
-                                        saveToCameraRoll(recording)
-                                    } label: {
-                                        Label {
-                                            Text(String(
-                                                localized: "recordings.action.saveToCameraRoll",
-                                                defaultValue: "Save to Camera Roll",
-                                                comment: "Recordings context-menu action that exports the recording to the Photos library."
-                                            ))
-                                        } icon: {
-                                            menuIcon("photo", accent: true)
-                                        }
-                                    }
-                                    Divider()
-                                    Button(role: .destructive) {
-                                        deleteTarget = recording
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label {
-                                            Text(String(
-                                                localized: "recordings.action.delete",
-                                                defaultValue: "Delete",
-                                                comment: "Recordings context-menu destructive action that removes the recording."
-                                            ))
-                                        } icon: {
-                                            menuIcon("trash", accent: false)
-                                        }
+                                Divider()
+                                Button(role: .destructive) {
+                                    deleteTarget = recording
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label {
+                                        Text(String(
+                                            localized: "recordings.action.delete",
+                                            defaultValue: "Delete",
+                                            comment: "Recordings context-menu destructive action that removes the recording."
+                                        ))
+                                    } icon: {
+                                        menuIcon("trash", accent: false)
                                     }
                                 }
+                            }
                         }
                     }
                 }

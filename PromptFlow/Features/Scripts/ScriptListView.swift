@@ -36,6 +36,9 @@ struct ScriptListView: View {
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
+    /// The card whose recording screen is open; it stays pressed until the
+    /// cover is dismissed (see `CardPressStyle`).
+    @State private var openingScriptID: UUID?
     @State private var showBulkImport = false
     @State private var paywallPresentation: PaywallPresentation?
     /// Captured at tap time and passed into BulkImportView so the
@@ -117,6 +120,15 @@ struct ScriptListView: View {
         return EdgeInsets(top: -7, leading: 0, bottom: 2, trailing: 0)
     }
 
+    /// The system row insets, applied inside the card so that the card
+    /// background is part of the button and scales with the press.
+    private static var cardPadding: EdgeInsets {
+        if #available(iOS 26.0, *) {
+            return EdgeInsets(top: 15, leading: 16, bottom: 15, trailing: 16)
+        }
+        return EdgeInsets(top: 11, leading: 20, bottom: 11, trailing: 20)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -159,7 +171,7 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .fullScreenCover(item: $scriptToRecord) { script in
+            .fullScreenCover(item: $scriptToRecord, onDismiss: { openingScriptID = nil }) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
             }
             .sheet(isPresented: $showBulkImport) {
@@ -318,28 +330,44 @@ struct ScriptListView: View {
             ForEach(scriptsByDay, id: \.day) { group in
                 ForEach(group.scripts) { script in
                     Section {
-                        HStack {
-                            ScriptRowView(script: script)
-                            Spacer()
-                            Button {
-                                editorMode = .edit(script)
-                            } label: {
-                                Image(systemName: "square.and.pencil")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Theme.accent)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel(Text("scripts.editor.title.edit", comment: "Navigation title of the script editor when editing an existing script."))
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
+                        Button {
                             AppAnalytics.log("script_tapped", params: [
                                 "script_source": script.isDemo ? "demo" : "user",
                                 "script_length_words": script.content.split(separator: " ").count
                             ])
+                            openingScriptID = script.id
                             scriptToRecord = script
+                        } label: {
+                            HStack {
+                                ScriptRowView(script: script)
+                                Spacer()
+                                // Drawn in the card so it scales with it; the
+                                // edit button overlaid below takes the taps.
+                                Image(systemName: "square.and.pencil")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(width: 44, height: 44)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(Self.cardPadding)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                                    .fill(Color(.secondarySystemGroupedBackground))
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                        }
+                        .buttonStyle(CardPressStyle(isOpening: openingScriptID == script.id))
+                        .overlay(alignment: .trailing) {
+                            Button {
+                                editorMode = .edit(script)
+                            } label: {
+                                Color.clear
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .padding(.trailing, Self.cardPadding.trailing)
+                            .accessibilityLabel(Text("scripts.editor.title.edit", comment: "Navigation title of the script editor when editing an existing script."))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
@@ -353,10 +381,8 @@ struct ScriptListView: View {
                             }
                         }
                         .listRowSeparator(.hidden)
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                                .fill(Color(.secondarySystemGroupedBackground))
-                        )
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                     } header: {
                         // Only the day's first card carries the date header.
                         if script.id == group.scripts.first?.id {
