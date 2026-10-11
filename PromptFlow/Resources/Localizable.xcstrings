@@ -165,6 +165,24 @@
             "state" : "new",
             "value" : "Try again tomorrow."
           }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inténtalo de nuevo mañana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tente novamente amanhã."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Попробуй завтра."
+          }
         }
       }
     },
@@ -176,6 +194,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Daily limit reached"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Llegaste al límite diario"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limite diário atingido"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дневной лимит исчерпан"
           }
         }
       }
