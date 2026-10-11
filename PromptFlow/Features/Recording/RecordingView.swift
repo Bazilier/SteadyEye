@@ -593,6 +593,11 @@ struct RecordingView: View {
                         controlsOverlay
                     }
                 }
+                // Folded Duo: the trailing safe-area strip is the camera
+                // housing only at the top; down here it is plain display and
+                // the recording screen has no tab rail, so the controls take
+                // the full width.
+                .ignoresSafeArea(edges: duoPosture == .folded ? .horizontal : [])
             }
 
             // 3b. Landscape transport column — the same three buttons against
