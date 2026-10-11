@@ -28,9 +28,14 @@ final class Script {
     }
 
     func update(title: String, content: String) {
+        // A save without changes must not move the script to the top of the
+        // list (sorted and grouped by `updatedAt`).
+        let changed = title != self.title || content != self.content
         self.title = title
         self.content = content
-        self.updatedAt = Date()
+        if changed {
+            self.updatedAt = Date()
+        }
         let words = content.split(separator: " ").count
         self.wordCount = words
         self.estimatedReadTime = Double(words) / 150.0 * 60.0

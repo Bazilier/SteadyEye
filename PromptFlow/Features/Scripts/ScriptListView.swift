@@ -31,7 +31,7 @@ struct ScriptListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-    @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
+    @Query(sort: \Script.updatedAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
@@ -89,6 +89,52 @@ struct ScriptListView: View {
         }
     }
 
+    /// `filteredScripts` split into runs that share a calendar day of
+    /// `updatedAt`. The query is already newest-first, so each day's
+    /// scripts are contiguous.
+    private var scriptsByDay: [(day: Date, scripts: [Script])] {
+        let calendar = Calendar.current
+        var groups: [(day: Date, scripts: [Script])] = []
+        for script in filteredScripts {
+            let day = calendar.startOfDay(for: script.updatedAt)
+            if groups.last?.day == day {
+                groups[groups.count - 1].scripts.append(script)
+            } else {
+                groups.append((day, [script]))
+            }
+        }
+        return groups
+    }
+
+    /// "Today" / "Yesterday" from the system's relative formatting, otherwise
+    /// day and month (plus year outside the current year). Localized by the OS.
+    private func dayTitle(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) || calendar.isDateInYesterday(day) {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .none
+            formatter.doesRelativeDateFormatting = true
+            formatter.formattingContext = .beginningOfSentence
+            return formatter.string(from: day)
+        }
+        if calendar.isDate(day, equalTo: Date(), toGranularity: .year) {
+            return day.formatted(.dateTime.day().month(.wide))
+        }
+        return day.formatted(.dateTime.day().month(.wide).year())
+    }
+
+    /// Trims the system header insets (10/10 pt on iOS 26, 17/6 pt on iOS
+    /// 17/18) so that, with the 10 pt section spacing, a date header has 20 pt
+    /// above it and 8 pt below. The leading inset stays the system one, which
+    /// lines up with the cards' content at every width.
+    private static var dayHeaderPadding: EdgeInsets {
+        if #available(iOS 26.0, *) {
+            return EdgeInsets(top: 0, leading: 0, bottom: -2, trailing: 0)
+        }
+        return EdgeInsets(top: -7, leading: 0, bottom: 2, trailing: 0)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -108,7 +154,7 @@ struct ScriptListView: View {
                             paywallPresentation = PaywallPresentation(source: "scripts_crown")
                         }) {
                             Image(systemName: "crown.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(Theme.accent)
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }
@@ -263,10 +309,9 @@ struct ScriptListView: View {
                     Image(systemName: "plus")
                 }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .primaryButtonStyle(fullWidth: false)
+            .tint(Theme.accent)
 
             Button {
                 handleBulkImportTap(entryPoint: "empty_state")
@@ -284,44 +329,68 @@ struct ScriptListView: View {
         }
     }
 
+    /// One `Section` per script so each row renders as its own card while
+    /// keeping the system List swipe-to-delete.
     private var scriptsList: some View {
         List {
-            ForEach(filteredScripts) { script in
-                HStack {
-                    ScriptRowView(script: script)
-                    Spacer()
-                    Button {
-                        editorMode = .edit(script)
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, height: 36)
-                    }
-                    .buttonStyle(.borderless)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    AppAnalytics.log("script_tapped", params: [
-                        "script_source": script.isDemo ? "demo" : "user",
-                        "script_length_words": script.content.split(separator: " ").count
-                    ])
-                    scriptToRecord = script
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        deleteScript(script)
-                    } label: {
-                        Label {
-                            Text("scripts.delete", comment: "Swipe-to-delete action on a script row")
-                        } icon: {
-                            Image(systemName: "trash")
+            ForEach(scriptsByDay, id: \.day) { group in
+                ForEach(group.scripts) { script in
+                    Section {
+                        HStack {
+                            ScriptRowView(script: script)
+                            Spacer()
+                            Button {
+                                editorMode = .edit(script)
+                            } label: {
+                                Image(systemName: "square.and.pencil")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(Text("scripts.editor.title.edit", comment: "Navigation title of the script editor when editing an existing script."))
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            AppAnalytics.log("script_tapped", params: [
+                                "script_source": script.isDemo ? "demo" : "user",
+                                "script_length_words": script.content.split(separator: " ").count
+                            ])
+                            scriptToRecord = script
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteScript(script)
+                            } label: {
+                                Label {
+                                    Text("scripts.delete", comment: "Swipe-to-delete action on a script row")
+                                } icon: {
+                                    Image(systemName: "trash")
+                                }
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                                .fill(Color(.secondarySystemGroupedBackground))
+                        )
+                    } header: {
+                        // Only the day's first card carries the date header.
+                        if script.id == group.scripts.first?.id {
+                            Text(dayTitle(group.day))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
+                                .padding(Self.dayHeaderPadding)
                         }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(10)
+        .contentMargins(.horizontal, 16, for: .scrollContent)
     }
 
     // MARK: - Actions
@@ -361,32 +430,28 @@ struct ScriptListView: View {
 struct ScriptRowView: View {
     let script: Script
 
+    private var wordCountText: String {
+        String(
+            localized: "script.wordCount",
+            defaultValue: "\(script.wordCount) words",
+            comment: "Word count display in script row and editor stats bar"
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(script.title.isEmpty
                 ? String(localized: "script.untitled", defaultValue: "Untitled Script", comment: "Fallback title for an untitled script")
                 : script.title)
-                .font(.headline)
+                .font(.title3.weight(.semibold))
+                .lineLimit(2)
             Text(script.content)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Image(systemName: "text.word.spacing")
-                    Text(String(
-                        localized: "script.wordCount",
-                        defaultValue: "\(script.wordCount) words",
-                        comment: "Word count display in script row and editor stats bar"
-                    ))
-                }
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                    Text(script.estimatedReadTimeFormatted)
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+                .lineLimit(1)
+            Text(verbatim: "\(wordCountText) · \(script.estimatedReadTimeFormatted)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
     }
