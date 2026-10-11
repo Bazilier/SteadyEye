@@ -111,7 +111,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(
                                         localized: "settings.chat.title",
-                                        defaultValue: "Chat with Kirill",
+                                        defaultValue: "Chat with Cyril",
                                         comment: "Title of the Settings row that opens the in-app chat with the founder."
                                     ))
                                         .font(.title3.weight(.semibold))
