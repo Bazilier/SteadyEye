@@ -516,7 +516,7 @@ struct RecordingView: View {
             // landscape pin are unaffected. Portrait reveals immediately;
             // landscape waits for the angle to be pinned so the first thing the
             // user sees is already landscape.
-            CameraPreviewView(session: cameraManager.session)
+            CameraPreviewView(session: cameraManager.session, device: cameraManager.activeVideoDevice)
                 #if DEBUG
                 // 1a. Duo geometry overlay — chromakey mockups only, never
                 // interactive. An overlay of the full-window preview layer:

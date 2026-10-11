@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var devNotificationStatus: String = "loading…"
     @State private var devPendingCount: Int = 0
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
+    @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -433,6 +434,17 @@ struct SettingsView: View {
                     }
                     .tint(Theme.accent)
                     Text("Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+
+                Section("iPhone Duo (DEV)") {
+                    Toggle(isOn: $devCropSidewaysToPortrait) {
+                        Text("Crop sideways takes to 9:16")
+                    }
+                    .tint(Theme.accent)
+                    Text("What iPhone Duo always does: with the phone held sideways, record the level horizon's vertical middle 9:16 instead of a tipped-over portrait frame. Hold this phone sideways to test it. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
