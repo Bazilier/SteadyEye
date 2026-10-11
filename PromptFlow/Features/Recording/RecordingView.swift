@@ -57,6 +57,8 @@ struct RecordingView: View {
     @Query private var settingsArray: [AppSettings]
     @ObservedObject private var cameraManager = CameraManager.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
     @StateObject private var player = ChunkPlayerEngine()
     /// Follow My Voice V2 toggle. iOS 26+ feature; on older OS the
     /// SettingsView toggle isn't shown so the value stays false.
@@ -246,6 +248,10 @@ struct RecordingView: View {
     /// of different geometry — a value calibrated for one should not silently
     /// become the other's starting point.
     @AppStorage("textLensOffsetLandscape") private var textOffsetLandscape: Double = 0
+    /// iPhone Duo keeps one nudge per posture: the cover and inner displays
+    /// have different lenses at different distances from the text row.
+    @AppStorage("textLensOffsetDuoFolded") private var textOffsetDuoFolded: Double = 0
+    @AppStorage("textLensOffsetDuoUnfolded") private var textOffsetDuoUnfolded: Double = 0
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
     @State private var exposureCompensation: Double = 0
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
@@ -498,6 +504,13 @@ struct RecordingView: View {
             // landscape waits for the angle to be pinned so the first thing the
             // user sees is already landscape.
             CameraPreviewView(session: cameraManager.session)
+                #if DEBUG
+                // 1a. Duo geometry overlay — chromakey mockups only, never
+                // interactive. An overlay of the full-window preview layer:
+                // it adds no size to the ZStack, draws in window coordinates,
+                // and stays below every control.
+                .overlay(alignment: .topLeading) { duoDebugOverlay }
+                #endif
                 .ignoresSafeArea()
                 .opacity(cameraManager.isPreviewRevealed ? 1 : 0)
 
@@ -515,15 +528,21 @@ struct RecordingView: View {
             // come from the capture output, never from this view tree.
             // Portrait only: landscape's bar sits along the view's leading
             // edge, and sizing a scrim there would need new constants.
+            //
+            // Full width always, so it has no edge along a Duo crease. With
+            // the Duo controls in the top half it hangs from the top edge,
+            // darkest there, and fades out at the crease.
             if !isLandscape {
+                let topScrimHeight = duoTopScrimHeight
                 VStack {
-                    Spacer()
+                    if topScrimHeight == nil { Spacer() }
                     LinearGradient(
                         colors: [.clear, .black.opacity(0.68), .black.opacity(0.86)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                        startPoint: topScrimHeight == nil ? .top : .bottom,
+                        endPoint: topScrimHeight == nil ? .bottom : .top
                     )
-                    .frame(height: 400)
+                    .frame(height: topScrimHeight ?? 400)
+                    if topScrimHeight != nil { Spacer() }
                 }
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
@@ -543,9 +562,11 @@ struct RecordingView: View {
             if isLandscape {
                 landscapeBottomBar
             } else {
-                VStack {
-                    Spacer()
-                    controlsOverlay
+                inDuoControlsRegion {
+                    VStack {
+                        Spacer()
+                        controlsOverlay
+                    }
                 }
             }
 
@@ -624,7 +645,140 @@ struct RecordingView: View {
         }
     }
 
+    #if DEBUG
+    /// Duo geometry overlay content, shown only in chromakey mode with a
+    /// resolved Duo state.
+    @ViewBuilder
+    private var duoDebugOverlay: some View {
+        if DuoDebugOverlay.isEnabled,
+           CameraManager.isChromakeyActive,
+           let duoMonitor,
+           let duoState = duoMonitor.state {
+            DuoDebugOverlay(state: duoState, occlusionFrames: duoMonitor.occlusionFrames)
+        }
+    }
+    #endif
+
     // MARK: - Shared panel geometry
+
+    /// Duo posture the portrait layout follows; nil off Duo, before the Duo
+    /// state resolves, and in landscape, which keeps its own layout.
+    private var duoPosture: DuoDisplayState.Posture? {
+        isLandscape ? nil : duoMonitor?.state?.posture
+    }
+
+    /// The persisted nudge for the current layout: landscape, Duo folded,
+    /// Duo unfolded, or plain portrait.
+    private var storedLensNudge: Double {
+        get {
+            if isLandscape { return textOffsetLandscape }
+            switch duoPosture {
+            case .folded: return textOffsetDuoFolded
+            case .unfolded: return textOffsetDuoUnfolded
+            case nil: return textVerticalOffset
+            }
+        }
+        nonmutating set {
+            if isLandscape { textOffsetLandscape = newValue; return }
+            switch duoPosture {
+            case .folded: textOffsetDuoFolded = newValue
+            case .unfolded: textOffsetDuoUnfolded = newValue
+            case nil: textVerticalOffset = newValue
+            }
+        }
+    }
+
+    /// Where the pill sits on iPhone Duo, in the panel's local coordinates.
+    /// Derived from the window-space lens and camera half, so it does not
+    /// depend on the safe area: on the cover display the lens lies outside it.
+    private struct DuoPanelPlacement {
+        /// Horizontal centre of the pill.
+        let centreX: CGFloat
+        /// Top edge of the pill.
+        let top: CGFloat
+        /// Width of the text row and the shift of its centre, which the text
+        /// anchor aligns to, from the pill's centre. Non-zero when the lens
+        /// takes one end of the pill.
+        let textWidth: CGFloat
+        let textOffsetX: CGFloat
+        /// The pill corner or side that is clear of the lens.
+        let toggleAlignment: Alignment
+        /// Close button centre: level with the pill, or the window's top
+        /// corner when the pill is elsewhere.
+        let closeCentreY: CGFloat
+        /// The recording timer goes above the pill rather than below it.
+        let badgeAbove: Bool
+    }
+
+    /// Pill size on Duo, the same in every posture and orientation. The
+    /// height fits the inner lens lengthwise (58 pt) with `duoLensMargin` on
+    /// either side; the classic three-line mode grows it.
+    private static let duoPillSize = CGSize(width: 304, height: 78)
+    /// Clearance between the lens and the end of the pill it sits in.
+    private static let duoLensMargin: CGFloat = 10
+    /// A lens whose top is within this of the camera half's top is "at the
+    /// top": the controls keep the full screen and the close button stays
+    /// beside the pill.
+    private static let duoTopLensBand: CGFloat = 80
+    /// Minimum clearance between the pill and the camera half's edges.
+    private static let duoSideInset: CGFloat = 8
+
+    /// The lens is "at the top" of the camera half.
+    private static func duoLensIsAtTop(_ duo: DuoDisplayState) -> Bool {
+        duo.lensFrame.minY - duo.cameraHalf.minY <= duoTopLensBand
+    }
+
+    /// Window-space region the portrait controls are confined to: on an
+    /// unfolded Duo whose lens is not at the top, the half without the
+    /// camera, so they stay clear of the lens and the pill around it. Nil
+    /// everywhere else, where they keep the full screen.
+    private var duoControlsRegion: CGRect? {
+        guard !isLandscape,
+              let duo = duoMonitor?.state,
+              !Self.duoLensIsAtTop(duo) else { return nil }
+        return duo.otherHalf
+    }
+
+    /// Height of the controls scrim when it hangs from the window's top edge
+    /// instead of rising from the bottom: when the controls are in the top
+    /// half (Duo, inner display upside down), it spans that half down to the
+    /// crease. Nil keeps the bottom scrim.
+    private var duoTopScrimHeight: CGFloat? {
+        guard let region = duoControlsRegion,
+              let window = duoMonitor?.state?.windowSize,
+              region.maxY < window.height - 1 else { return nil }
+        return region.maxY
+    }
+
+    /// Lays `content` out in `duoControlsRegion`, measured against the safe
+    /// area, when there is one; otherwise leaves it as is.
+    @ViewBuilder
+    private func inDuoControlsRegion<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        let content = content()
+        if let region = duoControlsRegion {
+            GeometryReader { geo in
+                let origin = geo.frame(in: .global).origin
+                let local = region
+                    .offsetBy(dx: -origin.x, dy: -origin.y)
+                    .intersection(CGRect(origin: .zero, size: geo.size))
+                if !local.isNull {
+                    content
+                        .frame(width: local.width, height: local.height)
+                        .offset(x: local.minX, y: local.minY)
+                }
+            }
+        } else {
+            content
+        }
+    }
+    /// Space kept clear for the mode toggle at the pill's far end when the
+    /// lens takes the other end.
+    private static let duoToggleClearance: CGFloat = 44
+    /// Close button inset from the camera half's top-leading corner, when it
+    /// cannot sit beside the pill.
+    private static let duoCloseInset: CGFloat = 12
 
     /// Geometry for the prompter panel, derived once per layout pass and shared
     /// with the close button. Both used to compute this independently, so
@@ -650,6 +804,9 @@ struct RecordingView: View {
         /// swallow the cutout. Zero in portrait, which leaves `thickness`
         /// exactly what it was.
         let minThickness: CGFloat
+        /// Non-nil on iPhone Duo in portrait: the pill follows the lens
+        /// instead of the cutout config's alignment.
+        let duo: DuoPanelPlacement?
 
         /// Short axis before any floor: cutout band plus content.
         var naturalThickness: CGFloat { collapsedExtent + contentExtent }
@@ -657,18 +814,28 @@ struct RecordingView: View {
         var thickness: CGFloat { max(naturalThickness, minThickness) }
         /// Centre the close button aligns to, measured from the screen edge.
         var anchorCentre: CGFloat {
-            cfg.topPadding + (collapsedExtent + anchorContentExtent) / 2
+            duo?.closeCentreY
+                ?? (duo?.top ?? cfg.topPadding) + (collapsedExtent + anchorContentExtent) / 2
         }
     }
 
     private func prompterGeometry(_ geo: GeometryProxy) -> PrompterGeometry {
         let cfg = CutoutLayoutConfig.current(
-            for: DeviceDetectionService.shared.cutoutType,
+            for: DeviceDetectionService.shared.cutoutType(for: duoMonitor?.state),
             screenWidth: geo.size.width,
             safeAreaTop: geo.safeAreaInsets.top
         )
         let wbwContentHeight: CGFloat = fontSize + 4 + 10
         let classicContentHeight: CGFloat = 28 * 3 + 10
+        if !isLandscape, let duoState = duoMonitor?.state {
+            return duoPrompterGeometry(
+                duoState,
+                cfg: cfg,
+                origin: geo.frame(in: .global).origin,
+                contentExtent: isClassicMode ? classicContentHeight : wbwContentHeight,
+                anchorContentExtent: wbwContentHeight
+            )
+        }
         return PrompterGeometry(
             cfg: cfg,
             collapsedExtent: max(1, geo.safeAreaInsets.top - cfg.topPadding),
@@ -677,7 +844,116 @@ struct RecordingView: View {
             longAxis: isLandscape
                 ? geo.size.height * Self.landscapeLongAxisFraction
                 : geo.size.width * 0.75,
-            minThickness: isLandscape ? Self.landscapeMinThickness : 0
+            minThickness: isLandscape ? Self.landscapeMinThickness : 0,
+            duo: nil
+        )
+    }
+
+    /// Duo portrait geometry. The pill has one fixed size (`duoPillSize`),
+    /// sits on the lens and stays inside the camera half, so it never
+    /// crosses the crease. The text is centred in the pill vertically.
+    /// - Where the pill fits centred on the lens (inner display, landscape),
+    ///   it is, and the anchor letter lands on the lens.
+    /// - Otherwise (inner display in portrait; cover display) the lens takes
+    ///   the pill's end on its side, and the text sits between it and the
+    ///   mode toggle at the other end.
+    /// Wherever the lens is not at the top, the close button moves to the
+    /// window's top-leading corner, and the controls to the other half
+    /// (`duoControlsRegion`). `origin` is the reader's window position, which
+    /// turns window-space regions into local coordinates.
+    private func duoPrompterGeometry(
+        _ duo: DuoDisplayState,
+        cfg: CutoutLayoutConfig,
+        origin: CGPoint,
+        contentExtent: CGFloat,
+        anchorContentExtent: CGFloat
+    ) -> PrompterGeometry {
+        let half = duo.cameraHalf
+        let lens = duo.lensFrame
+        let inset = Self.duoSideInset
+        let margin = Self.duoLensMargin
+        // The text block, without the 10 pt of bottom padding that
+        // `contentExtent` carries.
+        let block = contentExtent - 10
+        let width = min(Self.duoPillSize.width, half.width - 2 * inset)
+        let height = min(
+            max(Self.duoPillSize.height, block + 2 * margin),
+            half.height - 2 * inset
+        )
+        func clamp(_ value: CGFloat, _ lower: CGFloat, _ upper: CGFloat) -> CGFloat {
+            lower <= upper ? min(max(value, lower), upper) : (lower + upper) / 2
+        }
+
+        let minCentre = half.minX + inset + width / 2
+        let maxCentre = half.maxX - inset - width / 2
+        let centreX: CGFloat
+        var textWidth = width - 32
+        var textOffsetX: CGFloat = 0
+        let toggleAlignment: Alignment
+        if (minCentre...max(minCentre, maxCentre)).contains(lens.midX) {
+            centreX = lens.midX
+            toggleAlignment = .bottomTrailing
+        } else {
+            let isLeading = lens.midX < half.midX
+            centreX = clamp(
+                isLeading ? lens.minX - margin + width / 2 : lens.maxX + margin - width / 2,
+                minCentre,
+                maxCentre
+            )
+            let pillMin = centreX - width / 2
+            let pillMax = centreX + width / 2
+            let textMin = isLeading ? lens.maxX + margin : pillMin + Self.duoToggleClearance
+            let textMax = isLeading ? pillMax - Self.duoToggleClearance : lens.minX - margin
+            textWidth = max(0, textMax - textMin)
+            textOffsetX = (textMin + textMax) / 2 - centreX
+            toggleAlignment = isLeading ? .trailing : .leading
+        }
+
+        // Centred on the lens's height, unless that would take the pill past
+        // the camera half's edge (inner lens, 21 pt from it). The text is
+        // centred in the pill either way.
+        let top = clamp(lens.midY - height / 2, half.minY + inset, half.maxY - inset - height)
+        let textInset = (height - block) / 2
+
+        let lensAtTop = Self.duoLensIsAtTop(duo)
+        // Off the top the pill can reach the leading edge or the bottom, so
+        // the close button takes the window's top-leading corner (42 pt
+        // button, as `portraitCloseButton` sizes it with `isCameraOffset`).
+        let closeCentreY = lensAtTop
+            ? top + height / 2 - origin.y
+            : Self.duoCloseInset + 42 / 2 - origin.y
+        // A pill in the lower part of the camera half has the window's edge
+        // below it.
+        let badgeAbove = lens.midY > half.midY
+        let minThickness = height
+
+        // Floating, so rounded all round, like the Dynamic Island pill.
+        let duoCfg = CutoutLayoutConfig(
+            topPadding: 0,
+            textTopOffset: textInset,
+            bottomCornerRadius: cfg.bottomCornerRadius,
+            topCornerRadius: cfg.topCornerRadius,
+            collapsedWidth: cfg.collapsedWidth,
+            dragEnabled: cfg.dragEnabled,
+            defaultOffset: cfg.defaultOffset,
+            isCameraOffset: cfg.isCameraOffset
+        )
+        return PrompterGeometry(
+            cfg: duoCfg,
+            collapsedExtent: textInset,
+            contentExtent: contentExtent,
+            anchorContentExtent: anchorContentExtent,
+            longAxis: width,
+            minThickness: minThickness,
+            duo: DuoPanelPlacement(
+                centreX: centreX - origin.x,
+                top: top - origin.y,
+                textWidth: textWidth,
+                textOffsetX: textOffsetX,
+                toggleAlignment: toggleAlignment,
+                closeCentreY: closeCentreY,
+                badgeAbove: badgeAbove
+            )
         )
     }
 
@@ -686,8 +962,7 @@ struct RecordingView: View {
     /// orientations — what changes is what that means physically: nearer to or
     /// further from the lens above (portrait) or on the left (landscape).
     private var lensNudge: CGFloat {
-        let stored = isLandscape ? textOffsetLandscape : textVerticalOffset
-        let rawY = CGFloat(stored) + textDragY
+        let rawY = CGFloat(storedLensNudge) + textDragY
         let minY: CGFloat = -15
         let maxY: CGFloat = 20
         if rawY < minY { return minY + (rawY - minY) * 0.05 }
@@ -718,33 +993,58 @@ struct RecordingView: View {
     }
 
     /// Unchanged portrait layout: a wide strip under the cutout, trailing-
-    /// aligned on devices whose lens is off-centre.
+    /// aligned on devices whose lens is off-centre. On iPhone Duo the same
+    /// stack is placed by `g.duo` instead.
+    @ViewBuilder
     private func portraitPanelStack(_ g: PrompterGeometry) -> some View {
+        if let duo = g.duo {
+            portraitPanelContent(g)
+                // As wide as the expanded pill, so the stack's centre, and
+                // with it the pill's and the text anchor's, is `centreX`
+                // at every width the pill animates through.
+                .frame(width: g.longAxis)
+                .offset(x: duo.centreX - g.longAxis / 2, y: duo.top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            portraitPanelContent(g)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: g.cfg.isCameraOffset ? .topTrailing : .top
+                )
+                .padding(.trailing, g.cfg.isCameraOffset ? 8 : 0)
+                .padding(.top, g.cfg.topPadding)
+        }
+    }
+
+    private func portraitPanelContent(_ g: PrompterGeometry) -> some View {
         VStack(spacing: 8) {
             prompterPill(
                 cfg: g.cfg,
                 width: isExpanded ? g.longAxis : g.cfg.collapsedWidth,
                 height: isExpanded ? g.thickness : 0,
-                overlayAlignment: .top
+                overlayAlignment: .top,
+                // On Duo the top-trailing corner can hold the lens.
+                toggleAlignment: g.duo?.toggleAlignment ?? .topTrailing
             ) {
                 if showTextContent {
                     wordDisplay
-                        .frame(width: g.longAxis - 32)
+                        .frame(width: g.duo?.textWidth ?? g.longAxis - 32)
                         .padding(.top, g.cfg.textTopOffset)
-                        .offset(y: lensNudge)
+                        .offset(x: g.duo?.textOffsetX ?? 0, y: lensNudge)
                         .transition(.opacity.animation(.easeIn(duration: 0.15)))
                 }
             }
             // Recording timer — follows the container horizontally.
-            if cameraManager.isRecording { recordingTimerBadge }
+            if cameraManager.isRecording, g.duo?.badgeAbove != true { recordingTimerBadge }
         }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: g.cfg.isCameraOffset ? .topTrailing : .top
-        )
-        .padding(.trailing, g.cfg.isCameraOffset ? 8 : 0)
-        .padding(.top, g.cfg.topPadding)
+        .overlay(alignment: .top) {
+            // Above the pill, 8 pt clear of it, without moving the pill.
+            if cameraManager.isRecording, g.duo?.badgeAbove == true {
+                recordingTimerBadge
+                    .alignmentGuide(.top) { $0[.bottom] + 8 }
+            }
+        }
     }
 
     /// Landscape layout. The interface is portrait-locked, so this is the SAME
@@ -869,6 +1169,7 @@ struct RecordingView: View {
         width: CGFloat,
         height: CGFloat,
         overlayAlignment: Alignment,
+        toggleAlignment: Alignment = .topTrailing,
         @ViewBuilder textOverlay: () -> Overlay
     ) -> some View {
         UnevenRoundedRectangle(
@@ -883,7 +1184,7 @@ struct RecordingView: View {
         .opacity(isExpanded ? 1 : 0)
         .overlay(alignment: overlayAlignment) { textOverlay() }
         .clipped()
-        .overlay(alignment: .topTrailing) { modeToggleButton }
+        .overlay(alignment: toggleAlignment) { modeToggleButton }
         .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
         .overlay(
             UnevenRoundedRectangle(
@@ -917,15 +1218,10 @@ struct RecordingView: View {
                     }
                 }
                 .onEnded { _ in
-                    let stored = isLandscape ? textOffsetLandscape : textVerticalOffset
-                    let rawY = CGFloat(stored) + textDragY
+                    let rawY = CGFloat(storedLensNudge) + textDragY
                     let clampedY = min(max(rawY, -15), 20)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if isLandscape {
-                            textOffsetLandscape = Double(clampedY)
-                        } else {
-                            textVerticalOffset = Double(clampedY)
-                        }
+                        storedLensNudge = Double(clampedY)
                         textDragY = 0
                         isTextEditMode = false
                     }
@@ -939,11 +1235,7 @@ struct RecordingView: View {
                 .onEnded {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if isLandscape {
-                            textOffsetLandscape = 0
-                        } else {
-                            textVerticalOffset = 0
-                        }
+                        storedLensNudge = 0
                         textDragY = 0
                     }
                 }
