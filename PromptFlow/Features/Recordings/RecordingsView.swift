@@ -17,9 +17,9 @@ struct RecordingsView: View {
     @State private var missingRecording: Recording?
     @State private var showMissingFileAlert = false
     @State private var showPaywall = false
-    /// The card whose preview is open; it stays pressed until the cover is
-    /// dismissed (see `CardPressStyle`).
-    @State private var openingRecordingID: UUID?
+    /// Opens a card's preview after its press shrink (see `CardPressStyle`).
+    @State private var cardOpener = CardOpener()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns: [GridItem] = [
         GridItem(.flexible(), spacing: 12),
@@ -164,7 +164,7 @@ struct RecordingsView: View {
                 comment: "Body of the alert shown when a recording's underlying file is missing on disk."
             ))
         }
-        .fullScreenCover(item: $playingRecording, onDismiss: { openingRecordingID = nil }) { recording in
+        .fullScreenCover(item: $playingRecording, onDismiss: { cardOpener.didClose() }) { recording in
             VideoPreviewView(
                 recording: recording,
                 onDismiss: { playingRecording = nil },
@@ -259,8 +259,9 @@ struct RecordingsView: View {
                         ForEach(group.recordings) { recording in
                             Button {
                                 if FileManager.default.fileExists(atPath: recording.fileURL.path) {
-                                    openingRecordingID = recording.id
-                                    playingRecording = recording
+                                    cardOpener.open(recording.id, reduceMotion: reduceMotion) {
+                                        playingRecording = recording
+                                    }
                                 } else {
                                     missingRecording = recording
                                     showMissingFileAlert = true
@@ -272,7 +273,7 @@ struct RecordingsView: View {
                                     .previewZoomSource(id: recording.id, in: previewZoom)
                                     .contentShape(Rectangle())
                             }
-                            .buttonStyle(CardPressStyle(isOpening: openingRecordingID == recording.id))
+                            .buttonStyle(CardPressStyle(id: recording.id, opener: cardOpener))
                             .contextMenu {
                                 Button {
                                     saveToCameraRoll(recording)
@@ -303,6 +304,7 @@ struct RecordingsView: View {
                                     }
                                 }
                             }
+                            .disabled(cardOpener.pendingID != nil)
                         }
                     }
                 }
@@ -310,6 +312,8 @@ struct RecordingsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .cancelsPendingCardOpen(cardOpener)
+        .onDisappear { cardOpener.cancelPending() }
     }
 
     /// Context-menu icons are drawn by UIKit, whose tint is system blue: the

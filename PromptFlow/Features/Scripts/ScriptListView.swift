@@ -36,9 +36,10 @@ struct ScriptListView: View {
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
     @State private var scriptToRecord: Script?
-    /// The card whose recording screen is open; it stays pressed until the
-    /// cover is dismissed (see `CardPressStyle`).
-    @State private var openingScriptID: UUID?
+    /// Opens a card's recording screen after its press shrink (see
+    /// `CardPressStyle`).
+    @State private var cardOpener = CardOpener()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showBulkImport = false
     @State private var paywallPresentation: PaywallPresentation?
     /// Captured at tap time and passed into BulkImportView so the
@@ -171,7 +172,7 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .fullScreenCover(item: $scriptToRecord, onDismiss: { openingScriptID = nil }) { script in
+            .fullScreenCover(item: $scriptToRecord, onDismiss: { cardOpener.didClose() }) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
             }
             .sheet(isPresented: $showBulkImport) {
@@ -335,8 +336,9 @@ struct ScriptListView: View {
                                 "script_source": script.isDemo ? "demo" : "user",
                                 "script_length_words": script.content.split(separator: " ").count
                             ])
-                            openingScriptID = script.id
-                            scriptToRecord = script
+                            cardOpener.open(script.id, reduceMotion: reduceMotion) {
+                                scriptToRecord = script
+                            }
                         } label: {
                             HStack {
                                 ScriptRowView(script: script)
@@ -356,7 +358,8 @@ struct ScriptListView: View {
                             )
                             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
                         }
-                        .buttonStyle(CardPressStyle(isOpening: openingScriptID == script.id))
+                        .buttonStyle(CardPressStyle(id: script.id, opener: cardOpener))
+                        .disabled(cardOpener.pendingID != nil)
                         .overlay(alignment: .trailing) {
                             Button {
                                 editorMode = .edit(script)
@@ -367,6 +370,7 @@ struct ScriptListView: View {
                             }
                             .buttonStyle(.borderless)
                             .padding(.trailing, Self.cardPadding.trailing)
+                            .disabled(cardOpener.pendingID != nil)
                             .accessibilityLabel(Text("scripts.editor.title.edit", comment: "Navigation title of the script editor when editing an existing script."))
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -399,6 +403,8 @@ struct ScriptListView: View {
         .listStyle(.insetGrouped)
         .listSectionSpacing(10)
         .contentMargins(.horizontal, 16, for: .scrollContent)
+        .cancelsPendingCardOpen(cardOpener)
+        .onDisappear { cardOpener.cancelPending() }
     }
 
     // MARK: - Actions
