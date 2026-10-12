@@ -3,14 +3,41 @@ import SwiftData
 import AVFoundation
 import UserNotifications
 
-private struct GlassCircleModifier: ViewModifier {
+/// Capsule chip for the recording status line.
+private struct StatusChip: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+    }
+}
+
+/// Proposes at most `maxWidth` to its content but, unlike
+/// `.frame(maxWidth:)`, does not grow to fill it — a short name keeps a
+/// short chip.
+private struct CappedWidth: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = min(proposal.width ?? maxWidth, maxWidth)
+        return subviews.first?.sizeThatFits(ProposedViewSize(width: width, height: proposal.height)) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
+}
+
+struct GlassCircleModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.glassEffect(.regular.interactive())
         } else {
             content
-                .background(Color.white.opacity(0.2))
-                .clipShape(Circle())
+                .background(.ultraThinMaterial, in: Circle())
         }
     }
 }
@@ -25,8 +52,13 @@ struct RecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
+    /// Holds the Settings → Countdown choice. Settings creates the row on
+    /// first open; until then the countdown keeps its 3 s default.
+    @Query private var settingsArray: [AppSettings]
     @ObservedObject private var cameraManager = CameraManager.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
     @StateObject private var player = ChunkPlayerEngine()
     /// Follow My Voice V2 toggle. iOS 26+ feature; on older OS the
     /// SettingsView toggle isn't shown so the value stays false.
@@ -58,7 +90,11 @@ struct RecordingView: View {
     /// is consumed in ScriptListView before this view mounts, so
     /// `script.isDemo` is the only signal that survives down here).
     @AppStorage("hasSeenCameraExplainer") private var hasSeenCameraExplainer: Bool = false
-    @State private var showCameraExplainer: Bool = false
+    /// Ordinary camera opens (the onboarding demo not counted). The tip on
+    /// moving the text waits for the third: by then the user has recorded and
+    /// has a reason to care where the text sits.
+    @AppStorage("cameraOpenCount") private var cameraOpenCount: Int = 0
+    @State private var showDragTip = false
 
     /// Orientation this screen renders in, read ONCE when the view is first
     /// created so the very first frame is already correct: the user opens the
@@ -127,82 +163,51 @@ struct RecordingView: View {
     /// Raise it if any part of the cutout still shows against the preview.
     private static let landscapeMinThickness: CGFloat = 190
 
-    /// Gap between the record button and the reset/play pair above it.
-    ///
-    /// Aesthetic, but the resulting footprint is not: the column's physical
-    /// VERTICAL extent is 72 (record) + this + 56 (the pair's width) = 148pt,
-    /// down from 240pt when the three sat in a line. The column is centred
-    /// across view X, so at 240 it reached ~33pt into the bottom bar's
-    /// 8–128pt band; at 148 it stops ~13pt clear of it. That is what lets the
-    /// two coexist without moving the bar.
-    private static let landscapeTransportSpacing: CGFloat = 20
-
-    /// Gap between play and reset within the pair, along the physical
-    /// horizontal. Kept tight so the pair reads as one unit above the record
-    /// button rather than as two separate controls.
-    private static let landscapeTransportPairSpacing: CGFloat = 16
-
-    /// Frame sizes of the transport buttons. Named so `landscapeTransportBalance`
-    /// is derived from the real sizes rather than a number that happens to look
-    /// right and then drifts when a frame changes.
+    /// Frame sizes of the transport buttons.
     private static let recordButtonSize: CGFloat = 72
     private static let transportButtonSize: CGFloat = 56
 
-    /// Padding on the physically LOWER side of the landscape transport group,
-    /// making the group symmetric about the record button so that the RECORD
-    /// button's centre — not the group's — lands on the screen's vertical
-    /// midpoint. Equal to the pair's extent above it: one transport button plus
-    /// the gap.
-    private static let landscapeTransportBalance: CGFloat =
-        transportButtonSize + landscapeTransportSpacing
-
-    /// Horizontal inset shared by the landscape bar's top row and its scrub
-    /// bar, so the two span exactly the same extent.
-    private static let landscapeBarRowInset: CGFloat = 12
-
-    /// Inset of the landscape transport column from the physical right edge —
-    /// which, with the interface portrait-locked, is the view's bottom.
-    private static let landscapeTransportInset: CGFloat = 24
-
-    /// Tappable size of the gear in the landscape bar. 44 is the documented
-    /// minimum touch target, not a value tuned until taps started landing: the
-    /// glyph alone measures ~22x20, which the bar's quarter turn presents as a
-    /// ~20pt band in view x with dead row margin either side of it.
-    ///
-    /// Landscape only. Portrait shares `settingsGearButton`, and framing it
-    /// there would grow portrait's row by the same amount.
-    private static let landscapeGearHitTarget: CGFloat = 44
-
-    /// Height of the scrub bar, and therefore of the landscape bar's lower
-    /// slot. ONE constant with two consumers rather than two literals that have
-    /// to agree: the slot exists precisely to hold this height constant across
-    /// the exposure swap, so a drift between the two would be the very bug it
-    /// is there to prevent. Shared with portrait, like the transport sizes.
+    /// Height of the scrub bar.
     private static let scrubBarHeight: CGFloat = 44
-
-    /// Thickness of the landscape bottom bar — how far it reaches up from the
-    /// physical bottom edge. Aesthetic, not derived: sized to clear the two
-    /// rows (the status/gear/slider row, then the `scrubBarHeight` lower slot)
-    /// with slack, since the content is framed to this height rather than
-    /// measuring itself.
-    ///
-    /// CONSTANT, and now trivially so: the gear SWAPS the lower slot's occupant
-    /// rather than inserting a third row, so there is nothing to make room for.
-    /// An earlier attempt grew this 120 → 184 on disclosure, which looked
-    /// reasonable and was wrong — the bar is pinned at the physical bottom edge
-    /// and therefore grows AWAY from it, so the growth travelled up through the
-    /// content and moved the status row ~66pt, the very row whose gear had just
-    /// been tapped, while the scrub bar stayed put.
-    private static let landscapeBarThickness: CGFloat = 120
-    /// Inset from the physical bottom edge — the view's leading edge.
-    private static let landscapeBarInset: CGFloat = 8
-    /// Inset at each end of the bar, along the physical horizontal.
-    private static let landscapeBarEndInset: CGFloat = 16
 
     // Display settings
     private let fontSize: CGFloat = 32
     @AppStorage("speedSliderValue") private var speedSlider: Double = 0.5
     @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    #if DEV
+    @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
+    #endif
+    /// Eye-contact tracking (beta), from Settings → Recording.
+    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
+    @StateObject private var gazeAttention = GazeAttention()
+    private var gazeTrackingEnabled: Bool {
+        #if DEV
+        if devGazeProbe { return true }
+        #endif
+        return gazeIndicatorEnabled || gazeAutoPauseEnabled
+    }
+    /// Auto-pause shows the eye too: it is what explains a paused prompter.
+    private var showsGazeIndicator: Bool { gazeIndicatorEnabled || gazeAutoPauseEnabled }
+    /// Freeze the prompter while the user looks away from the lens.
+    private var gazeAutoPauses: Bool { gazeAutoPauseEnabled }
+    /// The onboarding demo's coach over the record button.
+    @State private var showFirstTakeCoach = false
+    /// The coach is guiding this screen until the first take starts recording.
+    @State private var firstTakeFlowActive = false
+    /// The coach is due: the sample before anything was ever recorded, or an
+    /// own script from the onboarding flow before its first take
+    /// (`ownTakeCoachPending` is set only by that flow, so existing users
+    /// never see it).
+    private var needsGuidedTake: Bool {
+        if script.isDemo { return !hasCompletedFirstRecording }
+        return !script.isSample && UserDefaults.standard.bool(forKey: "ownTakeCoachPending")
+    }
+    @State private var coachAfterRehearsal = false
+    /// Eye contact over the take that just ended, for its preview.
+    @State private var lastTakeGaze: GazeAttention.TakeSummary?
+    /// The preview on screen is of the user's very first take.
+    @State private var previewIsFirstTake = false
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { displayMode == "classic" }
@@ -216,6 +221,10 @@ struct RecordingView: View {
     /// of different geometry — a value calibrated for one should not silently
     /// become the other's starting point.
     @AppStorage("textLensOffsetLandscape") private var textOffsetLandscape: Double = 0
+    /// iPhone Duo keeps one nudge per posture: the cover and inner displays
+    /// have different lenses at different distances from the text row.
+    @AppStorage("textLensOffsetDuoFolded") private var textOffsetDuoFolded: Double = 0
+    @AppStorage("textLensOffsetDuoUnfolded") private var textOffsetDuoUnfolded: Double = 0
     @AppStorage("dimDuringRecording") private var dimDuringRecording: Bool = true
     @State private var exposureCompensation: Double = 0
     @AppStorage("autoStartPrompting") private var autoStartPrompting: Bool = true
@@ -234,12 +243,18 @@ struct RecordingView: View {
     @State private var isDragging = false
     @State private var isTextEditMode = false
     @State private var textDragY: CGFloat = 0
+    /// The current take was ended by folding or unfolding the Duo; carried
+    /// into its Duo report.
+    @State private var takeStoppedByFold = false
 
     // Recording countdown
     @State private var countdownValue: Int = 0
     @State private var isCountingDown = false
     @State private var countdownTimer: Timer?
-    private let countdownSeconds = 3
+    /// Settings → Countdown: 0 (Off), 3, 5 or 10 seconds.
+    private var countdownSeconds: Int {
+        max(0, settingsArray.first?.countdownDuration ?? 3)
+    }
 
     // UI
 
@@ -282,6 +297,9 @@ struct RecordingView: View {
             if cameraAuthStatus == .authorized {
                 cameraManager.start(position: .front)
             }
+            if gazeTrackingEnabled {
+                gazeAttention.start(probe: cameraManager.gazeProbe)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -296,6 +314,13 @@ struct RecordingView: View {
             animateProgressForChunk(at: newIndex)
         }
         .onChange(of: player.isPlaying) { _, playing in
+            gazeAttention.isReading = playing
+            // A first-take rehearsal ran to the end: say what comes next.
+            if !playing, firstTakeFlowActive, !cameraManager.isRecording, player.progress >= 1 {
+                coachAfterRehearsal = true
+                withAnimation { showFirstTakeCoach = true }
+                AppAnalytics.log("first_take_coach_after_rehearsal_shown")
+            }
             if playing && player.currentChunkIndex < player.chunks.count {
                 animateProgressForChunk(at: player.currentChunkIndex)
             }
@@ -343,12 +368,35 @@ struct RecordingView: View {
             if recording {
                 withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
                 startFMVIfEnabled()
+                gazeAttention.beginTake()
+                firstTakeFlowActive = false
+                showFirstTakeCoach = false
+                showDragTip = false
             } else {
                 stopFMV()
+                lastTakeGaze = gazeAttention.endTake()
+            }
+        }
+        .onChange(of: gazeAttention.state) { _, state in
+            guard gazeAutoPauses else { return }
+            if state == .away {
+                // Freeze first so the seek below does not reschedule, then
+                // take back the words that ran during the confirmation delay:
+                // resume on the word that was showing when the eyes left.
+                player.gazeFrozen = true
+                if let onset = gazeAttention.awayOnset,
+                   let index = player.chunkIndex(shownAt: onset),
+                   index < player.currentChunkIndex {
+                    player.seekTo(index: index)
+                }
+            } else {
+                player.gazeFrozen = false
             }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            gazeAttention.stop()
+            player.gazeFrozen = false
             player.pause()
             cameraManager.stopRecording()
             cameraManager.stop()
@@ -371,6 +419,28 @@ struct RecordingView: View {
             cameraManager.stop()
             dismiss()
         }
+        // iPhone Duo: folding or unfolding moves the window to the other
+        // display and its camera, which a running take does not survive.
+        // The hinge crossing the closed boundary leads the switch; the
+        // posture change is the backup. partiallyOpen <-> fullyOpen is
+        // neither, so it never stops a take.
+        .onChange(of: duoMonitor?.isHingeClosed) { old, new in
+            guard let old, let new, old != new else { return }
+            stopTakeForFoldChange()
+        }
+        .onChange(of: duoMonitor?.state?.posture) { old, new in
+            guard let old, let new, old != new else { return }
+            stopTakeForFoldChange()
+        }
+        // Duo report of the live camera, once per posture and orientation.
+        .onChange(of: duoMonitor?.state) { _, _ in
+            if cameraManager.isSessionReady {
+                DuoReportService.scheduleCameraReport(cameraManager, monitor: duoMonitor)
+            }
+        }
+        .onChange(of: cameraManager.isSessionReady) { _, ready in
+            if ready { DuoReportService.scheduleCameraReport(cameraManager, monitor: duoMonitor) }
+        }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
             cameraManager.lastRecordedURL = nil
@@ -378,15 +448,27 @@ struct RecordingView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        // Only the close button closes the camera screen: no swipe-down,
+        // edge pan or pinch from the zoom transition.
+        .interactiveDismissDisabled(true)
         .withRecordingToasts(
             showAudioToast: $showAudioToast,
             showResolutionToast: $showResolutionToast,
-            onOpenSettings: { selectedTab = .settings; dismiss() }
+            onOpenSettings: { selectedTab = .settings; close() }
         )
         .fullScreenCover(item: $previewRecording) { recording in
             VideoPreviewView(recording: recording, onDismiss: {
                 previewRecording = nil
                 resetDisplay()
+                // Leaving the first take's preview by any path (back, save,
+                // delete) moves on: close the camera, and the scripts list
+                // offers the own script. Staying on the sample would strand
+                // the user.
+                if previewIsFirstTake,
+                   UserDefaults.standard.bool(forKey: "pendingOwnScriptAfterFirstTake") {
+                    previewIsFirstTake = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { close() }
+                }
             }, shouldShowPaywallAfterSave: {
                 // First successful Camera Roll save of a user-written script
                 // (not the onboarding demo, not an app-provided sample), once
@@ -400,7 +482,15 @@ struct RecordingView: View {
             // The origin bit on its own. The closure above fuses it with
             // subscription state and the paywall's one-shot flag, so the
             // satisfaction prompt cannot reuse that answer.
-            isUserWrittenScript: !script.isDemo && !script.isSample)
+            isUserWrittenScript: !script.isDemo && !script.isSample,
+            firstTakeResult: previewIsFirstTake
+                ? FirstTakeResult(duration: recording.duration, gaze: lastTakeGaze)
+                : nil,
+            onRecordOwnScript: {
+                // ScriptListView picks this up once the camera is gone:
+                // paywall first, then the own-script offer.
+                close()
+            })
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "record_button", onPurchaseSuccess: { startCountdown() })
@@ -428,16 +518,30 @@ struct RecordingView: View {
         } message: {
             Text("recording.mic_alert.body", comment: "Body of the alert shown when the user taps record but mic permission is denied")
         }
-        .overlay {
-            if showCameraExplainer {
-                ExplainerOverlay(
-                    isPresented: $showCameraExplainer,
-                    icon: "hand.point.up.left",
-                    title: "common.tip.title",
-                    message: "scripts.recording.tip.body",
-                    buttonLabel: "common.tip.gotIt",
-                    onDismiss: { hasSeenCameraExplainer = true }
-                )
+        // The pill stays usable under it: trying the drag is the point, and
+        // the first drag closes it.
+        .coachSheet(
+            isPresented: $showDragTip,
+            icon: "hand.point.up.left",
+            title: "common.tip.title",
+            message: "scripts.recording.tip.body",
+            buttonLabel: "common.tip.gotIt",
+            allowsBackgroundInteraction: true,
+            onDismiss: {
+                hasSeenCameraExplainer = true
+                AppAnalytics.log("drag_tip_dismissed")
+            }
+        )
+        .onChange(of: isTextEditMode) { _, editing in
+            if editing, showDragTip { showDragTip = false }
+        }
+        // The record button can be tapped straight through the coach's
+        // spotlight: clear the coach as soon as the countdown starts.
+        .onChange(of: isCountingDown) { _, counting in
+            if counting, showFirstTakeCoach {
+                AppAnalytics.log("first_take_coach_record_tapped", params: ["via": "spotlight"])
+                firstTakeFlowActive = false
+                withAnimation { showFirstTakeCoach = false }
             }
         }
         .onAppear {
@@ -445,11 +549,26 @@ struct RecordingView: View {
             if wasOnboardingAuto {
                 UserDefaults.standard.set(false, forKey: "nextRecordingIsOnboardingAuto")
             }
-            guard cameraAuthStatus == .authorized,
-                  !wasOnboardingAuto,
-                  !hasSeenCameraExplainer
-            else { return }
-            showCameraExplainer = true
+            // Coach every open until the take it is for exists, so closing the
+            // camera early never loses it. Portrait only: the interface is
+            // portrait-locked, so in landscape the card would read sideways.
+            if cameraAuthStatus == .authorized, !isLandscape, needsGuidedTake {
+                firstTakeFlowActive = true
+                showFirstTakeCoach = true
+                AppAnalytics.log("first_take_coach_shown", params: [
+                    "script_source": script.isDemo ? "demo" : "user"
+                ])
+            }
+            guard cameraAuthStatus == .authorized, !wasOnboardingAuto else { return }
+            cameraOpenCount += 1
+            // Portrait only, like the coach: the interface is portrait-locked.
+            guard cameraOpenCount >= 3, !hasSeenCameraExplainer, !isLandscape else { return }
+            // After the pill has expanded, so the tip points at something.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                guard !cameraManager.isRecording, !isCountingDown else { return }
+                showDragTip = true
+                AppAnalytics.log("drag_tip_shown", params: ["camera_open": cameraOpenCount])
+            }
         }
     }
 
@@ -464,7 +583,14 @@ struct RecordingView: View {
             // landscape pin are unaffected. Portrait reveals immediately;
             // landscape waits for the angle to be pinned so the first thing the
             // user sees is already landscape.
-            CameraPreviewView(session: cameraManager.session)
+            CameraPreviewView(session: cameraManager.session, device: cameraManager.activeVideoDevice)
+                #if DEBUG
+                // 1a. Duo geometry overlay — chromakey mockups only, never
+                // interactive. An overlay of the full-window preview layer:
+                // it adds no size to the ZStack, draws in window coordinates,
+                // and stays below every control.
+                .overlay(alignment: .topLeading) { duoDebugOverlay }
+                #endif
                 .ignoresSafeArea()
                 .opacity(cameraManager.isPreviewRevealed ? 1 : 0)
 
@@ -477,8 +603,57 @@ struct RecordingView: View {
                     .animation(.easeInOut(duration: 0.3), value: cameraManager.isRecording)
             }
 
+            // 1c. Bottom scrim so the portrait controls stay legible over
+            // bright camera content. A SwiftUI layer only — recorded frames
+            // come from the capture output, never from this view tree.
+            // Full width always, so it has no edge along a Duo crease. With
+            // the Duo controls in the top half it hangs from the top edge,
+            // darkest there, and fades out at the crease.
+            //
+            // Landscape: the controls block sits at the physical right with
+            // its contents on the physical bottom, so the scrim fans out from
+            // the physical bottom-right corner — view bottom-LEADING, since the
+            // interface is portrait-locked (physical right is view +Y,
+            // physical up is view +X).
+            let topScrimHeight = duoTopScrimHeight
+            if isLandscape {
+                RadialGradient(
+                    colors: [.black.opacity(0.86), .black.opacity(0.68), .clear],
+                    center: .bottomLeading,
+                    startRadius: 0,
+                    // Reaches past the block's far corner (~436 x 360pt from
+                    // the screen corner) so the status chips there keep about
+                    // the scrim portrait gives them near its top.
+                    endRadius: 650
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            } else {
+                VStack {
+                    if topScrimHeight == nil { Spacer() }
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.68), .black.opacity(0.86)],
+                        startPoint: topScrimHeight == nil ? .top : .bottom,
+                        endPoint: topScrimHeight == nil ? .bottom : .top
+                    )
+                    .frame(height: topScrimHeight ?? 400)
+                    if topScrimHeight != nil { Spacer() }
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
+
             // 2. Black container expanding from top cutout area
             prompterContainerPanel
+
+            #if DEV
+            // 2a. Gaze prototype readout, mid-screen on the leading side.
+            if devGazeProbe {
+                GazeProbeOverlay(attention: gazeAttention)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+            }
+            #endif
 
             // 2b. Top-leading close button
             if !cameraManager.isRecording {
@@ -486,23 +661,22 @@ struct RecordingView: View {
                     .transition(.opacity)
             }
 
-            // 3. Controls. Portrait keeps one stack at the bottom; landscape
-            // splits it into the bottom bar here and the transport column (3b).
+            // 3. Controls. One block in both orientations; landscape turns it
+            // a quarter turn against the physical right edge.
             if isLandscape {
-                landscapeBottomBar
+                landscapeControlsBlock
             } else {
-                VStack {
-                    Spacer()
-                    controlsOverlay
+                inDuoControlsRegion {
+                    VStack {
+                        Spacer()
+                        controlsOverlay
+                    }
                 }
-            }
-
-            // 3b. Landscape transport column — the same three buttons against
-            // the physical right edge. Layered after the controls so its hit
-            // areas win where the two still overlap, which they do until the
-            // bottom bar moves in the next step.
-            if isLandscape {
-                landscapeTransportColumn
+                // Folded Duo: the trailing safe-area strip is the camera
+                // housing only at the top; down here it is plain display and
+                // the recording screen has no tab rail, so the controls take
+                // the full width.
+                .ignoresSafeArea(edges: duoPosture == .folded ? .horizontal : [])
             }
 
             // 4. Countdown
@@ -570,9 +744,175 @@ struct RecordingView: View {
                 .transition(.opacity)
             }
         }
+        // 8. First-take coach, spotlighting the record button.
+        .overlayPreferenceValue(RecordButtonBoundsKey.self) { anchor in
+            if showFirstTakeCoach {
+                GeometryReader { proxy in
+                    FirstTakeCoach(
+                        spotlight: anchor.map { proxy[$0] },
+                        afterRehearsal: coachAfterRehearsal,
+                        // The sample taught it all; an own script needs one line.
+                        compact: !script.isDemo,
+                        onRecord: {
+                            AppAnalytics.log("first_take_coach_record_tapped", params: ["after_rehearsal": coachAfterRehearsal])
+                            firstTakeFlowActive = false
+                            withAnimation { showFirstTakeCoach = false }
+                            toggleRecording()
+                        },
+                        onRehearse: {
+                            AppAnalytics.log("first_take_coach_rehearse_tapped", params: ["after_rehearsal": coachAfterRehearsal])
+                            withAnimation { showFirstTakeCoach = false }
+                            // From the end of a rehearsal, start over.
+                            if player.progress >= 1 { resetDisplay() }
+                            togglePlay()
+                        },
+                        onDismiss: {
+                            AppAnalytics.log("first_take_coach_dismissed")
+                            withAnimation { showFirstTakeCoach = false }
+                        }
+                    )
+                }
+                // Same full-screen space as the coach's own reader, so the
+                // spotlight lands on the button.
+                .ignoresSafeArea()
+            }
+        }
     }
 
+    #if DEBUG
+    /// Duo geometry overlay content, shown only in chromakey mode with a
+    /// resolved Duo state.
+    @ViewBuilder
+    private var duoDebugOverlay: some View {
+        if DuoDebugOverlay.isEnabled,
+           CameraManager.isChromakeyActive,
+           let duoMonitor,
+           let duoState = duoMonitor.state {
+            DuoDebugOverlay(state: duoState, occlusionFrames: duoMonitor.occlusionFrames)
+        }
+    }
+    #endif
+
     // MARK: - Shared panel geometry
+
+    /// Duo posture the portrait layout follows; nil off Duo, before the Duo
+    /// state resolves, and in landscape, which keeps its own layout.
+    private var duoPosture: DuoDisplayState.Posture? {
+        isLandscape ? nil : duoMonitor?.state?.posture
+    }
+
+    /// The persisted nudge for the current layout: landscape, Duo folded,
+    /// Duo unfolded, or plain portrait.
+    private var storedLensNudge: Double {
+        get {
+            if isLandscape { return textOffsetLandscape }
+            switch duoPosture {
+            case .folded: return textOffsetDuoFolded
+            case .unfolded: return textOffsetDuoUnfolded
+            case nil: return textVerticalOffset
+            }
+        }
+        nonmutating set {
+            if isLandscape { textOffsetLandscape = newValue; return }
+            switch duoPosture {
+            case .folded: textOffsetDuoFolded = newValue
+            case .unfolded: textOffsetDuoUnfolded = newValue
+            case nil: textVerticalOffset = newValue
+            }
+        }
+    }
+
+    /// Where the pill sits on iPhone Duo, in the panel's local coordinates.
+    /// Derived from the window-space lens and camera half, so it does not
+    /// depend on the safe area: on the cover display the lens lies outside it.
+    private struct DuoPanelPlacement {
+        /// Horizontal centre of the pill.
+        let centreX: CGFloat
+        /// Top edge of the pill.
+        let top: CGFloat
+        /// Width of the text row and the shift of its centre, which the text
+        /// anchor aligns to, from the pill's centre. Non-zero when the lens
+        /// takes one end of the pill.
+        let textWidth: CGFloat
+        let textOffsetX: CGFloat
+        /// The pill corner or side that is clear of the lens.
+        let toggleAlignment: Alignment
+        /// Close button centre: level with the pill, or the window's top
+        /// corner when the pill is elsewhere.
+        let closeCentreY: CGFloat
+        /// The recording timer goes above the pill rather than below it.
+        let badgeAbove: Bool
+    }
+
+    /// Pill size on Duo, the same in every posture and orientation. The
+    /// height fits the inner lens lengthwise (58 pt) with `duoLensMargin` on
+    /// either side; the classic three-line mode grows it.
+    private static let duoPillSize = CGSize(width: 304, height: 78)
+    /// Clearance between the lens and the end of the pill it sits in.
+    private static let duoLensMargin: CGFloat = 10
+    /// A lens whose top is within this of the camera half's top is "at the
+    /// top": the controls keep the full screen and the close button stays
+    /// beside the pill.
+    private static let duoTopLensBand: CGFloat = 80
+    /// Minimum clearance between the pill and the camera half's edges.
+    private static let duoSideInset: CGFloat = 8
+
+    /// The lens is "at the top" of the camera half.
+    private static func duoLensIsAtTop(_ duo: DuoDisplayState) -> Bool {
+        duo.lensFrame.minY - duo.cameraHalf.minY <= duoTopLensBand
+    }
+
+    /// Window-space region the portrait controls are confined to: on an
+    /// unfolded Duo whose lens is not at the top, the half without the
+    /// camera, so they stay clear of the lens and the pill around it. Nil
+    /// everywhere else, where they keep the full screen.
+    private var duoControlsRegion: CGRect? {
+        guard !isLandscape,
+              let duo = duoMonitor?.state,
+              !Self.duoLensIsAtTop(duo) else { return nil }
+        return duo.otherHalf
+    }
+
+    /// Height of the controls scrim when it hangs from the window's top edge
+    /// instead of rising from the bottom: when the controls are in the top
+    /// half (Duo, inner display upside down), it spans that half down to the
+    /// crease. Nil keeps the bottom scrim.
+    private var duoTopScrimHeight: CGFloat? {
+        guard let region = duoControlsRegion,
+              let window = duoMonitor?.state?.windowSize,
+              region.maxY < window.height - 1 else { return nil }
+        return region.maxY
+    }
+
+    /// Lays `content` out in `duoControlsRegion`, measured against the safe
+    /// area, when there is one; otherwise leaves it as is.
+    @ViewBuilder
+    private func inDuoControlsRegion<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        let content = content()
+        if let region = duoControlsRegion {
+            GeometryReader { geo in
+                let origin = geo.frame(in: .global).origin
+                let local = region
+                    .offsetBy(dx: -origin.x, dy: -origin.y)
+                    .intersection(CGRect(origin: .zero, size: geo.size))
+                if !local.isNull {
+                    content
+                        .frame(width: local.width, height: local.height)
+                        .offset(x: local.minX, y: local.minY)
+                }
+            }
+        } else {
+            content
+        }
+    }
+    /// Space kept clear for the mode toggle at the pill's far end when the
+    /// lens takes the other end.
+    private static let duoToggleClearance: CGFloat = 44
+    /// Close button inset from the camera half's top-leading corner, when it
+    /// cannot sit beside the pill.
+    private static let duoCloseInset: CGFloat = 12
 
     /// Geometry for the prompter panel, derived once per layout pass and shared
     /// with the close button. Both used to compute this independently, so
@@ -598,6 +938,9 @@ struct RecordingView: View {
         /// swallow the cutout. Zero in portrait, which leaves `thickness`
         /// exactly what it was.
         let minThickness: CGFloat
+        /// Non-nil on iPhone Duo in portrait: the pill follows the lens
+        /// instead of the cutout config's alignment.
+        let duo: DuoPanelPlacement?
 
         /// Short axis before any floor: cutout band plus content.
         var naturalThickness: CGFloat { collapsedExtent + contentExtent }
@@ -605,18 +948,28 @@ struct RecordingView: View {
         var thickness: CGFloat { max(naturalThickness, minThickness) }
         /// Centre the close button aligns to, measured from the screen edge.
         var anchorCentre: CGFloat {
-            cfg.topPadding + (collapsedExtent + anchorContentExtent) / 2
+            duo?.closeCentreY
+                ?? (duo?.top ?? cfg.topPadding) + (collapsedExtent + anchorContentExtent) / 2
         }
     }
 
     private func prompterGeometry(_ geo: GeometryProxy) -> PrompterGeometry {
         let cfg = CutoutLayoutConfig.current(
-            for: DeviceDetectionService.shared.cutoutType,
+            for: DeviceDetectionService.shared.cutoutType(for: duoMonitor?.state),
             screenWidth: geo.size.width,
             safeAreaTop: geo.safeAreaInsets.top
         )
         let wbwContentHeight: CGFloat = fontSize + 4 + 10
-        let classicContentHeight: CGFloat = 28 * 3 + 10
+        let classicContentHeight: CGFloat = ClassicThreeLineView.lineHeight(for: fontSize) * 3 + 10
+        if !isLandscape, let duoState = duoMonitor?.state {
+            return duoPrompterGeometry(
+                duoState,
+                cfg: cfg,
+                origin: geo.frame(in: .global).origin,
+                contentExtent: isClassicMode ? classicContentHeight : wbwContentHeight,
+                anchorContentExtent: wbwContentHeight
+            )
+        }
         return PrompterGeometry(
             cfg: cfg,
             collapsedExtent: max(1, geo.safeAreaInsets.top - cfg.topPadding),
@@ -625,7 +978,116 @@ struct RecordingView: View {
             longAxis: isLandscape
                 ? geo.size.height * Self.landscapeLongAxisFraction
                 : geo.size.width * 0.75,
-            minThickness: isLandscape ? Self.landscapeMinThickness : 0
+            minThickness: isLandscape ? Self.landscapeMinThickness : 0,
+            duo: nil
+        )
+    }
+
+    /// Duo portrait geometry. The pill has one fixed size (`duoPillSize`),
+    /// sits on the lens and stays inside the camera half, so it never
+    /// crosses the crease. The text is centred in the pill vertically.
+    /// - Where the pill fits centred on the lens (inner display, landscape),
+    ///   it is, and the anchor letter lands on the lens.
+    /// - Otherwise (inner display in portrait; cover display) the lens takes
+    ///   the pill's end on its side, and the text sits between it and the
+    ///   mode toggle at the other end.
+    /// Wherever the lens is not at the top, the close button moves to the
+    /// window's top-leading corner, and the controls to the other half
+    /// (`duoControlsRegion`). `origin` is the reader's window position, which
+    /// turns window-space regions into local coordinates.
+    private func duoPrompterGeometry(
+        _ duo: DuoDisplayState,
+        cfg: CutoutLayoutConfig,
+        origin: CGPoint,
+        contentExtent: CGFloat,
+        anchorContentExtent: CGFloat
+    ) -> PrompterGeometry {
+        let half = duo.cameraHalf
+        let lens = duo.lensFrame
+        let inset = Self.duoSideInset
+        let margin = Self.duoLensMargin
+        // The text block, without the 10 pt of bottom padding that
+        // `contentExtent` carries.
+        let block = contentExtent - 10
+        let width = min(Self.duoPillSize.width, half.width - 2 * inset)
+        let height = min(
+            max(Self.duoPillSize.height, block + 2 * margin),
+            half.height - 2 * inset
+        )
+        func clamp(_ value: CGFloat, _ lower: CGFloat, _ upper: CGFloat) -> CGFloat {
+            lower <= upper ? min(max(value, lower), upper) : (lower + upper) / 2
+        }
+
+        let minCentre = half.minX + inset + width / 2
+        let maxCentre = half.maxX - inset - width / 2
+        let centreX: CGFloat
+        var textWidth = width - 32
+        var textOffsetX: CGFloat = 0
+        let toggleAlignment: Alignment
+        if (minCentre...max(minCentre, maxCentre)).contains(lens.midX) {
+            centreX = lens.midX
+            toggleAlignment = .bottomTrailing
+        } else {
+            let isLeading = lens.midX < half.midX
+            centreX = clamp(
+                isLeading ? lens.minX - margin + width / 2 : lens.maxX + margin - width / 2,
+                minCentre,
+                maxCentre
+            )
+            let pillMin = centreX - width / 2
+            let pillMax = centreX + width / 2
+            let textMin = isLeading ? lens.maxX + margin : pillMin + Self.duoToggleClearance
+            let textMax = isLeading ? pillMax - Self.duoToggleClearance : lens.minX - margin
+            textWidth = max(0, textMax - textMin)
+            textOffsetX = (textMin + textMax) / 2 - centreX
+            toggleAlignment = isLeading ? .trailing : .leading
+        }
+
+        // Centred on the lens's height, unless that would take the pill past
+        // the camera half's edge (inner lens, 21 pt from it). The text is
+        // centred in the pill either way.
+        let top = clamp(lens.midY - height / 2, half.minY + inset, half.maxY - inset - height)
+        let textInset = (height - block) / 2
+
+        let lensAtTop = Self.duoLensIsAtTop(duo)
+        // Off the top the pill can reach the leading edge or the bottom, so
+        // the close button takes the window's top-leading corner (42 pt
+        // button, as `portraitCloseButton` sizes it with `isCameraOffset`).
+        let closeCentreY = lensAtTop
+            ? top + height / 2 - origin.y
+            : Self.duoCloseInset + 42 / 2 - origin.y
+        // A pill in the lower part of the camera half has the window's edge
+        // below it.
+        let badgeAbove = lens.midY > half.midY
+        let minThickness = height
+
+        // Floating, so rounded all round, like the Dynamic Island pill.
+        let duoCfg = CutoutLayoutConfig(
+            topPadding: 0,
+            textTopOffset: textInset,
+            bottomCornerRadius: cfg.bottomCornerRadius,
+            topCornerRadius: cfg.topCornerRadius,
+            collapsedWidth: cfg.collapsedWidth,
+            dragEnabled: cfg.dragEnabled,
+            defaultOffset: cfg.defaultOffset,
+            isCameraOffset: cfg.isCameraOffset
+        )
+        return PrompterGeometry(
+            cfg: duoCfg,
+            collapsedExtent: textInset,
+            contentExtent: contentExtent,
+            anchorContentExtent: anchorContentExtent,
+            longAxis: width,
+            minThickness: minThickness,
+            duo: DuoPanelPlacement(
+                centreX: centreX - origin.x,
+                top: top - origin.y,
+                textWidth: textWidth,
+                textOffsetX: textOffsetX,
+                toggleAlignment: toggleAlignment,
+                closeCentreY: closeCentreY,
+                badgeAbove: badgeAbove
+            )
         )
     }
 
@@ -634,8 +1096,7 @@ struct RecordingView: View {
     /// orientations — what changes is what that means physically: nearer to or
     /// further from the lens above (portrait) or on the left (landscape).
     private var lensNudge: CGFloat {
-        let stored = isLandscape ? textOffsetLandscape : textVerticalOffset
-        let rawY = CGFloat(stored) + textDragY
+        let rawY = CGFloat(storedLensNudge) + textDragY
         let minY: CGFloat = -15
         let maxY: CGFloat = 20
         if rawY < minY { return minY + (rawY - minY) * 0.05 }
@@ -666,33 +1127,62 @@ struct RecordingView: View {
     }
 
     /// Unchanged portrait layout: a wide strip under the cutout, trailing-
-    /// aligned on devices whose lens is off-centre.
+    /// aligned on devices whose lens is off-centre. On iPhone Duo the same
+    /// stack is placed by `g.duo` instead.
+    @ViewBuilder
     private func portraitPanelStack(_ g: PrompterGeometry) -> some View {
+        if let duo = g.duo {
+            portraitPanelContent(g)
+                // As wide as the expanded pill, so the stack's centre, and
+                // with it the pill's and the text anchor's, is `centreX`
+                // at every width the pill animates through.
+                .frame(width: g.longAxis)
+                .offset(x: duo.centreX - g.longAxis / 2, y: duo.top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            portraitPanelContent(g)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: g.cfg.isCameraOffset ? .topTrailing : .top
+                )
+                .padding(.trailing, g.cfg.isCameraOffset ? 8 : 0)
+                .padding(.top, g.cfg.topPadding)
+        }
+    }
+
+    private func portraitPanelContent(_ g: PrompterGeometry) -> some View {
         VStack(spacing: 8) {
             prompterPill(
                 cfg: g.cfg,
                 width: isExpanded ? g.longAxis : g.cfg.collapsedWidth,
                 height: isExpanded ? g.thickness : 0,
-                overlayAlignment: .top
+                overlayAlignment: .top,
+                // On Duo the top-trailing corner can hold the lens.
+                toggleAlignment: g.duo?.toggleAlignment ?? .topTrailing,
+                // The corner opposite the toggle. On Duo only when the toggle
+                // sits in a bottom corner; its side positions leave the
+                // opposite side to the lens.
+                indicatorAlignment: g.duo.map { $0.toggleAlignment == .bottomTrailing ? .bottomLeading : nil } ?? .topLeading
             ) {
                 if showTextContent {
                     wordDisplay
-                        .frame(width: g.longAxis - 32)
+                        .frame(width: g.duo?.textWidth ?? g.longAxis - 32)
                         .padding(.top, g.cfg.textTopOffset)
-                        .offset(y: lensNudge)
+                        .offset(x: g.duo?.textOffsetX ?? 0, y: lensNudge)
                         .transition(.opacity.animation(.easeIn(duration: 0.15)))
                 }
             }
             // Recording timer — follows the container horizontally.
-            if cameraManager.isRecording { recordingTimerBadge }
+            if cameraManager.isRecording, g.duo?.badgeAbove != true { recordingTimerBadge }
         }
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: g.cfg.isCameraOffset ? .topTrailing : .top
-        )
-        .padding(.trailing, g.cfg.isCameraOffset ? 8 : 0)
-        .padding(.top, g.cfg.topPadding)
+        .overlay(alignment: .top) {
+            // Above the pill, 8 pt clear of it, without moving the pill.
+            if cameraManager.isRecording, g.duo?.badgeAbove == true {
+                recordingTimerBadge
+                    .alignmentGuide(.top) { $0[.bottom] + 8 }
+            }
+        }
     }
 
     /// Landscape layout. The interface is portrait-locked, so this is the SAME
@@ -735,8 +1225,7 @@ struct RecordingView: View {
         //
         // TRAILING, physically ABOVE the panel. `Alignment.trailing` is the
         // large-view-x edge, and view +X is physically up with the device
-        // turned left — the same mapping that puts `landscapeBottomBar`, which
-        // is pinned at view-LEADING, along the physical bottom. So a positive
+        // turned left, so view-LEADING is the physical bottom. So a positive
         // x offset carries the badge off the panel's upper side. It used to be
         // `.leading` with a negative offset, the mirror image of this, which
         // placed it physically below the panel — directly in the band the
@@ -789,6 +1278,10 @@ struct RecordingView: View {
             )
     }
 
+    private var gazeIndicator: some View {
+        GazeIndicator(state: gazeAttention.state, isLandscape: isLandscape)
+    }
+
     /// Word-by-word / 3-line mode toggle.
     private var modeToggleButton: some View {
         Group {
@@ -817,6 +1310,8 @@ struct RecordingView: View {
         width: CGFloat,
         height: CGFloat,
         overlayAlignment: Alignment,
+        toggleAlignment: Alignment = .topTrailing,
+        indicatorAlignment: Alignment? = .topLeading,
         @ViewBuilder textOverlay: () -> Overlay
     ) -> some View {
         UnevenRoundedRectangle(
@@ -831,7 +1326,12 @@ struct RecordingView: View {
         .opacity(isExpanded ? 1 : 0)
         .overlay(alignment: overlayAlignment) { textOverlay() }
         .clipped()
-        .overlay(alignment: .topTrailing) { modeToggleButton }
+        .overlay(alignment: toggleAlignment) { modeToggleButton }
+        .overlay(alignment: indicatorAlignment ?? .topLeading) {
+            if showsGazeIndicator, isExpanded, indicatorAlignment != nil {
+                gazeIndicator
+            }
+        }
         .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
         .overlay(
             UnevenRoundedRectangle(
@@ -865,15 +1365,10 @@ struct RecordingView: View {
                     }
                 }
                 .onEnded { _ in
-                    let stored = isLandscape ? textOffsetLandscape : textVerticalOffset
-                    let rawY = CGFloat(stored) + textDragY
+                    let rawY = CGFloat(storedLensNudge) + textDragY
                     let clampedY = min(max(rawY, -15), 20)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if isLandscape {
-                            textOffsetLandscape = Double(clampedY)
-                        } else {
-                            textVerticalOffset = Double(clampedY)
-                        }
+                        storedLensNudge = Double(clampedY)
                         textDragY = 0
                         isTextEditMode = false
                     }
@@ -887,11 +1382,7 @@ struct RecordingView: View {
                 .onEnded {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        if isLandscape {
-                            textOffsetLandscape = 0
-                        } else {
-                            textVerticalOffset = 0
-                        }
+                        storedLensNudge = 0
                         textDragY = 0
                     }
                 }
@@ -959,8 +1450,20 @@ struct RecordingView: View {
         }
     }
 
+    /// Stops the camera session before the dismiss animation starts, so the
+    /// preview layer is not released on main while `stopRunning()` still holds
+    /// the session at the end of the animation (a visible freeze on device).
+    /// During a take nothing changes: `onDisappear` finalises it as before.
+    /// `onDisappear` still calls `stop()`, which is safe to repeat.
+    private func close() {
+        if !cameraManager.isRecording {
+            cameraManager.stop()
+        }
+        dismiss()
+    }
+
     private func closeChevron(size: CGFloat) -> some View {
-        Button { dismiss() } label: {
+        Button { close() } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
@@ -988,7 +1491,7 @@ struct RecordingView: View {
             .ignoresSafeArea()
             VStack(spacing: 16) {
                 HStack {
-                    Button { dismiss() } label: {
+                    Button { close() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.white)
@@ -1022,15 +1525,12 @@ struct RecordingView: View {
                     }
                 } label: {
                     Text(String(localized: "common.open_settings", defaultValue: "Open Settings"))
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
+                .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button(String(localized: "recording.permission.go_back", defaultValue: "Go back")) {
-                    dismiss()
+                    close()
                 }
                 .foregroundStyle(.white.opacity(0.7))
                 Spacer()
@@ -1046,7 +1546,7 @@ struct RecordingView: View {
         Group {
             if hasStartedPlayback && player.isReady {
                 if isClassicMode {
-                    ClassicThreeLineView(player: player)
+                    ClassicThreeLineView(player: player, fontSize: fontSize)
                 } else {
                     WordByWordView(player: player, fontSize: fontSize)
                 }
@@ -1111,10 +1611,10 @@ struct RecordingView: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.2))
+                    .fill(Color.white.opacity(0.25))
                     .frame(height: 4)
                 Capsule()
-                    .fill(Color.orange)
+                    .fill(Theme.accent)
                     .frame(width: max(0, geo.size.width * smoothProgress), height: 4)
             }
             .frame(maxHeight: .infinity)
@@ -1169,15 +1669,14 @@ struct RecordingView: View {
 
     private var controlsOverlay: some View {
         VStack(spacing: 16) {
-            if !cameraManager.isRecording {
-                HStack {
-                    Spacer()
+            HStack {
+                statusLine
+                Spacer(minLength: 8)
+                if !cameraManager.isRecording {
                     settingsGearButton
                 }
-                .padding(.horizontal, 20)
             }
-
-            statusLine
+            .padding(.horizontal, 20)
 
             if showCameraSettings { cameraSettingsPanel }
 
@@ -1188,12 +1687,11 @@ struct RecordingView: View {
             scrubBar
                 .padding(.horizontal, 24)
 
-            // `controlsOverlay` is portrait-only — landscape mounts
-            // `landscapeBottomBar` and `landscapeTransportColumn` instead — so
-            // this is unconditional.
             transportRow
         }
-        .padding(.bottom, 48)
+        // Landscape: the block's bottom is the physical bottom edge, which
+        // has no home indicator to clear.
+        .padding(.bottom, isLandscape ? 24 : 48)
         .padding(.top, 12)
     }
 
@@ -1209,7 +1707,8 @@ struct RecordingView: View {
             Image(systemName: "gearshape.fill")
                 .font(.title2)
                 .foregroundStyle(.white)
-                .shadow(radius: 4)
+                .frame(width: 44, height: 44)
+                .modifier(GlassCircleModifier())
         }
     }
 
@@ -1219,44 +1718,41 @@ struct RecordingView: View {
     /// same for video quality. The indicators were previously decorative-only —
     /// users reached for them and nothing happened.
     private var statusLine: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button {
                 showAudioToast = true
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
-                    Text(cameraManager.audioSourceName)
-                        .font(.caption2)
+                    // Long Bluetooth names truncate instead of pushing the row.
+                    CappedWidth(maxWidth: 140) {
+                        Text(cameraManager.audioSourceName)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
                 }
-                .foregroundStyle(.white.opacity(0.5))
+                .modifier(StatusChip())
             }
             .buttonStyle(.plain)
-            Text("·")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.5))
             Button {
                 showResolutionToast = true
             } label: {
                 Text("\(videoResolution == "4k" && subscriptionManager.canRecord4K ? "4K" : "1080p") · \(videoFPS)fps")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .modifier(StatusChip())
             }
             .buttonStyle(.plain)
         }
     }
 
     /// The exposure row itself — label, slider, EV readout — with no chrome.
-    /// Shared, so the two orientations differ only in what surrounds it:
-    /// portrait wraps it in the card below, landscape drops it bare into the
-    /// bar's lower slot, where the card's vertical padding would not fit.
     private var exposureControl: some View {
         HStack {
             Text("camera.exposure.label", comment: "Label for the exposure compensation slider")
                 .font(.caption)
                 .foregroundStyle(.white)
             Slider(value: $exposureCompensation, in: -2...2, step: 0.1)
-                .tint(.orange)
+                .tint(Theme.accent)
             Text(String(format: "%+.1f EV", exposureCompensation))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.7))
@@ -1268,7 +1764,7 @@ struct RecordingView: View {
     ///
     /// Restarted ONLY by a touch on the exposure control. Interaction elsewhere
     /// deliberately does not restart it: the neighbouring controls — speed,
-    /// transport, and in portrait the scrub bar — have nothing to do with
+    /// transport and the scrub bar — have nothing to do with
     /// exposure, so letting them hold it open would mean a user scrubbing
     /// through a script keeps an exposure slider on screen indefinitely, which
     /// is the situation auto-hide exists to prevent.
@@ -1286,9 +1782,8 @@ struct RecordingView: View {
         exposureAutoHideTask = nil
     }
 
-    /// The exposure disclosure, shown when the gear is toggled. PORTRAIT only —
-    /// landscape swaps `exposureControl` into its bar instead, without this
-    /// card, so this view and its position are exactly what they were.
+    /// The exposure disclosure, shown when the gear is toggled. Landscape shows
+    /// it too, turned with the rest of the controls block.
     private var cameraSettingsPanel: some View {
         VStack(spacing: 12) {
             // Exposure
@@ -1297,7 +1792,7 @@ struct RecordingView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 16))
+        .background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
         .padding(.horizontal, 20)
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
@@ -1309,13 +1804,13 @@ struct RecordingView: View {
         HStack(spacing: 10) {
             Image(systemName: "tortoise.fill")
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.9))
             Slider(value: $speedSlider, in: 0...1)
-                .tint(.orange)
+                .tint(Theme.accent)
                 .animation(.easeInOut(duration: 0.5), value: player.externalSpeedMultiplier)
             Image(systemName: "hare.fill")
                 .font(.system(size: 16))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.9))
         }
         .padding(.horizontal, 24)
         .background {
@@ -1333,111 +1828,43 @@ struct RecordingView: View {
         }
     }
 
-    // MARK: - Landscape bottom bar
+    // MARK: - Landscape controls block
 
-    /// Status line, gear and speed slider in one row, with the scrub bar
-    /// beneath, along the physical bottom edge.
+    /// Landscape: the portrait `controlsOverlay`, unchanged, turned a quarter
+    /// turn so it reads upright for a viewer holding the device turned left,
+    /// and pinned to the view's bottom — the physical right edge, since the
+    /// interface is portrait-locked (physical up is view +X, physical right is
+    /// view +Y).
     ///
-    /// This group rotates as ONE unit — unlike every other landscape element,
-    /// which turns only its inner content and keeps an axis-aligned hit area.
-    /// It has to: two of its children are drag targets that must track along
-    /// the physical horizontal, and a `Slider` tracks along its own x-axis, so
-    /// the control itself must turn. The DEV spike proved on device that a
-    /// rotated `Slider` follows a sustained drag correctly, which is why this
-    /// uses the native control rather than a hand-rolled gesture.
+    /// The block is square: its physical height is the view's width, and it is
+    /// given the same physical width so it lays out exactly as in portrait.
+    /// A square box is unchanged by a quarter turn about its centre, so the
+    /// layout box already equals the drawn result. Inside, a `Spacer` sits the
+    /// controls on the block's own bottom — the physical bottom edge.
     ///
-    /// The explicit `.frame` AFTER the rotation is the other half of what the
-    /// spike established: `rotationEffect` does not change layout, so without
-    /// it the content centres on its unrotated box and lands mid-screen
-    /// instead of at the edge.
-    private var landscapeBottomBar: some View {
+    /// The whole block rotates, drag targets included. The DEV spike proved on
+    /// device that a rotated `Slider` follows a sustained drag correctly, and
+    /// the previous landscape bar shipped the rotated slider and scrub bar.
+    private var landscapeControlsBlock: some View {
         GeometryReader { geo in
-            let length = max(0, geo.size.height - Self.landscapeBarEndInset * 2)
-            let thickness = Self.landscapeBarThickness
-            HStack {
-                landscapeBottomBarContent
-                    .frame(width: length, height: thickness)
-                    .rotationEffect(.degrees(90))
-                    // Swapped dimensions so the layout box equals the drawn
-                    // result and the bar sits where it appears to sit.
-                    .frame(width: thickness, height: length)
-                    .padding(.leading, Self.landscapeBarInset)
-                Spacer()
-            }
-            .frame(maxHeight: .infinity)
-            .animation(.spring(duration: 0.25), value: showCameraSettings)
-        }
-    }
-
-    /// The bar's contents, in their own unrotated space. A `VStack` stacks
-    /// along its local +Y, which the quarter turn maps to physically downward,
-    /// so the first child is the upper row as the user sees it; an `HStack`
-    /// stacks along local +X, which maps to physically rightward. Both read in
-    /// the natural order with nothing reversed.
-    ///
-    /// The exposure panel sits between the two rows — the same relative place
-    /// it occupies in portrait, below the status line and above the scrub bar.
-    private var landscapeBottomBarContent: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                statusLine
-                if !cameraManager.isRecording {
-                    // Explicit hit region — the one interactive control in this
-                    // bar that lacked one. Nothing intercepts these taps: the
-                    // file's only other hit-testing participants are the dim
-                    // overlay (hit testing off), the prompter pill's gestures
-                    // (bounded by the pill, and a lower ZStack layer than this
-                    // bar), the scrub bar's contentShape (the slot below), and
-                    // statusLine's two buttons. There was simply very little to
-                    // hit: a ~22x20 glyph, which the quarter turn renders as a
-                    // ~20pt band in view x.
-                    //
-                    // `contentShape` so the whole frame is tappable rather than
-                    // just where the symbol's strokes fall.
-                    settingsGearButton
-                        .frame(
-                            width: Self.landscapeGearHitTarget,
-                            height: Self.landscapeGearHitTarget
-                        )
-                        .contentShape(Rectangle())
+            let side = geo.size.width
+            VStack {
+                Spacer(minLength: 0)
+                VStack {
+                    Spacer(minLength: 0)
+                    controlsOverlay
                 }
-                speedSliderRow
+                .frame(width: side, height: side)
+                .rotationEffect(.degrees(90))
+                .animation(.spring(duration: 0.25), value: showCameraSettings)
             }
-            .padding(.horizontal, Self.landscapeBarRowInset)
-
-            // One slot, two occupants. The gear SWAPS the scrub bar for the
-            // exposure row rather than inserting anything, so the content is
-            // the same height either way: nothing is pushed, nothing needs
-            // reserving, and the row above cannot move.
-            //
-            // The slot is pinned to `scrubBarHeight` because the two occupants
-            // are NOT the same height — the scrub bar declares 44, the exposure
-            // row is ~33 of slider. Without the frame the bar would shrink by
-            // 11 on every swap and the row would drift ~5.5. The shorter
-            // occupant centres in the slot; the taller one, portrait's ~57pt
-            // card, never enters this path.
-            //
-            // Hidden by conditional insertion, not opacity: the occupant that
-            // is not showing is not mounted, so it leaves the accessibility
-            // tree rather than lurking in it as a silent, swipeable control.
-            //
-            // The same inset as the row above, from the same constant, so the
-            // two span identical extents and cannot drift apart again.
-            Group {
-                if showCameraSettings {
-                    exposureControl
-                } else {
-                    scrubBar
-                }
-            }
-            .frame(height: Self.scrubBarHeight)
-            .padding(.horizontal, Self.landscapeBarRowInset)
         }
     }
 
     // MARK: - Transport controls
 
-    /// Portrait: the three transport buttons in a row, unchanged.
+    /// The three transport buttons in a row. Landscape turns them with the
+    /// whole block, so no glyph turns on its own.
     private var transportRow: some View {
         HStack(spacing: 48) {
             playPauseButton
@@ -1446,62 +1873,13 @@ struct RecordingView: View {
         }
     }
 
-    /// Landscape: the record button on the screen's vertical centre line, with
-    /// the play/reset pair side by side above it, against the physical RIGHT
-    /// edge.
-    ///
-    /// Two axes are in play and both follow from one mapping — the interface is
-    /// portrait-locked, so physical up is view +X and physical right is view +Y:
-    ///
-    /// * The outer `HStack` lays out along +X, i.e. bottom-to-top on screen, so
-    ///   listing `recordButton` FIRST puts it lowest with the pair above it.
-    /// * The inner `VStack` lays out along +Y, i.e. left-to-right on screen, so
-    ///   listing `playPauseButton` first puts play on the left and reset on the
-    ///   right — the same left-to-right relationship the two have in portrait's
-    ///   row. Swapping the two lines is all it takes to reverse that.
-    ///
-    /// `landscapeTransportBalance` is what centres the RECORD button rather
-    /// than the group, and the arithmetic is checkable. Without it the group is
-    /// 72 + 20 + 56 = 148 wide and the enclosing `VStack` centres it across
-    /// [mid-74, mid+74]; the record button, as the leading child, occupies
-    /// [mid-74, mid-2], putting its centre 38pt BELOW the midpoint — which is
-    /// exactly the dead space that appeared above the pair. Padding the leading
-    /// (physically lower) side by the pair's own extent, 56 + 20 = 76, makes
-    /// the padded box 224 wide, centred across [mid-112, mid+112]; the leading
-    /// padding consumes [mid-112, mid-36], so the record button lands at
-    /// [mid-36, mid+36] — its centre exactly on the midpoint.
-    ///
-    /// The pair stays in layout flow rather than becoming an overlay: an
-    /// overlay would draw outside the record button's bounds, and content drawn
-    /// outside a parent's bounds is not reliably hit-testable. These are
-    /// buttons, so that risk is not worth taking for a tidier expression.
-    private var landscapeTransportColumn: some View {
-        VStack {
-            Spacer()
-            HStack(spacing: Self.landscapeTransportSpacing) {
-                recordButton
-                VStack(spacing: Self.landscapeTransportPairSpacing) {
-                    playPauseButton
-                    resetButton
-                }
-            }
-            .padding(.leading, Self.landscapeTransportBalance)
-            .padding(.bottom, Self.landscapeTransportInset)
-        }
-    }
-
     private var playPauseButton: some View {
         Button { togglePlay() } label: {
             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.white)
-                // Glyph turned, frame applied AFTER, so the tappable bounds
-                // stay an axis-aligned square. Same pattern as `closeChevron`,
-                // `modeToggleButton` and the timer badge — the interactive
-                // control is never itself rotated.
-                .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .modifier(GlassCircleModifier())
         }
         .disabled(!player.isReady)
     }
@@ -1514,13 +1892,18 @@ struct RecordingView: View {
     /// under a quarter turn, so a `rotationEffect` here would be a no-op
     /// transform carrying a comment that implied otherwise.
     private var recordButton: some View {
+        recordButtonCore
+            .anchorPreference(key: RecordButtonBoundsKey.self, value: .bounds) { $0 }
+    }
+
+    private var recordButtonCore: some View {
         Button { toggleRecording() } label: {
             ZStack {
                 Circle()
                     .strokeBorder(.white, lineWidth: 3)
                     .frame(width: Self.recordButtonSize, height: Self.recordButtonSize)
                 RoundedRectangle(cornerRadius: cameraManager.isRecording ? 6 : 28)
-                    .fill(.red)
+                    .fill(Theme.accent)
                     .frame(
                         width: cameraManager.isRecording ? 28 : 52,
                         height: cameraManager.isRecording ? 28 : 52
@@ -1535,9 +1918,8 @@ struct RecordingView: View {
             Image(systemName: "arrow.counterclockwise")
                 .font(.system(size: 22))
                 .foregroundStyle(.white)
-                .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
-                .background(.ultraThinMaterial, in: Circle())
+                .modifier(GlassCircleModifier())
         }
     }
 
@@ -1587,7 +1969,9 @@ struct RecordingView: View {
             player.pause()
             // Stay on current chunk — do not reset
         } else {
-            guard SubscriptionManager.shared.canRecord else {
+            // The guided first run shows value before any paywall, hard
+            // paywall mode included.
+            guard SubscriptionManager.shared.canRecord || OnboardingFlow.isActive else {
                 showPaywall = true
                 return
             }
@@ -1599,6 +1983,22 @@ struct RecordingView: View {
         }
     }
 
+    /// Ends a countdown or a take because the Duo is being folded or
+    /// unfolded. A take stops exactly as the record button stops it, so the
+    /// usual Retake / Save flow follows; a countdown is simply cancelled.
+    private func stopTakeForFoldChange() {
+        if isCountingDown {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+            isCountingDown = false
+        }
+        guard cameraManager.isRecording else { return }
+        takeStoppedByFold = true
+        cameraManager.stopRecording()
+        player.pause()
+        AppAnalytics.log("recording_stopped_by_fold", params: nil)
+    }
+
     private func startCountdown() {
         // Show real chunks statically during countdown (no advancement)
         player.reset()
@@ -1606,7 +2006,14 @@ struct RecordingView: View {
         hasStartedPlayback = true
         // Player stays paused — chunks visible but frozen
 
-        countdownValue = countdownSeconds
+        // Countdown Off: start straight away, no overlay.
+        let seconds = countdownSeconds
+        guard seconds > 0 else {
+            beginRecording()
+            return
+        }
+
+        countdownValue = seconds
         isCountingDown = true
 
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [self] t in
@@ -1617,16 +2024,21 @@ struct RecordingView: View {
                     t.invalidate()
                     countdownTimer = nil
                     isCountingDown = false
-                    cameraManager.startRecording()
-                    AppAnalytics.log("recording_started", params: [
-                        "display_mode": displayMode,
-                        "script_length_words": script.content.split(separator: " ").count
-                    ])
-                    if autoStartPrompting {
-                        player.play()
-                    }
+                    beginRecording()
                 }
             }
+        }
+    }
+
+    private func beginRecording() {
+        takeStoppedByFold = false
+        cameraManager.startRecording()
+        AppAnalytics.log("recording_started", params: [
+            "display_mode": displayMode,
+            "script_length_words": script.content.split(separator: " ").count
+        ])
+        if autoStartPrompting {
+            player.play()
         }
     }
 
@@ -1657,7 +2069,27 @@ struct RecordingView: View {
                     "was_first": wasFirst,
                     "via": "auto_persist"
                 ])
+                // The result sheet and the own-script follow-up belong to the
+                // sample take; a first take of an own script skips them.
+                previewIsFirstTake = wasFirst && script.isDemo
+                // The paywall waits for real value: a successful take of the
+                // user's own script, not the sample. Shown once the camera
+                // closes (see ScriptListView), once per install — the same
+                // one-shot flag as the post-save paywall, so never both.
+                if !script.isDemo, !script.isSample {
+                    UserDefaults.standard.set(false, forKey: "ownTakeCoachPending")
+                    if !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                        UserDefaults.standard.set(true, forKey: "ownTakePaywallDue")
+                    }
+                }
                 if wasFirst {
+                    if script.isDemo {
+                        // After the sample take, whichever way the user leaves
+                        // the preview, the list offers to write an own script,
+                        // and the camera coaches that script's first take.
+                        UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                        UserDefaults.standard.set(true, forKey: "ownTakeCoachPending")
+                    }
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())
@@ -1671,6 +2103,14 @@ struct RecordingView: View {
                 // successful recording here means a recording that yields to a
                 // paywall still moves the user toward the prompt.
                 ReviewPromptManager.recordSuccessfulRecording()
+                DuoReportService.reportTake(
+                    fileURL: recording.fileURL,
+                    failure: nil,
+                    duration: duration,
+                    stoppedByFold: takeStoppedByFold,
+                    cameraManager: cameraManager,
+                    monitor: duoMonitor
+                )
                 previewRecording = recording
             case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,
@@ -1688,6 +2128,14 @@ struct RecordingView: View {
                     "display_mode": displayMode,
                     "error_reason": "\(nsError.domain)/\(nsError.code)"
                 ])
+                DuoReportService.reportTake(
+                    fileURL: nil,
+                    failure: "\(nsError.domain)/\(nsError.code)",
+                    duration: duration,
+                    stoppedByFold: takeStoppedByFold,
+                    cameraManager: cameraManager,
+                    monitor: duoMonitor
+                )
                 try? FileManager.default.removeItem(at: sourceURL)
                 resetDisplay()
             }

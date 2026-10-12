@@ -68,25 +68,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye uses the camera so you can record yourself while reading your script."
+            "value" : "SteadyEye uses the camera so you can record yourself while reading your script, and to show on your device whether you are looking at the lens."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye usa la cámara para que puedas grabarte mientras lees tu guion."
+            "value" : "SteadyEye usa la cámara para que puedas grabarte mientras lees tu guion y para mostrarte, en tu dispositivo, si estás mirando a la cámara."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O SteadyEye usa a câmera para você se gravar enquanto lê seu roteiro."
+            "value" : "O SteadyEye usa a câmera para você se gravar enquanto lê seu roteiro e para mostrar, no seu aparelho, se você está olhando para a câmera."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye использует камеру, чтобы ты мог записывать себя, читая скрипт."
+            "value" : "SteadyEye использует камеру, чтобы ты мог записывать себя, читая скрипт, и прямо на устройстве показывать, смотришь ли ты в камеру."
           }
         }
       }
@@ -176,7 +176,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Это поможет показывать тебе более релевантную рекламу."
+            "value" : "Разреши SteadyEye измерять, как реклама помогает новым авторам находить наше приложение. Твои данные остаются анонимными."
           }
         }
       }

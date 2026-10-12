@@ -4,7 +4,13 @@ import Photos
 import UIKit
 
 enum OnboardingStage {
-    case priming
+    /// The product at a glance: the real prompter pill under the lens.
+    case welcome
+    /// One word or three lines, anchor letter or not — saved as the
+    /// prompter's own settings.
+    case readingStyle
+    /// What we are about to ask for, right before the system prompts.
+    case access
     case permissionExplainer
 }
 
@@ -15,7 +21,11 @@ struct OnboardingView: View {
     /// with the demo script as soon as the onboarding cover dismisses.
     /// Reset to false by ScriptListView after consumption.
     @AppStorage("pendingDemoRecording") private var pendingDemoRecording: Bool = false
-    @State private var stage: OnboardingStage = .priming
+    @State private var stage: OnboardingStage = .welcome
+    /// The prompter's own settings, written live so the pill previews them.
+    @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @State private var didDefaultReadingStyle = false
     @State private var cameraGranted: Bool = false
     @State private var micGranted: Bool = false
     @State private var photosGranted: Bool = false
@@ -25,24 +35,40 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             switch stage {
-            case .priming:
-                primingView
+            case .welcome:
+                welcomeView
+                    .transition(.opacity)
+            case .readingStyle:
+                readingStyleView
+                    .transition(.opacity)
+            case .access:
+                accessView
+                    .transition(.opacity)
             case .permissionExplainer:
                 explainerView
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: stage)
+        // Welcome shows the pill where it sits on the camera, whose screen
+        // hides the status bar; the clock would collide with the pill's eye.
+        .statusBarHidden(stage == .welcome || stage == .readingStyle)
         .preferredColorScheme(.dark)
         .onAppear {
             if !didLogStart {
                 didLogStart = true
                 AppAnalytics.log("onboarding_started")
             }
+            OnboardingFlow.start()
         }
         .onChange(of: stage) { _, newStage in
             switch newStage {
+            case .readingStyle:
+                AppAnalytics.log("onboarding_reading_style_shown")
+            case .access:
+                AppAnalytics.log("onboarding_access_shown")
             case .permissionExplainer:
                 AppAnalytics.log("onboarding_permission_explainer_shown")
-            case .priming:
+            case .welcome:
                 break
             }
         }
@@ -50,51 +76,294 @@ struct OnboardingView: View {
 
     // MARK: - Stages
 
-    private var primingView: some View {
-        ZStack {
-            backgroundGradient
-            VStack(spacing: 0) {
-                Spacer().frame(maxHeight: 120)
-                MiniWBWView()
-                Spacer().frame(height: 40)
-                Text("Read your script. Look natural.")
+    private var welcomeView: some View {
+        ZStack(alignment: .top) {
+            pillBackdrop
+            OnboardingPrompterPill(phrase: String(
+                localized: "onboarding.welcome.pill_phrase",
+                defaultValue: "Read your script and keep your eyes on the camera",
+                comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
+            ))
+            VStack(alignment: .leading, spacing: 16) {
+                Spacer()
+                Text(String(
+                    localized: "onboarding.welcome.title",
+                    defaultValue: "Look into the lens. Read every word.",
+                    comment: "Headline of the first onboarding screen."
+                ))
                     .font(.largeTitle.bold())
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                Text("SteadyEye shows your text right under the camera lens — so your eyes never leave the camera.")
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "onboarding.welcome.body",
+                    defaultValue: "Your script runs right under the camera, word by word. Viewers see eye contact, not someone reading.",
+                    comment: "Body text under the headline of the first onboarding screen."
+                ))
                     .font(.body)
                     .foregroundStyle(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .padding(.horizontal, 32)
-                    .padding(.top, 16)
-                Spacer().frame(height: 32)
-                permissionsBlock
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 12) {
+                    Image(systemName: "eye.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .frame(width: 36, height: 36)
+                        .background(Color.green.opacity(0.16), in: Circle())
+                    Text(String(
+                        localized: "onboarding.welcome.eye_hint",
+                        defaultValue: "The eye turns green while you hold eye contact.",
+                        comment: "Card on the first onboarding screen explaining the eye-contact indicator on the prompter pill."
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.86))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
+                .padding(.top, 8)
                 Spacer()
                 Button {
                     AppAnalytics.log("onboarding_continue_tapped")
-                    Task { await requestPermissionsAndAdvance() }
+                    stage = .readingStyle
                 } label: {
                     Text("Continue")
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
-                .padding(.horizontal, 24)
-                Spacer().frame(height: 8)
+                .primaryButtonStyle()
                 Text(String(
-                    localized: "onboarding.priming.permission_note",
-                    defaultValue: "We'll ask for access next"
+                    localized: "onboarding.welcome.caption",
+                    defaultValue: "Your first take in under a minute",
+                    comment: "Caption under the Continue button on the first onboarding screen."
                 ))
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 32)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 16)
             }
+            .padding(.horizontal, 24)
+            // Clear of the pill: cutout band plus its three rows.
+            .padding(.top, 180)
         }
+    }
+
+    /// Lighter at the top than `backgroundGradient`, so the black pill reads
+    /// against it the way it does against a camera image.
+    private var pillBackdrop: some View {
+        LinearGradient(
+            colors: [Color(white: 0.16), Color(red: 0.1, green: 0.04, blue: 0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    private var readingStyleView: some View {
+        ZStack(alignment: .top) {
+            pillBackdrop
+            OnboardingPrompterPill(
+                phrase: String(
+                    localized: "onboarding.welcome.pill_phrase",
+                    defaultValue: "Read your script and keep your eyes on the camera",
+                    comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
+                ),
+                isClassicMode: displayMode == "classic"
+            )
+            VStack(alignment: .leading, spacing: 14) {
+                Spacer()
+                Text(String(
+                    localized: "onboarding.style.title",
+                    defaultValue: "How do you like to read?",
+                    comment: "Title of the onboarding step where the user picks the prompter mode and the anchor letter."
+                ))
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "onboarding.style.subtitle",
+                    defaultValue: "You can change this later on the camera and in Settings.",
+                    comment: "Subtitle of the onboarding reading-style step."
+                ))
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 6)
+
+                styleOption(
+                    mode: "classic",
+                    title: String(localized: "onboarding.style.classic.title", defaultValue: "Three lines", comment: "Onboarding reading-style option: the 3-line prompter mode."),
+                    detail: String(localized: "onboarding.style.classic.detail", defaultValue: "The word you’re on, with the one before and after. Easiest to start.", comment: "Onboarding reading-style option detail for the 3-line mode.")
+                )
+                styleOption(
+                    mode: "wbw",
+                    title: String(localized: "onboarding.style.wbw.title", defaultValue: "Word by word", comment: "Onboarding reading-style option: the one-word-at-a-time prompter mode."),
+                    detail: String(localized: "onboarding.style.wbw.detail", defaultValue: "One word at a time, right under the lens. The closest eye contact.", comment: "Onboarding reading-style option detail for the word-by-word mode.")
+                )
+
+                Toggle(isOn: $orpAlignmentEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "onboarding.style.anchor.title", defaultValue: "Anchor letter", comment: "Onboarding reading-style toggle: align words on a highlighted anchor letter."))
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text(String(localized: "onboarding.style.anchor.detail", defaultValue: "An orange letter marks where to look, so your eyes stay still.", comment: "Onboarding reading-style toggle detail: what the anchor letter does."))
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Theme.accent)
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
+
+                Spacer()
+                Button {
+                    AppAnalytics.log("onboarding_reading_style_chosen", params: [
+                        "display_mode": displayMode,
+                        "anchor": orpAlignmentEnabled
+                    ])
+                    stage = .access
+                } label: {
+                    Text("Continue")
+                        .frame(maxWidth: .infinity)
+                }
+                .primaryButtonStyle()
+                .padding(.bottom, 16)
+            }
+            .padding(.horizontal, 24)
+            // Clear of the pill: cutout band plus its three rows.
+            .padding(.top, 180)
+        }
+        .onAppear {
+            // Three lines is the new-user default: it shows the next word,
+            // which the eyes want before the voice gets there.
+            guard !didDefaultReadingStyle else { return }
+            didDefaultReadingStyle = true
+            displayMode = "classic"
+        }
+    }
+
+    private func styleOption(mode: String, title: String, detail: String) -> some View {
+        let isSelected = displayMode == mode
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { displayMode = mode }
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Theme.accent : Color.white.opacity(0.3))
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    .fill(isSelected ? Theme.accent.opacity(0.14) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var accessView: some View {
+        ZStack {
+            backgroundGradient
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(
+                        localized: "onboarding.access.title",
+                        defaultValue: "Let’s set up your camera",
+                        comment: "Title of the onboarding screen shown right before the camera, microphone and photos permission prompts."
+                    ))
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "onboarding.access.subtitle",
+                        defaultValue: "iOS will ask next. Your takes stay on your phone.",
+                        comment: "Subtitle on the onboarding permissions screen. The system prompts follow; recordings are stored on the device."
+                    ))
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 40)
+                VStack(spacing: 10) {
+                    accessRow(
+                        icon: "video.fill",
+                        title: String(localized: "onboarding.access.camera.title", defaultValue: "Camera", comment: "Onboarding permissions screen: camera row title."),
+                        detail: String(localized: "onboarding.access.camera.detail", defaultValue: "To record you, and to see where you look", comment: "Onboarding permissions screen: why the camera is needed. Mentions eye-contact tracking, which runs on the camera frames.")
+                    )
+                    accessRow(
+                        icon: "mic.fill",
+                        title: String(localized: "onboarding.access.mic.title", defaultValue: "Microphone", comment: "Onboarding permissions screen: microphone row title."),
+                        detail: String(localized: "onboarding.access.mic.detail", defaultValue: "For your voice", comment: "Onboarding permissions screen: why the microphone is needed.")
+                    )
+                    accessRow(
+                        icon: "photo.on.rectangle.angled",
+                        title: String(localized: "onboarding.access.photos.title", defaultValue: "Photos", comment: "Onboarding permissions screen: photos row title."),
+                        detail: String(localized: "onboarding.access.photos.detail", defaultValue: "Only to save takes to your library", comment: "Onboarding permissions screen: why photo library (add-only) access is needed.")
+                    )
+                }
+                Spacer()
+                Button {
+                    AppAnalytics.log("onboarding_access_allow_tapped")
+                    Task { await requestPermissionsAndAdvance() }
+                } label: {
+                    Text(String(
+                        localized: "onboarding.access.allow",
+                        defaultValue: "Allow access",
+                        comment: "Button on the onboarding permissions screen that triggers the system permission prompts."
+                    ))
+                        .frame(maxWidth: .infinity)
+                }
+                .primaryButtonStyle()
+                Text(String(
+                    localized: "onboarding.access.caption",
+                    defaultValue: "Then your first take, with a sample script",
+                    comment: "Caption under the Allow access button: what happens after the permissions."
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 16)
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+
+    private func accessRow(icon: String, title: String, detail: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 44, height: 44)
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
     }
 
     private var explainerView: some View {
@@ -121,12 +390,9 @@ struct OnboardingView: View {
                     finishOnboarding(path: "settings_opened")
                 } label: {
                     Text("Open Settings")
-                        .font(.headline)
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange, in: Capsule())
                 }
+                .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button("Skip for now") {
                     AppAnalytics.log("onboarding_skip_for_now_tapped", params: [
@@ -138,44 +404,6 @@ struct OnboardingView: View {
                 }
                 .foregroundStyle(.white.opacity(0.7))
                 .padding(.bottom, 32)
-            }
-        }
-    }
-
-    private var permissionsBlock: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 12) {
-                Image(systemName: "video.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(String(
-                    localized: "onboarding.priming.camera_label",
-                    defaultValue: "Camera — to record yourself"
-                ))
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            HStack(spacing: 12) {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(String(
-                    localized: "onboarding.priming.mic_label",
-                    defaultValue: "Microphone — for audio"
-                ))
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            HStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white.opacity(0.7))
-                Text(String(
-                    localized: "onboarding.priming.photos_label",
-                    defaultValue: "Photos — to save to Camera Roll"
-                ))
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.7))
             }
         }
     }

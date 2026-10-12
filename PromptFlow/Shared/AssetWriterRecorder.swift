@@ -304,9 +304,7 @@ final class AssetWriterRecorder {
             self.camLog.notice(
                 "event=recording_finish status=\(writer.status.rawValue) error=\(writer.error?.localizedDescription ?? "none", privacy: .public) final_size=\(Int(self.configuredVideoSize.width))x\(Int(self.configuredVideoSize.height)) frames_written=\(self.framesWritten) mismatched_frames=\(self.mismatchedSampleCount)"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=recording_finish status=\(writer.status.rawValue) error=\(writer.error?.localizedDescription ?? "none") final_size=\(Int(self.configuredVideoSize.width))x\(Int(self.configuredVideoSize.height)) frames_written=\(self.framesWritten) mismatched_frames=\(self.mismatchedSampleCount)")
-            #endif
             switch writer.status {
             case .completed:
                 self.state = .finished

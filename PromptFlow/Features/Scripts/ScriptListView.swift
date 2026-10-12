@@ -5,18 +5,22 @@ import SwiftData
 /// is passed into .sheet(item:), avoiding the stale-state capture bug.
 enum EditorMode: Identifiable {
     case new
+    /// A new script the user chose to write themselves, from the draft
+    /// screen: the editor does not offer the AI draft again.
+    case newSelfWritten
     case edit(Script)
 
     var id: String {
         switch self {
         case .new: return "new"
+        case .newSelfWritten: return "newSelfWritten"
         case .edit(let s): return s.id.uuidString
         }
     }
 
     var script: Script? {
         switch self {
-        case .new: return nil
+        case .new, .newSelfWritten: return nil
         case .edit(let s): return s
         }
     }
@@ -31,11 +35,21 @@ struct ScriptListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-    @Query(sort: \Script.createdAt, order: .reverse) private var scripts: [Script]
+    @Query(sort: \Script.updatedAt, order: .reverse) private var scripts: [Script]
 
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
+    /// "What's your video about?", offered after the first take.
+    @State private var showDraftScript = false
+    /// The draft sheet closed through one of its outcomes, not the X.
+    @State private var draftOutcomeTaken = false
     @State private var scriptToRecord: Script?
+    /// Opens a card's recording screen after its press shrink (see
+    /// `CardPressStyle`).
+    @State private var cardOpener = CardOpener()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Zoom from a card into the recording screen (iOS 18+).
+    @Namespace private var recordZoom
     @State private var showBulkImport = false
     @State private var paywallPresentation: PaywallPresentation?
     /// Captured at tap time and passed into BulkImportView so the
@@ -89,6 +103,43 @@ struct ScriptListView: View {
         }
     }
 
+    /// `filteredScripts` split into runs that share a calendar day of
+    /// `updatedAt`. The query is already newest-first, so each day's
+    /// scripts are contiguous.
+    private var scriptsByDay: [(day: Date, scripts: [Script])] {
+        let calendar = Calendar.current
+        var groups: [(day: Date, scripts: [Script])] = []
+        for script in filteredScripts {
+            let day = calendar.startOfDay(for: script.updatedAt)
+            if groups.last?.day == day {
+                groups[groups.count - 1].scripts.append(script)
+            } else {
+                groups.append((day, [script]))
+            }
+        }
+        return groups
+    }
+
+    /// Trims the system header insets (10/10 pt on iOS 26, 17/6 pt on iOS
+    /// 17/18) so that, with the 10 pt section spacing, a date header has 20 pt
+    /// above it and 8 pt below. The leading inset stays the system one, which
+    /// lines up with the cards' content at every width.
+    private static var dayHeaderPadding: EdgeInsets {
+        if #available(iOS 26.0, *) {
+            return EdgeInsets(top: 0, leading: 0, bottom: -2, trailing: 0)
+        }
+        return EdgeInsets(top: -7, leading: 0, bottom: 2, trailing: 0)
+    }
+
+    /// The system row insets, applied inside the card so that the card
+    /// background is part of the button and scales with the press.
+    private static var cardPadding: EdgeInsets {
+        if #available(iOS 26.0, *) {
+            return EdgeInsets(top: 15, leading: 16, bottom: 15, trailing: 16)
+        }
+        return EdgeInsets(top: 11, leading: 20, bottom: 11, trailing: 20)
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -108,7 +159,7 @@ struct ScriptListView: View {
                             paywallPresentation = PaywallPresentation(source: "scripts_crown")
                         }) {
                             Image(systemName: "crown.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(Theme.accent)
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }
@@ -129,15 +180,37 @@ struct ScriptListView: View {
                 }
             }
             .sheet(item: $editorMode) { mode in
-                ScriptEditorView(script: mode.script)
+                ScriptEditorView(script: mode.script, offersDraft: mode.id != EditorMode.newSelfWritten.id)
+            }
+            .sheet(isPresented: $showDraftScript, onDismiss: {
+                // Closed without an outcome: the user declined the own
+                // script, so the guided run is over.
+                if !draftOutcomeTaken { OnboardingFlow.finish(reason: "declined_draft") }
+                draftOutcomeTaken = false
+            }) {
+                DraftScriptView(onFinish: handleDraftOutcome)
+                    // Burned once it is really on screen, so an offer that
+                    // never got shown is retried.
+                    .onAppear {
+                        UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
+                    }
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
+                    .cardZoomTransition(id: script.id, in: recordZoom)
+                    .onPresentationComplete { cardOpener.resetCard() }
+            }
+            .onChange(of: scriptToRecord) { _, script in
+                // Closed before the presentation completed.
+                if script == nil {
+                    cardOpener.resetCard()
+                    continueOnboardingFlow()
+                }
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView(entryPoint: bulkImportEntryPoint)
             }
-            .fullScreenCover(item: $paywallPresentation) { presentation in
+            .fullScreenCover(item: $paywallPresentation, onDismiss: { continueOnboardingFlow() }) { presentation in
                 PaywallView(source: presentation.source)
             }
         }
@@ -154,6 +227,7 @@ struct ScriptListView: View {
             }
             .onDisappear {
                 PromptArbiter.shared.didDismiss()
+                continueOnboardingFlow()
             }
         }
         .onAppear {
@@ -189,6 +263,13 @@ struct ScriptListView: View {
                         "cold_start_count": countAtTrigger
                     ])
                 }
+            }
+            // Resume an unfinished post-onboarding flow after a relaunch. Late
+            // enough that the cold-start paywall (0.5s) and the soft-ask
+            // (1.5s) decide first; the arbiter sorts out any overlap.
+            if !Self.didResumeFlowThisLaunch, !pendingDemoRecording {
+                Self.didResumeFlowThisLaunch = true
+                continueOnboardingFlow(after: 2.5)
             }
             // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
             // reliably fire when a fullScreenCover dismisses on top of an
@@ -263,10 +344,9 @@ struct ScriptListView: View {
                     Image(systemName: "plus")
                 }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .primaryButtonStyle(fullWidth: false)
+            .tint(Theme.accent)
 
             Button {
                 handleBulkImportTap(entryPoint: "empty_state")
@@ -284,50 +364,163 @@ struct ScriptListView: View {
         }
     }
 
+    /// One `Section` per script so each row renders as its own card while
+    /// keeping the system List swipe-to-delete.
     private var scriptsList: some View {
         List {
-            ForEach(filteredScripts) { script in
-                HStack {
-                    ScriptRowView(script: script)
-                    Spacer()
-                    Button {
-                        editorMode = .edit(script)
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, height: 36)
-                    }
-                    .buttonStyle(.borderless)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    AppAnalytics.log("script_tapped", params: [
-                        "script_source": script.isDemo ? "demo" : "user",
-                        "script_length_words": script.content.split(separator: " ").count
-                    ])
-                    scriptToRecord = script
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        deleteScript(script)
-                    } label: {
-                        Label {
-                            Text("scripts.delete", comment: "Swipe-to-delete action on a script row")
-                        } icon: {
-                            Image(systemName: "trash")
+            ForEach(scriptsByDay, id: \.day) { group in
+                ForEach(group.scripts) { script in
+                    Section {
+                        Button {
+                            AppAnalytics.log("script_tapped", params: [
+                                "script_source": script.isDemo ? "demo" : "user",
+                                "script_length_words": script.content.split(separator: " ").count
+                            ])
+                            cardOpener.open(script.id, reduceMotion: reduceMotion) {
+                                scriptToRecord = script
+                            }
+                        } label: {
+                            HStack {
+                                ScriptRowView(script: script)
+                                Spacer()
+                                // Drawn in the card so it scales with it; the
+                                // edit button overlaid below takes the taps.
+                                Image(systemName: "square.and.pencil")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(width: 44, height: 44)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(Self.cardPadding)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                                    .fill(Color(.secondarySystemGroupedBackground))
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                            // Inside the press scale, so the zoom starts from
+                            // the pressed frame.
+                            .cardZoomSource(id: script.id, in: recordZoom)
+                        }
+                        .buttonStyle(CardPressStyle(id: script.id, opener: cardOpener))
+                        .disabled(cardOpener.pendingID != nil)
+                        .overlay(alignment: .trailing) {
+                            Button {
+                                editorMode = .edit(script)
+                            } label: {
+                                Color.clear
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .padding(.trailing, Self.cardPadding.trailing)
+                            .disabled(cardOpener.pendingID != nil)
+                            .accessibilityLabel(Text("scripts.editor.title.edit", comment: "Navigation title of the script editor when editing an existing script."))
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteScript(script)
+                            } label: {
+                                Label {
+                                    Text("scripts.delete", comment: "Swipe-to-delete action on a script row")
+                                } icon: {
+                                    Image(systemName: "trash")
+                                }
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    } header: {
+                        // Only the day's first card carries the date header.
+                        if script.id == group.scripts.first?.id {
+                            Text(DayTitle.string(for: group.day))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
+                                .padding(Self.dayHeaderPadding)
                         }
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(10)
+        .contentMargins(.horizontal, 16, for: .scrollContent)
+        .cancelsPendingCardOpen(cardOpener)
+        .onDisappear { cardOpener.cancelPending() }
     }
 
     // MARK: - Actions
 
     private func deleteScript(_ script: Script) {
         modelContext.delete(script)
+    }
+
+    // MARK: - Onboarding flow, resumable
+
+    /// In-memory, per-process: the launch-time resume runs once.
+    private static var didResumeFlowThisLaunch = false
+
+    /// Continues the post-onboarding flow wherever it was left, from any of
+    /// its natural moments: the camera closing, a paywall closing, or the app
+    /// launching. Two persisted marks drive it, and each is cleared only once
+    /// its screen is really up, so a kill or a collision just defers it:
+    ///  - `ownTakePaywallDue`: the first successful take of an own script —
+    ///    the real value moment — earns free users the paywall, once.
+    ///  - `pendingOwnScriptAfterFirstTake`: after the sample take, offer
+    ///    "What's your video about?".
+    private func continueOnboardingFlow(after delay: TimeInterval = 0.45) {
+        let defaults = UserDefaults.standard
+        guard hasSeenOnboarding,
+              defaults.bool(forKey: "ownTakePaywallDue")
+                || defaults.bool(forKey: "pendingOwnScriptAfterFirstTake")
+        else { return }
+        Task { @MainActor in
+            // Let whatever just closed finish dismissing.
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            // Something else is on screen: its own dismissal comes back here,
+            // or the next launch does.
+            guard scriptToRecord == nil, editorMode == nil, paywallPresentation == nil,
+                  !showDraftScript, !showBulkImport, !showNotificationSoftAsk,
+                  !PromptArbiter.shared.isPromptVisible
+            else { return }
+
+            if defaults.bool(forKey: "ownTakePaywallDue") {
+                if subscriptionManager.isSubscribed
+                    || defaults.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                    defaults.set(false, forKey: "ownTakePaywallDue")
+                    OnboardingFlow.finish(reason: subscriptionManager.isSubscribed ? "subscribed" : "paywall_already_shown")
+                } else if PromptArbiter.shared.canPresent(.onboardingPaywall) {
+                    defaults.set(false, forKey: "ownTakePaywallDue")
+                    defaults.set(true, forKey: "postFirstOwnRecordingPaywallShown")
+                    PromptArbiter.shared.didPresent(.onboardingPaywall)
+                    // The flow's planned end: ordinary prompts may run again.
+                    OnboardingFlow.finish(reason: "paywall")
+                    paywallPresentation = PaywallPresentation(source: "first_own_take")
+                    return
+                } else {
+                    // Too soon after another prompt: keep the mark, retry later.
+                    return
+                }
+            }
+            if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") {
+                showDraftScript = true
+            }
+        }
+    }
+
+    /// Where the draft screen hands off, once its sheet is down.
+    private func handleDraftOutcome(_ outcome: DraftScriptView.Outcome) {
+        draftOutcomeTaken = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            switch outcome {
+            case .record(let script): scriptToRecord = script
+            case .insert: break
+            case .writeMyself: editorMode = .newSelfWritten
+            case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")
+            }
+        }
     }
 
     /// Decision tree shared by every "Import Multiple Scripts" entry
@@ -361,32 +554,28 @@ struct ScriptListView: View {
 struct ScriptRowView: View {
     let script: Script
 
+    private var wordCountText: String {
+        String(
+            localized: "script.wordCount",
+            defaultValue: "\(script.wordCount) words",
+            comment: "Word count display in script row and editor stats bar"
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(script.title.isEmpty
                 ? String(localized: "script.untitled", defaultValue: "Untitled Script", comment: "Fallback title for an untitled script")
                 : script.title)
-                .font(.headline)
+                .font(.title3.weight(.semibold))
+                .lineLimit(2)
             Text(script.content)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Image(systemName: "text.word.spacing")
-                    Text(String(
-                        localized: "script.wordCount",
-                        defaultValue: "\(script.wordCount) words",
-                        comment: "Word count display in script row and editor stats bar"
-                    ))
-                }
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                    Text(script.estimatedReadTimeFormatted)
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+                .lineLimit(1)
+            Text(verbatim: "\(wordCountText) · \(script.estimatedReadTimeFormatted)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
     }

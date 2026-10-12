@@ -4,7 +4,14 @@ import Combine
 /// Owns chunk advancement scheduling, independent of display views.
 @MainActor
 final class ChunkPlayerEngine: ObservableObject {
-    @Published var currentChunkIndex = 0
+    @Published var currentChunkIndex = 0 {
+        didSet {
+            shownLog.append((currentChunkIndex, Date()))
+            if shownLog.count > 64 { shownLog.removeFirst() }
+        }
+    }
+    /// When each recent index went on screen, for `chunkIndex(shownAt:)`.
+    private var shownLog: [(index: Int, at: Date)] = []
     @Published var isPlaying = false
     @Published private(set) var chunks: [String] = []
     /// Parallel array to `chunks` carrying per-chunk speed multiplier
@@ -24,9 +31,28 @@ final class ChunkPlayerEngine: ObservableObject {
     var externallyFrozen: Bool = false {
         didSet {
             guard oldValue != externallyFrozen else { return }
-            if !externallyFrozen, isPlaying { scheduleAdvance() }
+            if !isFrozen, isPlaying { scheduleAdvance() }
         }
     }
+
+    /// Freeze owned by eye-contact tracking: set while the user looks away
+    /// from the lens with auto-pause on. Separate from `externallyFrozen` so
+    /// it and FMV never clobber each other. Unlike FMV's freeze it stops the
+    /// current word at once — the user is not reading it — and on release the
+    /// word gets its full time again.
+    var gazeFrozen: Bool = false {
+        didSet {
+            guard oldValue != gazeFrozen else { return }
+            if gazeFrozen {
+                advanceTask?.cancel()
+                advanceTask = nil
+            } else if !isFrozen, isPlaying {
+                scheduleAdvance()
+            }
+        }
+    }
+
+    private var isFrozen: Bool { externallyFrozen || gazeFrozen }
 
     /// External speed multiplier (1.0 = no change, >1.0 = faster).
     /// Currently only set by FollowMyVoiceServiceV2 for pace tracking. Composed
@@ -159,6 +185,12 @@ final class ChunkPlayerEngine: ObservableObject {
         }
     }
 
+    /// The chunk that was on screen at `date`, from the last ~64 changes.
+    /// Nil when `date` predates the log.
+    func chunkIndex(shownAt date: Date) -> Int? {
+        shownLog.last { $0.at <= date }?.index
+    }
+
     // MARK: - Duration
 
     /// Baseline duration per typical word at the current slider position,
@@ -206,7 +238,7 @@ final class ChunkPlayerEngine: ObservableObject {
     private func scheduleAdvance() {
         advanceTask?.cancel()
         guard currentChunkIndex < chunks.count, isPlaying else { return }
-        guard !externallyFrozen else { return }
+        guard !isFrozen else { return }
 
         let duration = chunkDuration(at: currentChunkIndex)
 

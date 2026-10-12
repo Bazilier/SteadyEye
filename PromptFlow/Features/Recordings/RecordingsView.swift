@@ -13,23 +13,44 @@ struct RecordingsView: View {
     @State private var playingRecording: Recording?
     @State private var deleteTarget: Recording?
     @State private var showDeleteConfirmation = false
-    @State private var shareItems: [Any]?
-    @State private var showShareSheet = false
     @State private var showSavedToast = false
     @State private var missingRecording: Recording?
     @State private var showMissingFileAlert = false
     @State private var showPaywall = false
+    /// Opens a card's preview after its press shrink (see `CardPressStyle`).
+    @State private var cardOpener = CardOpener()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns: [GridItem] = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
 
+    /// Zoom from a card into the preview (iOS 18+).
+    @Namespace private var previewZoom
+
     private var filteredRecordings: [Recording] {
         if searchText.isEmpty { return allRecordings }
         return allRecordings.filter {
             $0.scriptTitle.localizedCaseInsensitiveContains(searchText)
         }
+    }
+
+    /// `filteredRecordings` split into runs that share a calendar day of
+    /// `createdAt`. The query is already newest-first, so each day's
+    /// recordings are contiguous and days with no matches drop out.
+    private var recordingsByDay: [(day: Date, recordings: [Recording])] {
+        let calendar = Calendar.current
+        var groups: [(day: Date, recordings: [Recording])] = []
+        for recording in filteredRecordings {
+            let day = calendar.startOfDay(for: recording.createdAt)
+            if groups.last?.day == day {
+                groups[groups.count - 1].recordings.append(recording)
+            } else {
+                groups.append((day, [recording]))
+            }
+        }
+        return groups
     }
 
     var body: some View {
@@ -59,7 +80,7 @@ struct RecordingsView: View {
                             showPaywall = true
                         }) {
                             Image(systemName: "crown.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(Theme.accent)
                                 .font(.system(size: 17, weight: .semibold))
                         }
                     }
@@ -144,17 +165,21 @@ struct RecordingsView: View {
             ))
         }
         .fullScreenCover(item: $playingRecording) { recording in
-            VideoPreviewView(recording: recording, onDismiss: {
-                playingRecording = nil
-            })
+            VideoPreviewView(
+                recording: recording,
+                onDismiss: { playingRecording = nil },
+                // The same file the card shows; read, not regenerated.
+                poster: recording.thumbnailURL.flatMap { UIImage(contentsOfFile: $0.path) }
+            )
+            .cardZoomTransition(id: recording.id, in: previewZoom)
+            .onPresentationComplete { cardOpener.resetCard() }
+        }
+        .onChange(of: playingRecording) { _, recording in
+            // Closed before the presentation completed.
+            if recording == nil { cardOpener.resetCard() }
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "recordings_crown")
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let items = shareItems {
-                ActivityView(items: items)
-            }
         }
     }
 
@@ -211,13 +236,9 @@ struct RecordingsView: View {
                     defaultValue: "Go to Scripts",
                     comment: "Empty-state CTA button on the Recordings tab that switches to the Scripts tab."
                 ))
-                    .font(.body.bold())
-                    .foregroundColor(.black)
                     .padding(.horizontal, 32)
-                    .padding(.vertical, 14)
-                    .background(Color.orange)
-                    .cornerRadius(12)
             }
+            .primaryButtonStyle(fullWidth: false)
             Spacer()
             Spacer()
         }
@@ -228,63 +249,88 @@ struct RecordingsView: View {
 
     private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(filteredRecordings) { recording in
-                    RecordingThumbnailCard(recording: recording)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if FileManager.default.fileExists(atPath: recording.fileURL.path) {
-                                playingRecording = recording
-                            } else {
-                                missingRecording = recording
-                                showMissingFileAlert = true
-                            }
-                        }
-                        .contextMenu {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(recordingsByDay.enumerated()), id: \.element.day) { index, group in
+                    // Same header as the script list; lines up with the
+                    // cards' text, scrolls with the content.
+                    Text(DayTitle.string(for: group.day))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 12)
+                        .padding(.top, index == 0 ? 0 : 20)
+                        .padding(.bottom, 8)
+
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(group.recordings) { recording in
                             Button {
-                                share(recording)
+                                if FileManager.default.fileExists(atPath: recording.fileURL.path) {
+                                    cardOpener.open(recording.id, reduceMotion: reduceMotion) {
+                                        playingRecording = recording
+                                    }
+                                } else {
+                                    missingRecording = recording
+                                    showMissingFileAlert = true
+                                }
                             } label: {
-                                Label(String(
-                                    localized: "recordings.action.share",
-                                    defaultValue: "Share",
-                                    comment: "Recordings context-menu action that opens the system share sheet."
-                                ), systemImage: "square.and.arrow.up")
+                                // The zoom source sits inside the press scale,
+                                // so the zoom starts from the pressed frame.
+                                RecordingThumbnailCard(recording: recording)
+                                    .cardZoomSource(id: recording.id, in: previewZoom)
+                                    .contentShape(Rectangle())
                             }
-                            Button {
-                                saveToCameraRoll(recording)
-                            } label: {
-                                Label(String(
-                                    localized: "recordings.action.saveToCameraRoll",
-                                    defaultValue: "Save to Camera Roll",
-                                    comment: "Recordings context-menu action that exports the recording to the Photos library."
-                                ), systemImage: "photo")
+                            .buttonStyle(CardPressStyle(id: recording.id, opener: cardOpener))
+                            .contextMenu {
+                                Button {
+                                    saveToCameraRoll(recording)
+                                } label: {
+                                    Label {
+                                        Text(String(
+                                            localized: "recordings.action.saveToCameraRoll",
+                                            defaultValue: "Save to Camera Roll",
+                                            comment: "Recordings context-menu action that exports the recording to the Photos library."
+                                        ))
+                                    } icon: {
+                                        menuIcon("photo", accent: true)
+                                    }
+                                }
+                                Divider()
+                                Button(role: .destructive) {
+                                    deleteTarget = recording
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label {
+                                        Text(String(
+                                            localized: "recordings.action.delete",
+                                            defaultValue: "Delete",
+                                            comment: "Recordings context-menu destructive action that removes the recording."
+                                        ))
+                                    } icon: {
+                                        menuIcon("trash", accent: false)
+                                    }
+                                }
                             }
-                            Divider()
-                            Button(role: .destructive) {
-                                deleteTarget = recording
-                                showDeleteConfirmation = true
-                            } label: {
-                                Label(String(
-                                    localized: "recordings.action.delete",
-                                    defaultValue: "Delete",
-                                    comment: "Recordings context-menu destructive action that removes the recording."
-                                ), systemImage: "trash")
-                            }
+                            .disabled(cardOpener.pendingID != nil)
                         }
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .cancelsPendingCardOpen(cardOpener)
+        .onDisappear { cardOpener.cancelPending() }
+    }
+
+    /// Context-menu icons are drawn by UIKit, whose tint is system blue: the
+    /// AccentColor asset and the SwiftUI `.tint` don't reach it. Pre-coloured
+    /// images keep their colour (accent, or red for the destructive item).
+    private func menuIcon(_ systemName: String, accent: Bool) -> Image {
+        let color = accent ? (UIColor(named: "AccentColor") ?? .tintColor) : .systemRed
+        guard let image = UIImage(systemName: systemName) else { return Image(systemName: systemName) }
+        return Image(uiImage: image.withTintColor(color, renderingMode: .alwaysOriginal))
     }
 
     // MARK: - Actions
-
-    private func share(_ recording: Recording) {
-        guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
-        shareItems = [recording.fileURL]
-        showShareSheet = true
-    }
 
     private func saveToCameraRoll(_ recording: Recording) {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
@@ -321,19 +367,18 @@ struct RecordingThumbnailCard: View {
     let recording: Recording
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
                 Color.black
                     .aspectRatio(1, contentMode: .fit)
                     .overlay { thumbnailImage }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipped()
                 Text(formatDuration(recording.duration))
-                    .font(.caption.bold())
+                    .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.black.opacity(0.7))
-                    .cornerRadius(6)
+                    .background(Color.black.opacity(0.6), in: Capsule())
                     .padding(8)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -344,13 +389,19 @@ struct RecordingThumbnailCard: View {
                         comment: "Fallback title shown on a recording card when the source script has no title."
                     )
                     : recording.scriptTitle)
-                    .font(.body.bold())
+                    .font(.headline)
                     .lineLimit(1)
                 Text(recording.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundColor(.secondary)
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Same card as the script list rows; the thumbnail is clipped by it.
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
 
     @ViewBuilder
@@ -361,7 +412,7 @@ struct RecordingThumbnailCard: View {
             // No explicit aspect ratio here — `resizable()` + `aspectRatio(contentMode: .fill)`
             // preserves the source image's natural ratio (portrait 9:16) and scales it to
             // fully cover the surrounding square frame. Overflow on top/bottom is clipped
-            // by the outer `.clipShape` in the caller. Adding an explicit `aspectRatio(1, ...)`
+            // by the outer `.clipped()` in the caller. Adding an explicit `aspectRatio(1, ...)`
             // here would override the source ratio and squeeze the pixels.
             Image(uiImage: uiImage)
                 .resizable()

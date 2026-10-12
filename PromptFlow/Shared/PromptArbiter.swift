@@ -16,12 +16,15 @@ final class PromptArbiter {
     enum PromptKind {
         case coldStartPaywall
         case firstOwnRecordingPaywall
+        /// The one paywall the guided first run plans for (see
+        /// `OnboardingFlow`): after the first take of an own script.
+        case onboardingPaywall
         case notificationSoftAsk
         case reviewPrompt
 
         var isPaywall: Bool {
             switch self {
-            case .coldStartPaywall, .firstOwnRecordingPaywall: return true
+            case .coldStartPaywall, .firstOwnRecordingPaywall, .onboardingPaywall: return true
             case .notificationSoftAsk, .reviewPrompt: return false
             }
         }
@@ -54,6 +57,11 @@ final class PromptArbiter {
     /// must NOT present and must NOT burn any one-shot flag — the prompt is
     /// expected to try again at its next natural opportunity.
     func canPresent(_ kind: PromptKind) -> Bool {
+        // The guided first run is never interrupted by anything automatic.
+        if OnboardingFlow.isActive, kind != .onboardingPaywall {
+            log("deny \(kind) — onboarding flow is active")
+            return false
+        }
         if isPromptVisible {
             log("deny \(kind) — another prompt is visible")
             return false

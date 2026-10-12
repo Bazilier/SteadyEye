@@ -34,6 +34,10 @@ final class CameraManager: NSObject, ObservableObject {
         comment: "Default audio source name in the recording HUD."
     )
     @Published var audioRouteToast: String?
+    /// The video device of the current session configuration, published on
+    /// main once the session is configured. The preview uses it to follow the
+    /// interface's rotation on iPhone Duo.
+    @Published private(set) var activeVideoDevice: AVCaptureDevice?
 
     // MARK: - Private
     private static let cameraQueue = DispatchQueue(label: "com.steadyeye.camera", qos: .userInitiated)
@@ -53,6 +57,9 @@ final class CameraManager: NSObject, ObservableObject {
     /// Read concurrently across `sampleBufferQueue` and the main thread
     /// (when set/cleared) — the `ifNotNil` check tolerates the race.
     var audioBufferBroadcast: ((CMSampleBuffer) -> Void)?
+    /// DEV gaze prototype. Fed every video frame; idle (one lock check per
+    /// frame) unless a `GazeProbeOverlay` has started it.
+    nonisolated let gazeProbe = GazeProbe()
     private var assetWriterRecorder: AssetWriterRecorder?
     private var watermarkComposer: RealtimeWatermarkComposer?
     /// Writer geometry frozen at record start by `startWriterPipeline`. Read on
@@ -80,6 +87,28 @@ final class CameraManager: NSObject, ObservableObject {
     /// not alter a running session — it takes effect the next time the session
     /// is configured.
     private var sessionOrientationMode: RecordingOrientation = .portrait
+    /// Whether this session configuration crops sideways portrait takes (see
+    /// `cropsSidewaysToPortrait`). Read in `setupSession` alongside
+    /// `sessionOrientationMode`, and like it, fixed for the configuration.
+    private var sessionCropsSideways = false
+
+    /// Portrait takes with the device on its side: accept the RotationCoordinator's
+    /// level-horizon angle, which then delivers a LANDSCAPE buffer, and record
+    /// its vertical middle 9:16 at full height — instead of keeping a portrait
+    /// angle, which records the scene tipped over by a quarter turn.
+    ///
+    /// On iPhone Duo, whose inner display is used with the body on its side
+    /// (crease horizontal) and whose inner camera's mounting is unknown. On
+    /// other iPhones only through the DEV switch, to test the same pose by
+    /// holding the phone sideways.
+    private static var cropsSidewaysToPortrait: Bool {
+        if DuoDisplayMonitor.deviceHasHinge { return true }
+        #if DEV
+        return UserDefaults.standard.bool(forKey: "dev_crop_sideways_to_portrait")
+        #else
+        return false
+        #endif
+    }
     /// Landscape candidates and the chosen angle from the most recent selection,
     /// carried into `rotation_selected` / `recording_start` so one device run
     /// shows which of the two was picked and what the alternative was.
@@ -142,6 +171,9 @@ final class CameraManager: NSObject, ObservableObject {
     private var orientationCIContext: CIContext?
     /// `orientation_corrected` fires once per recording; reset at record start.
     private var orientationCorrectionLogged = false
+    /// `sideways_cropped` fires once per recording; reset at record start.
+    /// Touched only on `sampleBufferQueue` and at record start, like the flag above.
+    private var sidewaysCropLogged = false
     /// Whether this take has handed at least one canvas-shaped frame to the
     /// writer. Only frames BEFORE that can be leftovers from the previous
     /// configuration, so the leading-frame drop is confined to them. Touched
@@ -318,8 +350,10 @@ final class CameraManager: NSObject, ObservableObject {
             let producesPortrait = residue.map {
                 CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: $0)
             } ?? true
-            accepted = producesPortrait
-            target = producesPortrait ? reported : connection.videoRotationAngle
+            // Cropping sideways takes: a landscape-producing level angle is
+            // wanted too — the take records its vertical middle.
+            accepted = producesPortrait || sessionCropsSideways
+            target = accepted ? reported : connection.videoRotationAngle
         }
         lastLandscapeCandidates = candidates
         let supported = connection.isVideoRotationAngleSupported(target)
@@ -346,9 +380,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=rotation_selected mode=\(self.sessionOrientationMode.rawValue, privacy: .public) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState, privacy: .public) pinned_angle=\(pinnedField, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField, privacy: .public) observed_buffer=\(observedField, privacy: .public) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=rotation_selected mode=\(self.sessionOrientationMode.rawValue) reported=\(Int(reported)) selected=\(Int(target)) accepted=\(accepted) pin=\(pinState) pinned_angle=\(pinnedField) landscape_candidates=\(candidatesField) connection_angle_after=\(Int(connection.videoRotationAngle)) portrait_residue=\(residueField) observed_buffer=\(observedField) mirrored=\(connection.isVideoMirrored) active_format=\(dims?.width ?? -1)x\(dims?.height ?? -1) supported=\(supported)")
-        #endif
         return appliedRotationAngle
     }
 
@@ -428,9 +460,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=landscape_warmup outcome=\(outcome, privacy: .public) elapsed_ms=\(elapsedMs)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=landscape_warmup outcome=\(outcome) elapsed_ms=\(elapsedMs)")
-        #endif
     }
 
     /// RotationCoordinator KVO handler. Freezes the applied angle while a
@@ -454,6 +484,7 @@ final class CameraManager: NSObject, ObservableObject {
                 wantsLandscape
                     ? CaptureRotationGeometry.producesLandscape(angle: reported, portraitResidue: residue)
                     : CaptureRotationGeometry.producesPortrait(angle: reported, portraitResidue: residue)
+                        || sessionCropsSideways
             } ?? false
             pendingRotationAngle = shapeMatches ? reported : old
             camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true")
@@ -680,6 +711,7 @@ final class CameraManager: NSObject, ObservableObject {
         // life: a change made while the recording screen is open reaches the
         // next configuration, never the running one.
         sessionOrientationMode = RecordingOrientation.current()
+        sessionCropsSideways = !sessionOrientationMode.wantsLandscapeBuffer && Self.cropsSidewaysToPortrait
         // A new configuration (or a different camera, whose sensor may be
         // mounted differently) must re-derive the landscape angle rather than
         // inherit a pin that belonged to the previous one.
@@ -711,9 +743,7 @@ final class CameraManager: NSObject, ObservableObject {
             camLog.notice(
                 "event=session_config_complete device_model=\(Self.deviceModelIdentifier, privacy: .public) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue, privacy: .public) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=session_config_complete device_model=\(Self.deviceModelIdentifier) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))")
-            #endif
         }
 
         // Arm the landscape gate BEFORE the session runs. Two reasons: the wait
@@ -736,6 +766,7 @@ final class CameraManager: NSObject, ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.activeVideoDevice = videoDevice
             self.isSessionReady = true
             // Portrait reveals exactly as it always has: its angle is right from
             // the first frame, so gating would cost startup time for nothing.
@@ -928,8 +959,8 @@ final class CameraManager: NSObject, ObservableObject {
         let recordingAngle = appliedRotationAngle
         let connection = videoDataOutput?.connection(with: .video)
         let connectionAngle = connection?.videoRotationAngle ?? recordingAngle
-        let videoSize: CGSize
-        let writerSizeSource: String
+        var videoSize: CGSize
+        var writerSizeSource: String
         if let observed = observedBuffer.withLock({ $0 }) {
             let expected = CaptureRotationGeometry.expectedDimensions(
                 observedWidth: observed.width,
@@ -956,6 +987,13 @@ final class CameraManager: NSObject, ObservableObject {
                 videoSize = CGSize(width: 1080, height: 1920)
             }
             writerSizeSource = "preset_fallback"
+        }
+        // A sideways take in a cropping session: the connection delivers
+        // landscape buffers, and the canvas is their vertical middle.
+        // `captureOutput` cuts each frame to it.
+        if sessionCropsSideways, videoSize.width > videoSize.height {
+            videoSize = CaptureRotationGeometry.portraitCrop(of: videoSize)
+            writerSizeSource += "_sideways_crop"
         }
         let fps = UserDefaults.standard.integer(forKey: "videoFPS")
         let targetFPS = fps > 0 ? fps : 30
@@ -995,9 +1033,7 @@ final class CameraManager: NSObject, ObservableObject {
         camLog.notice(
             "event=recording_start mode=\(self.sessionOrientationMode.rawValue, privacy: .public) landscape_candidates=\(candidatesField, privacy: .public) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource, privacy: .public) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality, privacy: .public) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue, privacy: .public) stabilization=\(stabMode?.rawValue ?? -1)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=recording_start mode=\(self.sessionOrientationMode.rawValue) landscape_candidates=\(candidatesField) writer_size=\(Int(videoSize.width))x\(Int(videoSize.height)) writer_size_source=\(writerSizeSource) applied_angle=\(Int(recordingAngle)) connection_angle=\(Int(connectionAngle)) horizon_angle=\(Int(frozenHorizonAngle)) mirrored=\(mirrored) quality=\(quality) active_format=\(recDims?.width ?? -1)x\(recDims?.height ?? -1) preset=\(self.session.sessionPreset.rawValue) stabilization=\(stabMode?.rawValue ?? -1)")
-        #endif
 
         if let pool = recorder.pixelBufferPool {
             composer.setPixelBufferPool(pool)
@@ -1014,6 +1050,7 @@ final class CameraManager: NSObject, ObservableObject {
         // Settings mid-recording cannot reach the pipeline.
         self.recordingOrientationMode = self.sessionOrientationMode
         self.orientationCorrectionLogged = false
+        self.sidewaysCropLogged = false
         // The leading-drop counters are deliberately NOT reset here. Publishing
         // them from this queue is what made them unreliable: `sampleBufferQueue`
         // could see the new recorder before these stores landed. They reset
@@ -1149,6 +1186,35 @@ final class CameraManager: NSObject, ObservableObject {
         backgroundTaskID = .invalid
     }
 
+    // MARK: - iPhone Duo diagnostics
+
+    /// The current capture configuration, for an iPhone Duo report
+    /// (`DuoReportService`). Reads the same state the rotation logs do.
+    func duoDiagnostics() -> [String: Any] {
+        var info: [String: Any] = [
+            "session_ready": isSessionReady,
+            "preset": session.sessionPreset.rawValue,
+            "orientation_mode": sessionOrientationMode.rawValue,
+            "crops_sideways": sessionCropsSideways,
+            "applied_angle": appliedRotationAngle,
+            "chromakey": Self.isChromakeyActive,
+        ]
+        if let horizon = lastReportedHorizonAngle { info["horizon_angle"] = horizon }
+        if let connection = videoDataOutput?.connection(with: .video) {
+            info["connection_angle"] = connection.videoRotationAngle
+            info["mirrored"] = connection.isVideoMirrored
+            info["stabilization"] = connection.activeVideoStabilizationMode.rawValue
+        }
+        if let observed = observedBuffer.withLock({ $0 }) {
+            info["observed_buffer"] = "\(observed.width)x\(observed.height)@\(Int(observed.connectionAngle))"
+            info["portrait_residue"] = observedPortraitResidue ?? -1
+        }
+        if let device = currentCamera {
+            info["device"] = DuoReportService.describe(device, formats: false)
+        }
+        return info
+    }
+
     private func updateAudioSourceName() {
         #if !targetEnvironment(simulator)
         let input = AVAudioSession.sharedInstance().currentRoute.inputs.first
@@ -1179,9 +1245,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             return
         }
         guard var pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        if output === videoDataOutput {
+            gazeProbe.submit(pixelBuffer)
+        }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
-        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+        var bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        var bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
         // Record what the connection actually delivers. This is what decides
         // portrait angles and the writer canvas. Straggler buffers from an
         // output that a reconfiguration already replaced are ignored. Normal
@@ -1271,6 +1340,23 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             liveTake = nil
             takeCanvas = nil
         }
+        // Sideways take (`cropsSidewaysToPortrait`): the canvas is the vertical
+        // middle of the landscape buffers delivered, at their full height. Cut
+        // it out first, so every check below sees a canvas-shaped frame. Only
+        // that exact geometry qualifies — a landscape buffer exactly as tall as
+        // a narrower portrait canvas — which no other mode's canvas has, so
+        // nothing else changes; a stale portrait buffer still fails the shape
+        // test below and is dropped.
+        if let canvas = takeCanvas, let recorder = liveTake,
+           bufferWidth > bufferHeight,
+           canvas.height > canvas.width,
+           bufferHeight == Int(canvas.height),
+           bufferWidth > Int(canvas.width),
+           let cropped = sidewaysCropped(pixelBuffer, bufferWidth: bufferWidth, canvas: canvas, recorder: recorder) {
+            pixelBuffer = cropped
+            bufferWidth = Int(canvas.width)
+            bufferHeight = Int(canvas.height)
+        }
         if let canvas = takeCanvas,
            bufferWidth != Int(canvas.width) || bufferHeight != Int(canvas.height),
            !recordingHasAppendedVideo,
@@ -1352,9 +1438,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.notice(
             "event=first_buffer mode=\(self.sessionOrientationMode.rawValue, privacy: .public) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField, privacy: .public)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=first_buffer mode=\(self.sessionOrientationMode.rawValue) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField)")
-        #endif
     }
 
     /// Slow path of the orientation correction in `captureOutput`: rotates
@@ -1408,18 +1492,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &output) == kCVReturnSuccess,
               let outputBuffer = output else { return pixelBuffer }
 
-        let context: CIContext
-        if let existing = orientationCIContext {
-            context = existing
-        } else {
-            // Same construction as RealtimeWatermarkComposer's context.
-            if let device = MTLCreateSystemDefaultDevice() {
-                context = CIContext(mtlDevice: device)
-            } else {
-                context = CIContext(options: nil)
-            }
-            orientationCIContext = context
-        }
+        let context = correctionCIContext()
 
         let rotated = CIImage(cvPixelBuffer: pixelBuffer).oriented(orientation)
         // Pin the rotated extent to the origin so the render fills the buffer.
@@ -1435,9 +1508,51 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             camLog.error(
                 "event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) mirrored=\(self.recordingConnectionMirrored) difference=\(difference)"
             )
-            #if DEV
             CameraDiagnosticsLog.record("event=orientation_corrected buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) recording_angle=\(Int(self.recordingWriterAngle)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) mirrored=\(self.recordingConnectionMirrored) difference=\(difference)")
-            #endif
+        }
+        return outputBuffer
+    }
+
+    /// Created on the first frame that needs re-rendering — an orientation
+    /// correction or a sideways crop — never on the normal path.
+    nonisolated private func correctionCIContext() -> CIContext {
+        if let existing = orientationCIContext { return existing }
+        // Same construction as RealtimeWatermarkComposer's context.
+        let context: CIContext
+        if let device = MTLCreateSystemDefaultDevice() {
+            context = CIContext(mtlDevice: device)
+        } else {
+            context = CIContext(options: nil)
+        }
+        orientationCIContext = context
+        return context
+    }
+
+    /// The horizontally centred, full-height `canvas`-sized part of a
+    /// landscape `pixelBuffer`, rendered into a buffer from the take's writer
+    /// pool. Nil when no buffer can be allocated: the frame then goes on
+    /// uncut and the checks after it treat it as any mismatched frame.
+    nonisolated private func sidewaysCropped(
+        _ pixelBuffer: CVPixelBuffer,
+        bufferWidth: Int,
+        canvas: CGSize,
+        recorder: AssetWriterRecorder
+    ) -> CVPixelBuffer? {
+        guard let pool = recorder.pixelBufferPool else { return nil }
+        var output: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &output) == kCVReturnSuccess,
+              let outputBuffer = output else { return nil }
+        let x = ((CGFloat(bufferWidth) - canvas.width) / 2).rounded(.down)
+        let cut = CIImage(cvPixelBuffer: pixelBuffer)
+            .cropped(to: CGRect(x: x, y: 0, width: canvas.width, height: canvas.height))
+            .transformed(by: CGAffineTransform(translationX: -x, y: 0))
+        correctionCIContext().render(cut, to: outputBuffer)
+        if !sidewaysCropLogged {
+            sidewaysCropLogged = true
+            camLog.notice(
+                "event=sideways_cropped buffer_w=\(bufferWidth) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))"
+            )
+            CameraDiagnosticsLog.record("event=sideways_cropped buffer_w=\(bufferWidth) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))")
         }
         return outputBuffer
     }
@@ -1452,9 +1567,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.error(
             "event=orientation_uncorrectable reason=\(reason, privacy: .public) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) difference=\(difference)"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=orientation_uncorrectable reason=\(reason) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) horizon_angle=\(Int(self.recordingHorizonAngle)) connection_angle=\(Int(self.recordingConnectionAngle)) difference=\(difference)")
-        #endif
     }
 
     /// A leading frame whose shape contradicted the canvas was dropped rather
@@ -1471,9 +1584,7 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         camLog.error(
             "event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue, privacy: .public) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))"
         )
-        #if DEV
         CameraDiagnosticsLog.record("event=stale_leading_frame_dropped mode=\(self.recordingOrientationMode.rawValue) buffer_w=\(bufferWidth) buffer_h=\(bufferHeight) canvas_w=\(Int(canvas.width)) canvas_h=\(Int(canvas.height)) writer_w=\(Int(writerSize.width)) writer_h=\(Int(writerSize.height)) dropped=\(self.droppedLeadingMismatchCount) connection_angle=\(Int(self.recordingConnectionAngle)) horizon_angle=\(Int(self.recordingHorizonAngle))")
-        #endif
     }
 
     #if DEV

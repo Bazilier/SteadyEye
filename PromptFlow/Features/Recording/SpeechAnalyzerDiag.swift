@@ -595,7 +595,7 @@ struct SpeechAnalyzerDiagButton: View {
         if diag.isRunning {
             Text("SpeechAnalyzer is RUNNING — recording audio routes here.")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.accent)
         }
     }
 }

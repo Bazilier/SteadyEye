@@ -4,6 +4,11 @@ enum CutoutType {
     case dynamicIsland
     case notch
     case none
+    /// iPhone Duo, cover display. Never produced by `detectCutoutType`; only
+    /// by `cutoutType(for:)` from a resolved `DuoDisplayState`.
+    case duoFolded
+    /// iPhone Duo, inner display. Same provenance as `duoFolded`.
+    case duoUnfolded
 }
 
 final class DeviceDetectionService {
@@ -106,8 +111,8 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: topPad,
                 textTopOffset: max(0, safeAreaTop - topPad - 6),
-                bottomCornerRadius: 28,
-                topCornerRadius: 28,
+                bottomCornerRadius: 32,
+                topCornerRadius: 32,
                 collapsedWidth: 126,
                 dragEnabled: true,
                 defaultOffset: 20,
@@ -117,7 +122,7 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: 0,
                 textTopOffset: max(0, safeAreaTop - 6),
-                bottomCornerRadius: 28,
+                bottomCornerRadius: 32,
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: true,
@@ -128,12 +133,28 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: 0,
                 textTopOffset: 4,
-                bottomCornerRadius: 28,
+                bottomCornerRadius: 32,
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: false,
                 defaultOffset: 0,
                 isCameraOffset: false
+            )
+        case .duoFolded, .duoUnfolded:
+            // Shape and controls only. Placement — top, text row, horizontal
+            // position — comes from the lens and camera half in
+            // `RecordingView`, which overrides `textTopOffset`. The pill
+            // floats, so it is rounded all round. The lens is off-centre on
+            // both displays.
+            return CutoutLayoutConfig(
+                topPadding: 0,
+                textTopOffset: 0,
+                bottomCornerRadius: 32,
+                topCornerRadius: 32,
+                collapsedWidth: 126,
+                dragEnabled: false,
+                defaultOffset: 0,
+                isCameraOffset: true
             )
         }
     }

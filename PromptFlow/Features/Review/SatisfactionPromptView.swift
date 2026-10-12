@@ -60,14 +60,12 @@ struct SatisfactionPromptView: View {
                     Text("review.satisfaction.yes")
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
                 }
                 // Same construction as the soft-ask's Allow CTA — the app's
-                // primary button. `Color.accentColor` is deliberately avoided:
-                // AccentColor.colorset carries no value, so it resolves to
-                // system blue.
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                // primary button. Tint re-applied because sheets don't
+                // inherit the TabView's `.tint`.
+                .primaryButtonStyle()
+                .tint(Theme.accent)
 
                 Button {
                     AppAnalytics.log("satisfaction_prompt_no")
@@ -103,15 +101,15 @@ struct SatisfactionPromptView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: Color.orange.opacity(0.35), radius: 18, x: 0, y: 10)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                .shadow(color: Theme.accent.opacity(0.35), radius: 18, x: 0, y: 10)
 
             Image(systemName: "star.fill")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .scaleEffect(starScale)
                 .frame(width: 30, height: 30)
-                .background(Circle().fill(Color.orange))
+                .background(Circle().fill(Theme.accent))
                 .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
                 .offset(x: 9, y: -9)
         }

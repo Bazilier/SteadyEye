@@ -28,8 +28,13 @@ enum RecordingOrientation: String, CaseIterable, Identifiable, Sendable {
 
     /// Reads the persisted mode. Used by the capture pipeline, which has no
     /// SwiftUI environment of its own.
+    ///
+    /// Always portrait on a foldable (iPhone Duo): landscape mode is not
+    /// supported there yet, and its setting is hidden, so a value saved before
+    /// must not keep applying.
     static func current(_ defaults: UserDefaults = .standard) -> RecordingOrientation {
-        defaults.string(forKey: appStorageKey)
+        if DuoDisplayMonitor.deviceHasHinge { return .portrait }
+        return defaults.string(forKey: appStorageKey)
             .flatMap(RecordingOrientation.init(rawValue:)) ?? fallback
     }
 

@@ -1,1 +1,0 @@
-Oi! Este é um roteiro de exemplo para mostrar como funciona a otimização com IA no SteadyEye. Ela transforma números como 25k ou 3x em palavras, expande abreviações como p. ex. e etc., e divide frases longas como esta para que fiquem fáceis de ler em voz alta na câmera sem travar. Teste com este texto ou troque pelo seu.

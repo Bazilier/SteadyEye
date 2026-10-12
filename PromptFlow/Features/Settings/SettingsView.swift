@@ -24,6 +24,8 @@ struct SettingsView: View {
     @AppStorage("fmv_enabled") private var fmvEnabled: Bool = false
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
+    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
@@ -31,11 +33,17 @@ struct SettingsView: View {
     @State private var showRestoreAlert = false
     @State private var showChat = false
     @StateObject private var chatBadgeState = ChatBadgeState.shared
+    /// The window has leading or trailing safe-area insets (iPhone Duo).
+    @State private var hasSideSafeArea = false
 
     #if DEV
     @State private var devNotificationStatus: String = "loading…"
     @State private var devPendingCount: Int = 0
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
+    @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
+    @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
+    @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
+    @State private var devConfirmFreshInstall = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -81,6 +89,12 @@ struct SettingsView: View {
         }
     }
 
+    /// Same card as the script list rows; used for the three top cards.
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+            .fill(Color(.secondarySystemGroupedBackground))
+    }
+
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
         let new = AppSettings()
@@ -105,10 +119,10 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(
                                         localized: "settings.chat.title",
-                                        defaultValue: "Chat with Kirill",
+                                        defaultValue: "Chat with Cyril",
                                         comment: "Title of the Settings row that opens the in-app chat with the founder."
                                     ))
-                                        .font(.body.weight(.semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundColor(.primary)
                                     Text(String(
                                         localized: "settings.chat.subtitle",
@@ -138,21 +152,24 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(cardBackground)
+                    .listSectionSpacing(10)
                 }
 
-                // First section: Upgrade entry point + Redeem code.
-                // For free users: shows Upgrade row above Redeem code row.
-                // For Pro users: Upgrade row is hidden; Redeem code remains
+                // Top cards: Upgrade entry point, then Redeem code.
+                // For free users: shows the Upgrade card above the Redeem card.
+                // For Pro users: Upgrade card is hidden; Redeem code remains
                 // visible (Pro users may still hold an offer or transfer
                 // code to redeem against their existing entitlement).
-                Section {
-                    if !subscriptionManager.isSubscribed {
+                if !subscriptionManager.isSubscribed {
+                    Section {
                         Button(action: {
                             showUpgradePaywall = true
                         }) {
                             HStack {
                                 Image(systemName: "crown.fill")
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(Theme.accent)
                                     .font(.system(size: 22))
                                     .frame(width: 30, alignment: .center)
 
@@ -162,7 +179,7 @@ struct SettingsView: View {
                                         defaultValue: "Upgrade to Pro",
                                         comment: "Title of the Settings → Upgrade row that opens the paywall. Hidden for Pro users."
                                     ))
-                                        .font(.body.weight(.semibold))
+                                        .font(.title3.weight(.semibold))
                                         .foregroundColor(.primary)
                                     Text(String(
                                         localized: "settings.upgrade.subtitle",
@@ -183,6 +200,12 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(cardBackground)
+                    .listSectionSpacing(10)
+                }
+
+                Section {
                     Button {
                         Task {
                             await SubscriptionManager.shared.presentCodeRedemption()
@@ -191,16 +214,21 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "ticket")
                                 .foregroundStyle(.tint)
+                                .font(.system(size: 22))
+                                .frame(width: 30, alignment: .center)
                             Text(String(
                                 localized: "settings.subscription.redeem_code",
                                 defaultValue: "Redeem code",
                                 comment: "Settings row that presents Apple's offer-code redemption sheet for App Store offer codes (e.g., promotional, win-back, transfer codes)."
                             ))
+                                .font(.title3.weight(.semibold))
                                 .foregroundColor(.primary)
                             Spacer()
                         }
                     }
                 }
+                .listRowSeparator(.hidden)
+                .listRowBackground(cardBackground)
 
                 Section {
                     Picker(selection: $videoResolution) {
@@ -222,6 +250,8 @@ struct SettingsView: View {
 
                     // Read when the capture session is configured, so a change
                     // here reaches the next session rather than the running one.
+                    // Not offered on iPhone Duo, which records portrait only.
+                    if !DuoDisplayMonitor.deviceHasHinge {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Text("settings.video.orientation", comment: "Label above the recording orientation picker")
@@ -234,10 +264,10 @@ struct SettingsView: View {
                             // MODE is beta, not one of its values.
                             Text("common.beta", comment: "Badge beside the Recording Orientation label, marking landscape recording as a beta feature")
                                 .font(.caption2.bold())
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.accent)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(.orange.opacity(0.2), in: Capsule())
+                                .background(Theme.accent.opacity(0.2), in: Capsule())
                         }
                         Picker(selection: $recordingOrientation) {
                             Text("settings.video.orientation.portrait", comment: "Recording orientation option: portrait")
@@ -250,11 +280,13 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
+                    }
                 } header: {
                     Text("settings.section.videoQuality", comment: "Settings section header")
                 } footer: {
                     Text("settings.video.qualityFooter", comment: "Footer below the video quality picker")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Picker(selection: Binding(
@@ -284,15 +316,52 @@ struct SettingsView: View {
                     Toggle(isOn: $dimDuringRecording) {
                         Text("settings.recording.dimScreen", comment: "Toggle: dim screen while recording")
                     }
+                    .tint(Theme.accent)
 
                     Toggle(isOn: $stabilizationEnabled) {
                         Text("settings.recording.stabilization", comment: "Toggle: video stabilization")
                     }
+                    .tint(Theme.accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Toggle(isOn: $autoStartPrompting) {
                             Text("settings.recording.autoStart", comment: "Toggle: auto-start the prompter when recording begins")
                         }
+                        .tint(Theme.accent)
                         Text("settings.recording.autoStartFooter", comment: "Helper text below the auto-start toggle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $gazeIndicatorEnabled) {
+                            Text(String(
+                                localized: "settings.recording.eyeContact",
+                                defaultValue: "Eye-contact indicator",
+                                comment: "Toggle: show the eye on the prompter that turns green while the user looks at the lens."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.eyeContactFooter",
+                            defaultValue: "An eye on the prompter turns green while you look at the lens. Beta.",
+                            comment: "Helper text below the eye-contact indicator toggle."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $gazeAutoPauseEnabled) {
+                            Text(String(
+                                localized: "settings.recording.gazeAutoPause",
+                                defaultValue: "Pause when you look away",
+                                comment: "Toggle: freeze the prompter while the user looks away from the lens."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.gazeAutoPauseFooter",
+                            defaultValue: "The prompter waits while you look down at the screen and picks up on the same word. Beta.",
+                            comment: "Helper text below the pause-when-you-look-away toggle."
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -300,6 +369,7 @@ struct SettingsView: View {
                         Toggle(isOn: $useBluetoothMic) {
                             Text("settings.allowBluetoothMics", comment: "Toggle: allow Bluetooth microphones (AirPods etc.) as audio input. Off by default because BT forces 16kHz HFP audio.")
                         }
+                        .tint(Theme.accent)
                         Text("settings.allowBluetoothMics.footer", comment: "Helper text below the Bluetooth mic toggle, explaining why it's off by default and that wired mics are unaffected.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -310,6 +380,7 @@ struct SettingsView: View {
                             Toggle(isOn: $fmvEnabled) {
                                 Text("settings.followMyVoice.toggle", comment: "Toggle: Follow my voice. Adapts the prompter pace to the user's actual speech.")
                             }
+                            .tint(Theme.accent)
                             Text("settings.followMyVoice.englishOnly", comment: "Helper text: Follow My Voice supports English scripts only at v2.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -319,21 +390,36 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.recording", comment: "Settings section header")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Toggle(isOn: $orpAlignmentEnabled) {
                         Text("settings.anchor.align", comment: "Toggle: align words by anchor letter")
                     }
+                    .tint(Theme.accent)
                     Toggle(isOn: $orpHighlightAnchor) {
                         Text("settings.anchor.highlight", comment: "Toggle: highlight anchor letter")
                     }
+                    .tint(Theme.accent)
                     .disabled(!orpAlignmentEnabled)
                 } header: {
                     Text("settings.section.anchorAlignment", comment: "Settings section header for ORP toggles")
                 }
+                .listRowSeparator(.hidden)
 
                 #if DEV
                 Section("Debug") {
+                    Button("Reset to new install (replays onboarding)", role: .destructive) {
+                        devConfirmFreshInstall = true
+                    }
+                    .alert("Reset to a new install?", isPresented: $devConfirmFreshInstall) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Erase everything and quit", role: .destructive) {
+                            DevReset.resetToFreshInstallAndQuit()
+                        }
+                    } message: {
+                        Text("Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay.")
+                    }
                     Picker("Subscription Override", selection: $subscriptionManager.devSubscriptionOverride) {
                         Text("Off (use RC)").tag("off")
                         Text("Force Free").tag("free")
@@ -386,21 +472,53 @@ struct SettingsView: View {
                     }
                     Text("Build: DEV")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.accent)
 
                     if #available(iOS 26.0, *) {
                         SpeechAnalyzerDiagButton()
                     }
                 }
+                .listRowSeparator(.hidden)
 
                 Section("Chromakey (DEV)") {
                     Toggle(isOn: $devChromakeyEnabled) {
                         Text("Chromakey background (replace camera)")
                     }
+                    .tint(Theme.accent)
                     Text("Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .listRowSeparator(.hidden)
+
+                Section("iPhone Duo (DEV)") {
+                    Toggle(isOn: $devCropSidewaysToPortrait) {
+                        Text("Crop sideways takes to 9:16")
+                    }
+                    .tint(Theme.accent)
+                    Text("What iPhone Duo always does: with the phone held sideways, record the level horizon's vertical middle 9:16 instead of a tipped-over portrait frame. Hold this phone sideways to test it. Takes effect on next Recording open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devDuoGeometryOverlay) {
+                        Text("Geometry overlay (chromakey)")
+                    }
+                    .tint(Theme.accent)
+                    Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+
+                Section("Gaze probe (DEV)") {
+                    Toggle(isOn: $devGazeProbe) {
+                        Text("Gaze readout on the camera")
+                    }
+                    .tint(Theme.accent)
+                    Text("Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
 
                 Section("Notifications (DEV)") {
                     HStack {
@@ -468,6 +586,7 @@ struct SettingsView: View {
                         UserDefaults.standard.set(0, forKey: "coldStartCountAfterOnboarding")
                     }
                 }
+                .listRowSeparator(.hidden)
                 .onAppear {
                     Task { await refreshDevDiagnostics() }
                 }
@@ -488,6 +607,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .listRowSeparator(.hidden)
                 }
 
                 Section {
@@ -500,6 +620,7 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.about", comment: "Settings section header for app metadata")
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Button(action: { restoreTapped() }) {
@@ -524,6 +645,7 @@ struct SettingsView: View {
                         comment: "Settings section header for subscription-related actions (restore purchases, etc.)."
                     ))
                 }
+                .listRowSeparator(.hidden)
 
                 Section {
                     Button {
@@ -540,17 +662,26 @@ struct SettingsView: View {
                 } header: {
                     Text("settings.section.support", comment: "Settings section header for support and legal")
                 }
+                .listRowSeparator(.hidden)
             }
+            // 16 pt groups, unless the window has side safe-area insets (the
+            // iPhone Duo's camera strip and tab rail): a fixed margin makes the
+            // system section backgrounds ignore those insets and run under the
+            // rail, so there the system margins, which respect them, apply.
+            .contentMargins(.horizontal, hasSideSafeArea ? nil : 16, for: .scrollContent)
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.safeAreaInsets.leading > 0 || proxy.safeAreaInsets.trailing > 0
+            } action: { hasSideSafeArea = $0 }
             .navigationTitle(Text("settings.title", comment: "Settings nav title"))
             #if DEV
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Text("DEV")
                         .font(.caption2.bold())
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.orange.opacity(0.2), in: Capsule())
+                        .background(Theme.accent.opacity(0.2), in: Capsule())
                 }
             }
             #endif

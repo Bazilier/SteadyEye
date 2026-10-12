@@ -134,6 +134,10 @@ struct PaywallView: View {
     /// NOT cleared on `.succeeded`, where this presentation is on its way out.
     @State private var isPurchaseLocked: Bool = false
 
+    /// A purchase or restore is awaiting the store: the CTA shows a spinner
+    /// and the plan controls are disabled. Derived, not stored.
+    private var isTransactionInFlight: Bool { isPurchaseInFlight || isRestoring }
+
     // MARK: - Packages from offerings
 
     /// SINGLE SOURCE OF TRUTH for which offering is displayed and whether trial
@@ -651,6 +655,11 @@ struct PaywallView: View {
             scrollContent
             bottomSheet
         }
+        .overlay(alignment: .topLeading) {
+            closeButton
+                .padding(.leading, 16)
+                .padding(.top, 8)
+        }
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled(true)
         .alert(
@@ -763,10 +772,11 @@ struct PaywallView: View {
     private var scrollContent: some View {
         ScrollView {
             VStack(spacing: 28) {
-                heroSection
-                featuresList
+                VStack(spacing: 12) {
+                    heroSection
+                    featuresList
+                }
                 restoreRow
-                dismissGroup
                 Spacer().frame(height: bottomSheetHeight + 24)
             }
             .padding(.horizontal, 24)
@@ -780,8 +790,8 @@ struct PaywallView: View {
         .background(
             RadialGradient(
                 colors: [
-                    Color.orange.opacity(0.18),
-                    Color.orange.opacity(0.06),
+                    Theme.accent.opacity(0.18),
+                    Theme.accent.opacity(0.06),
                     Color.clear
                 ],
                 center: .top,
@@ -824,6 +834,8 @@ struct PaywallView: View {
             }
         }
         .font(.subheadline)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
     }
@@ -852,8 +864,8 @@ struct PaywallView: View {
     private var heroSection: some View {
         VStack(spacing: 12) {
             Text(heroHeadlineText)
-                .font(.largeTitle.weight(.bold))
-                .foregroundColor(.orange)
+                .font(.system(size: 40, weight: .bold))
+                .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
@@ -865,12 +877,15 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
         }
+        // Clears the top-leading close button (44pt + 8pt inset) so a long
+        // first headline line cannot run under it.
+        .padding(.top, 52)
     }
 
     // MARK: - Features list
 
     private var featuresList: some View {
-        VStack(alignment: .leading, spacing: 28) {
+        VStack(alignment: .leading, spacing: 10) {
             featureRow(
                 icon: "drop.fill",
                 title: String(
@@ -880,7 +895,7 @@ struct PaywallView: View {
                 ),
                 subtitle: String(
                     localized: "paywall.v2.feature.noWatermark.subtitle",
-                    defaultValue: "Share videos without 'Made with SteadyEye'",
+                    defaultValue: "Share videos without the SteadyEye watermark",
                     comment: "Paywall v2 feature row subtitle for the no-watermark feature."
                 )
             )
@@ -925,26 +940,30 @@ struct PaywallView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 48)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+        )
     }
 
     private func featureRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(spacing: 18) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.orange.opacity(0.15))
+                RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
+                    .fill(Theme.accentTint)
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .foregroundColor(.orange)
+                    .foregroundColor(Theme.accent)
                     .font(.system(size: 18, weight: .semibold))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body)
-                    .fontWeight(.semibold)
+                    .font(.title3.weight(.semibold))
                     .foregroundColor(.white)
                 Text(subtitle)
-                    .font(.footnote)
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
             }
             Spacer(minLength: 0)
@@ -971,7 +990,7 @@ struct PaywallView: View {
             Feature(
                 icon: "drop.fill",
                 title: String(localized: "paywall.v2.feature.noWatermark", defaultValue: "No watermark on recordings", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without 'Made with SteadyEye'", comment: "Paywall v2 feature card subtitle.")
+                subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without the SteadyEye watermark", comment: "Paywall v2 feature card subtitle.")
             ),
             Feature(
                 icon: "sparkles",
@@ -1027,6 +1046,26 @@ struct PaywallView: View {
                 }
             }
         }
+    }
+
+    /// Low-emphasis top-leading close. Same path as the former inline
+    /// Dismiss link: `dismiss()`, with `paywall_dismissed` logged from
+    /// `onDisappear`.
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.55))
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel(String(
+            localized: "paywall.v2.dismissA11y",
+            defaultValue: "Dismiss paywall and continue with free tier",
+            comment: "VoiceOver label for the inline Dismiss link on the paywall."
+        ))
     }
 
     private var dismissGroup: some View {
@@ -1094,14 +1133,19 @@ struct PaywallView: View {
             }
 
             Button(action: { purchase(selectedPlan) }) {
-                Text(continueButtonLabel)
-                    .font(.body).bold()
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(Color.orange)
-                    .cornerRadius(12)
+                // Opacity swap, not if/else, so the button keeps the label's
+                // size while the spinner shows (same as the editor's Optimize).
+                ZStack {
+                    Text(continueButtonLabel)
+                        .opacity(isTransactionInFlight ? 0 : 1)
+                    ProgressView()
+                        .tint(Theme.onAccent)
+                        .opacity(isTransactionInFlight ? 1 : 0)
+                }
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .primaryButtonStyle()
+            .disabled(isTransactionInFlight)
 
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -1129,6 +1173,7 @@ struct PaywallView: View {
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .contentShape(Rectangle())
             }
+            .disabled(isTransactionInFlight)
         }
         .padding(20)
         .background {
@@ -1138,10 +1183,10 @@ struct PaywallView: View {
         }
         .background(
             UnevenRoundedRectangle(
-                topLeadingRadius: 24,
+                topLeadingRadius: Theme.Radius.card,
                 bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0,
-                topTrailingRadius: 24,
+                topTrailingRadius: Theme.Radius.card,
                 style: .continuous
             )
             .fill(.ultraThinMaterial)
@@ -1167,10 +1212,12 @@ struct PaywallView: View {
             }
         }) {
             HStack {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Theme.accent : Color.secondary)
                 HStack(spacing: 8) {
                     Text(plan.title)
-                        .font(.body)
-                        .bold()
+                        .font(.title3.weight(.semibold))
                         .foregroundColor(.white)
                     // Trial rows carry no badge: the duration text on the
                     // right already says "Free for 7 days". The HStack stays
@@ -1205,7 +1252,7 @@ struct PaywallView: View {
                 // exactly this pairing — no new constant.
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(displayPrice)
-                        .font(.body)
+                        .font(.title3.weight(.semibold))
                         .foregroundColor(.white)
                     // Omitted entirely rather than rendered empty, so a row with
                     // no intro collapses to a single line at exactly its
@@ -1231,18 +1278,12 @@ struct PaywallView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.orange.opacity(0.08) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        isSelected ? Color.orange : Color.gray.opacity(0.3),
-                        lineWidth: isSelected ? 2 : 1
-                    )
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(isSelected ? Theme.accentTint : Color(.secondarySystemGroupedBackground))
             )
         }
         .buttonStyle(.plain)
+        .disabled(isTransactionInFlight)
     }
 
     // MARK: - Purchase action

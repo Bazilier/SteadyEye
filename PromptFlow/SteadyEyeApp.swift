@@ -13,6 +13,8 @@ struct SteadyEyeApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var container: ModelContainer?
     @StateObject private var subscriptionManager = SubscriptionManager.shared
+    /// iPhone Duo display state; nil everywhere else. Fed and injected at the root.
+    @State private var duoDisplayMonitor = DuoDisplayMonitor()
 
     init() {
         // iOS doesn't auto-create the Application Support directory; SwiftData
@@ -133,6 +135,7 @@ struct SteadyEyeApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: container != nil)
+            .duoDisplayMonitor(duoDisplayMonitor)
         }
         .onChange(of: scenePhase) { _, newPhase in
             // Re-query RC every time the app becomes active. Catches the case

@@ -79,21 +79,18 @@ struct BulkImportView: View {
                         editorView
                     }
                 }
-
-                if showExplainer {
-                    ExplainerOverlay(
-                        isPresented: $showExplainer,
-                        icon: "doc.on.doc",
-                        title: "scripts.import.explainer.title",
-                        message: "scripts.import.explainer.body",
-                        buttonLabel: "scripts.import.explainer.button",
-                        onDismiss: {
-                            hasSeenBulkImportExplainer = true
-                            AppAnalytics.log("bulk_import_explainer_dismissed")
-                        }
-                    )
-                }
             }
+            .coachSheet(
+                isPresented: $showExplainer,
+                icon: "doc.on.doc",
+                title: "scripts.import.explainer.title",
+                message: "scripts.import.explainer.body",
+                buttonLabel: "scripts.import.explainer.button",
+                onDismiss: {
+                    hasSeenBulkImportExplainer = true
+                    AppAnalytics.log("bulk_import_explainer_dismissed")
+                }
+            )
             .navigationTitle(Text("scripts.import.navTitle", comment: "Bulk import sheet nav title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -204,10 +201,9 @@ struct BulkImportView: View {
                         Image(systemName: "wand.and.stars")
                     }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                .primaryButtonStyle()
+                .tint(Theme.accent)
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).count < 50 || inputText.count > maxChars)
             }
             .padding(.horizontal)
@@ -217,7 +213,7 @@ struct BulkImportView: View {
 
     private var bulkCharCountColor: Color {
         if inputText.count >= maxChars { return .red }
-        if inputText.count >= 40000 { return .orange }
+        if inputText.count >= 40000 { return Theme.warning }
         return .secondary
     }
 
@@ -228,7 +224,7 @@ struct BulkImportView: View {
             Spacer()
 
             ProgressView(value: progress)
-                .tint(.orange)
+                .tint(Theme.accent)
                 .padding(.horizontal, 40)
 
             Text(statusText)

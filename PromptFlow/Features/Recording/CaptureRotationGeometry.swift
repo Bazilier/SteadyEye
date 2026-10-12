@@ -98,6 +98,14 @@ nonisolated enum CaptureRotationGeometry {
             : (observedHeight, observedWidth)
     }
 
+    /// The vertical middle 9:16 of a landscape frame of `size`, at full height:
+    /// the canvas of a portrait take recorded with the device on its side.
+    /// Width rounded to even, which encoders require; never wider than `size`.
+    static func portraitCrop(of size: CGSize) -> CGSize {
+        let width = (size.height * 9 / 16 / 2).rounded() * 2
+        return CGSize(width: min(width, size.width), height: size.height)
+    }
+
     /// Clockwise rotation, in degrees, that turns a buffer delivered at
     /// `connectionAngle` into what a connection at `horizonAngle` would have
     /// delivered. This is Apple's recommended correction (thread 813548):

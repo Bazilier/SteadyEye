@@ -185,4 +185,24 @@ final class CaptureRotationGeometryTests: XCTestCase {
         XCTAssertEqual(size.width, 1920)
         XCTAssertEqual(size.height, 1080)
     }
+
+    /// A sideways take records the vertical middle 9:16 of a landscape frame
+    /// at full height, with an even width.
+    func testPortraitCropOfLandscapeFrame() {
+        XCTAssertEqual(
+            CaptureRotationGeometry.portraitCrop(of: CGSize(width: 1920, height: 1080)),
+            CGSize(width: 608, height: 1080)
+        )
+        XCTAssertEqual(
+            CaptureRotationGeometry.portraitCrop(of: CGSize(width: 3840, height: 2160)),
+            CGSize(width: 1216, height: 2160)
+        )
+    }
+
+    /// Never wider than the frame it is cut from.
+    func testPortraitCropNeverExceedsFrameWidth() {
+        let crop = CaptureRotationGeometry.portraitCrop(of: CGSize(width: 500, height: 1080))
+        XCTAssertEqual(crop.width, 500)
+        XCTAssertEqual(crop.height, 1080)
+    }
 }

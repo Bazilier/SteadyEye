@@ -5,6 +5,10 @@ import SwiftUI
 struct PlaceholderLoopView: View {
     let fontSize: CGFloat
     let isClassicMode: Bool
+    /// Text to cycle. Nil: the "your script will appear here" placeholder.
+    var phrase: String? = nil
+    /// Word brightness. Dimmed by default, since it stands in for a script.
+    var textOpacity: Double = 0.5
 
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
@@ -16,10 +20,9 @@ struct PlaceholderLoopView: View {
     @State private var supportsORP: Bool = true
     @State private var currentIndex = 0
     @State private var opacity: Double = 1
-    @State private var scrollOffset: CGFloat = 0
     @State private var loopTask: Task<Void, Never>?
 
-    private let lineHeight: CGFloat = 28
+    private var classicLineHeight: CGFloat { ClassicThreeLineView.lineHeight(for: fontSize) }
 
     private var useORP: Bool { orpAlignmentEnabled && supportsORP }
     private var currentChunk: String {
@@ -66,7 +69,7 @@ struct PlaceholderLoopView: View {
                     word: currentChunk,
                     fontSize: fontSize,
                     highlightAnchor: orpHighlightAnchor,
-                    textColor: .white.opacity(0.5)
+                    textColor: .white.opacity(textOpacity)
                 )
                 .opacity(opacity)
                 .lineLimit(1)
@@ -76,7 +79,7 @@ struct PlaceholderLoopView: View {
             } else {
                 Text(currentChunk)
                     .font(.system(size: fontSize, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(textOpacity))
                     .opacity(opacity)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -91,39 +94,40 @@ struct PlaceholderLoopView: View {
 
     private var classicPlaceholder: some View {
         VStack(spacing: 0) {
-            ForEach(0..<4, id: \.self) { slot in
-                let idx = currentIndex - 1 + slot
+            ForEach(0..<3, id: \.self) { row in
+                let idx = currentIndex - 1 + row
                 let count = max(chunks.count, 1)
-                let wrapped = ((idx % count) + count) % count
-                let text = (idx < 0 || chunks.isEmpty) ? "" : chunks[wrapped]
-                Text(text)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white.opacity(classicSlotOpacity(slot) * 0.5))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: lineHeight)
+                let text = (idx < 0 || chunks.isEmpty) ? "" : chunks[idx % count]
+                Group {
+                    if useORP {
+                        ORPWord(
+                            word: text,
+                            fontSize: fontSize,
+                            highlightAnchor: orpHighlightAnchor,
+                            textColor: .white.opacity(textOpacity)
+                        )
+                        .lineLimit(1)
+                    } else {
+                        Text(text)
+                            .font(.system(size: fontSize, weight: .semibold))
+                            .foregroundStyle(.white.opacity(textOpacity))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                    }
+                }
+                .opacity(ClassicThreeLineView.rowOpacity(row))
+                .frame(maxWidth: .infinity)
+                .frame(height: classicLineHeight)
             }
         }
-        .offset(y: -scrollOffset)
-        .frame(height: lineHeight * 3, alignment: .top)
-        .clipped()
+        .frame(height: classicLineHeight * 3, alignment: .top)
         .padding(.horizontal, 16)
-    }
-
-    private func classicSlotOpacity(_ slot: Int) -> Double {
-        switch slot {
-        case 0: return 0.3
-        case 1: return 1.0
-        case 2: return 0.6
-        default: return 0.0
-        }
     }
 
     // MARK: - Chunking
 
     private func recomputeChunks() {
-        let phrase = String(
+        let phrase = self.phrase ?? String(
             localized: "recording.placeholder.phrase",
             defaultValue: "Your script will appear here when you hit record",
             comment: "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should read naturally when split on spaces and hint that the user needs to tap record to start."
@@ -176,24 +180,21 @@ struct PlaceholderLoopView: View {
         loopTask?.cancel()
         currentIndex = 0
         opacity = 1
-        scrollOffset = 0
 
         loopTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: chunkDelay())
-                guard !Task.isCancelled else { return }
-
                 if isClassicMode {
-                    await MainActor.run {
-                        withAnimation(.easeInOut(duration: 0.3)) { scrollOffset = lineHeight }
-                    }
-                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    // One cycle = chunkDelay + 80ms, exactly the WbW cycle
+                    // below, so both modes run at the same pace for a given
+                    // slider position. The queue steps instantly — no slide.
+                    try? await Task.sleep(nanoseconds: chunkDelay() + 80_000_000)
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
-                        scrollOffset = 0
                         currentIndex = chunks.isEmpty ? 0 : (currentIndex + 1) % chunks.count
                     }
                 } else {
+                    try? await Task.sleep(nanoseconds: chunkDelay())
+                    guard !Task.isCancelled else { return }
                     await MainActor.run { withAnimation(.easeOut(duration: 0.08)) { opacity = 0 } }
                     try? await Task.sleep(nanoseconds: 80_000_000)
                     guard !Task.isCancelled else { return }
@@ -341,12 +342,34 @@ struct WordByWordView: View {
 
 struct ClassicThreeLineView: View {
     @ObservedObject var player: ChunkPlayerEngine
+    /// Same size as the single-line mode; the prompter plate grows to fit.
+    let fontSize: CGFloat
+
+    /// Row height for a given font size. `RecordingView` sizes the plate from
+    /// this, so the plate and the rows can never disagree.
+    static func lineHeight(for fontSize: CGFloat) -> CGFloat {
+        (fontSize * 1.2).rounded()
+    }
+
+    /// Opacity per row: previous word, current word (middle), next word.
+    /// The eyes run a word or two ahead of the voice when reading aloud, so
+    /// the word being spoken is usually the one above the highlighted row —
+    /// keeping it on screen gives the voice an anchor and the eyes a place
+    /// to regress to.
+    static func rowOpacity(_ row: Int) -> Double {
+        switch row {
+        case 1: return 1.0
+        case 0: return 0.35
+        default: return 0.5
+        }
+    }
+
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
 
     @State private var displayIndex: Int = 0
-    @State private var scrollOffset: CGFloat = 0
 
-    private let lineFontSize: CGFloat = 22
-    private let lineHeight: CGFloat = 28
+    private var lineHeight: CGFloat { Self.lineHeight(for: fontSize) }
 
     private static let cjkStripPunctuation: Set<Character> = ["。", "！", "？"]
 
@@ -361,53 +384,54 @@ struct ClassicThreeLineView: View {
         return chunk
     }
 
-    private func lineOpacity(_ slot: Int) -> Double {
-        switch slot {
-        case 0: return 0.3
-        case 1: return 1.0
-        case 2: return 0.6
-        default: return 0.0
-        }
-    }
+    /// Anchor mode: the engine chunks per word, and every line puts its anchor
+    /// letter on the same vertical axis (the view's center X).
+    private var useORP: Bool { orpAlignmentEnabled && player.supportsORP }
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(0..<4, id: \.self) { slot in
-                let chunkIdx = displayIndex - 1 + slot
-                Text(chunkText(at: chunkIdx))
-                    .font(.system(size: lineFontSize, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .opacity(lineOpacity(slot))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+            ForEach(0..<3, id: \.self) { row in
+                line(chunkText(at: displayIndex - 1 + row))
+                    .opacity(Self.rowOpacity(row))
                     .frame(maxWidth: .infinity)
                     .frame(height: lineHeight)
             }
         }
-        .offset(y: -scrollOffset)
         .frame(height: lineHeight * 3, alignment: .top)
-        .clipped()
         .multilineTextAlignment(.center)
         .padding(.horizontal, 16)
         .onAppear {
+            player.orpEnabled = orpAlignmentEnabled
             displayIndex = player.currentChunkIndex
-            scrollOffset = 0
         }
         .onChange(of: player.currentChunkIndex) { _, newIdx in
-            guard newIdx != displayIndex else { return }
-            animateScrollTo(newIdx)
+            // Queue steps instantly — no slide — so lines change in lockstep
+            // with the engine at every speed.
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { displayIndex = newIdx }
+        }
+        .onChange(of: orpAlignmentEnabled) { _, newValue in
+            player.orpEnabled = newValue
+            player.reloadChunks()
         }
     }
 
-    private func animateScrollTo(_ newIdx: Int) {
-        // Scroll up one slot
-        withAnimation(.easeInOut(duration: 0.25)) {
-            scrollOffset = lineHeight
-        }
-        // After animation, snap to new position
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            scrollOffset = 0
-            displayIndex = newIdx
+    @ViewBuilder
+    private func line(_ text: String) -> some View {
+        if useORP {
+            // No minimumScaleFactor: per-line scaling would knock the anchors
+            // off the shared axis. The Latin chunker's right budget keeps
+            // every word inside the plate at this size. Upcoming rows keep
+            // their accent anchor; the row opacity dims it with the word.
+            ORPWord(word: text, fontSize: fontSize, highlightAnchor: orpHighlightAnchor)
+                .lineLimit(1)
+        } else {
+            Text(text)
+                .font(.system(size: fontSize, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
         }
     }
 }

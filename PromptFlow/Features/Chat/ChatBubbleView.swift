@@ -10,17 +10,13 @@ struct ChatBubbleView: View {
     private var isFailed: Bool { isInbound && message.sendStatus == .failed }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            if isInbound { Spacer(minLength: 40) }
-
+        ChatBubbleRow(trailing: isInbound) {
             VStack(alignment: isInbound ? .trailing : .leading, spacing: 4) {
                 ChatBubbleSurface(content: Text(message.text), isInbound: isInbound)
                     .opacity(isFailed ? 0.7 : 1.0)
 
                 statusOrTimestampLine
             }
-
-            if !isInbound { Spacer(minLength: 40) }
         }
     }
 
@@ -60,7 +56,7 @@ struct ChatBubbleView: View {
     private var timestampView: some View {
         Text(timestampText)
             .font(.caption2)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
     }
 
@@ -91,17 +87,38 @@ struct ChatBubbleSurface: View {
     var body: some View {
         content
             .font(.body)
-            .foregroundStyle(isInbound ? Color.white : Color.primary)
+            .foregroundStyle(isInbound ? Theme.onAccent : Color.primary)
+            // Links: on-accent over the user's accent bubble, accent otherwise.
+            .tint(isInbound ? Theme.onAccent : Theme.accent)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    // Color.orange (literal) instead of Color.accentColor:
-                    // sheets don't inherit the parent TabView's
-                    // .tint(.orange), so accentColor flickers from system
-                    // default → orange on first frame inside a sheet.
-                    .fill(isInbound ? Color.orange : Color(.secondarySystemBackground))
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    // Explicit Theme.accent rather than the inherited tint:
+                    // sheets don't inherit the parent TabView's .tint.
+                    .fill(isInbound ? Theme.accent : Color(.secondarySystemGroupedBackground))
             )
             .textSelection(.enabled)
+    }
+}
+
+/// One chat row: its content is offered at most `maxFraction` of the row's
+/// width and sits against the leading or trailing edge.
+struct ChatBubbleRow: Layout {
+    var trailing: Bool
+    var maxFraction: CGFloat = 0.78
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let rowWidth = proposal.width
+        let size = content.sizeThatFits(ProposedViewSize(width: rowWidth.map { $0 * maxFraction }, height: nil))
+        return CGSize(width: rowWidth ?? size.width, height: size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let content = subviews.first else { return }
+        let size = content.sizeThatFits(ProposedViewSize(width: bounds.width * maxFraction, height: nil))
+        let x = trailing ? bounds.maxX - size.width : bounds.minX
+        content.place(at: CGPoint(x: x, y: bounds.minY), proposal: ProposedViewSize(size))
     }
 }

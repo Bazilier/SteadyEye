@@ -27,6 +27,8 @@ enum AnthropicService {
         case rateLimited
         case aiDisabled
         case inputTooLong(maxChars: Int?)
+        /// The model declined the topic (`/draft/` only).
+        case cannotDraft
 
         // Developer-facing only. The user sees the wrapped message produced by
         // ScriptEditorView (`scripts.editor.error.formatFailed`) — these strings
@@ -42,6 +44,7 @@ enum AnthropicService {
             case .freeQuotaExhausted: return "Free quota exhausted."
             case .rateLimited: return "Rate limited. Try again later."
             case .aiDisabled: return "AI features are temporarily unavailable."
+            case .cannotDraft: return "The model declined this topic."
             case .inputTooLong(let maxChars):
                 if let maxChars {
                     return "Input too long (max \(maxChars) characters)."
@@ -70,20 +73,63 @@ enum AnthropicService {
         return parseScriptsJSON(responseText)
     }
 
+    // MARK: - Script drafts
+
+    /// Target length of a drafted script; the server maps it to a word count.
+    enum DraftLength: Int, CaseIterable, Identifiable {
+        case seconds15 = 15, seconds30 = 30, seconds60 = 60
+        var id: Int { rawValue }
+    }
+
+    /// What the video is for. Raw values are the server's closed enum (which
+    /// also accepts `youtube`; the app is about vertical video for now).
+    enum DraftKind: String, CaseIterable, Identifiable {
+        case short, sales, lesson, other
+        var id: String { rawValue }
+    }
+
+    /// Drafts a script to read aloud from a one-line topic, in the topic's
+    /// language (the app's language when the topic does not tell).
+    static func draftScript(
+        topic: String,
+        length: DraftLength,
+        kind: DraftKind
+    ) async throws -> String {
+        let responseText = try await callProxy(
+            path: "/draft/",
+            text: topic,
+            extra: ["length_sec": length.rawValue, "kind": kind.rawValue],
+            language: Bundle.main.preferredLocalizations.first
+        )
+        let trimmed = responseText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw ServiceError.emptyResponse }
+        return trimmed
+    }
+
     // MARK: - Proxy transport
 
     /// POSTs `{"text": ...}` to the backend proxy and returns the `text` field
     /// of a 200 response. The model, system prompt and token limits are fixed
-    /// server-side — this client sends the script and nothing else.
-    private static func callProxy(path: String, text: String) async throws -> String {
+    /// server-side — this client sends the script and nothing else, plus the
+    /// closed-enum options `/draft/` takes.
+    private static func callProxy(
+        path: String,
+        text: String,
+        extra: [String: Any] = [:],
+        language: String? = nil
+    ) async throws -> String {
         let url = URL(string: baseURL + path)!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 100
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(appUserId(), forHTTPHeaderField: "X-App-User-Id")
+        if let language {
+            request.setValue(language, forHTTPHeaderField: "Accept-Language")
+        }
 
-        let body: [String: Any] = ["text": text]
+        var body: [String: Any] = ["text": text]
+        body.merge(extra) { _, new in new }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let data: Data
@@ -127,6 +173,7 @@ enum AnthropicService {
         case "rate_limited":          return .rateLimited
         case "ai_disabled":           return .aiDisabled
         case "input_too_long":        return .inputTooLong(maxChars: json["max_chars"] as? Int)
+        case "cannot_draft":          return .cannotDraft
         default:                      return .httpError(status)
         }
     }
