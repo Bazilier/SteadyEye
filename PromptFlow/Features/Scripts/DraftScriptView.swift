@@ -239,7 +239,18 @@ struct DraftScriptView: View {
                 withAnimation { draft = text }
             } catch AnthropicService.ServiceError.freeQuotaExhausted {
                 AppAnalytics.log("draft_script_failed", params: ["reason": "free_quota_exhausted"])
-                finish(.paywall)
+                if OnboardingFlow.isActive {
+                    // No paywall in the middle of the guided first run.
+                    withAnimation {
+                        errorMessage = String(
+                            localized: "draft.error.quota",
+                            defaultValue: "You’ve used today’s free drafts. Write it yourself, or try again tomorrow.",
+                            comment: "Error on the draft-a-script screen when the free daily drafts are used up during onboarding."
+                        )
+                    }
+                } else {
+                    finish(.paywall)
+                }
             } catch AnthropicService.ServiceError.cannotDraft {
                 AppAnalytics.log("draft_script_failed", params: ["reason": "cannot_draft"])
                 withAnimation {

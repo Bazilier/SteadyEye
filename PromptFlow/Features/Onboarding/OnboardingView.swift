@@ -58,6 +58,7 @@ struct OnboardingView: View {
                 didLogStart = true
                 AppAnalytics.log("onboarding_started")
             }
+            OnboardingFlow.start()
         }
         .onChange(of: stage) { _, newStage in
             switch newStage {

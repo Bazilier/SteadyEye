@@ -1958,7 +1958,9 @@ struct RecordingView: View {
             player.pause()
             // Stay on current chunk — do not reset
         } else {
-            guard SubscriptionManager.shared.canRecord else {
+            // The guided first run shows value before any paywall, hard
+            // paywall mode included.
+            guard SubscriptionManager.shared.canRecord || OnboardingFlow.isActive else {
                 showPaywall = true
                 return
             }

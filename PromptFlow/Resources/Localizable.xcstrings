@@ -1373,6 +1373,36 @@
         }
       }
     },
+    "draft.error.quota" : {
+      "comment" : "Error on the draft-a-script screen when the free daily drafts are used up during onboarding.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve used today’s free drafts. Write it yourself, or try again tomorrow."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste los borradores gratis de hoy. Escríbelo tú o inténtalo mañana."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já usou os rascunhos grátis de hoje. Escreva você mesmo ou tente amanhã."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатные черновики на сегодня закончились. Напишите сами или попробуйте завтра."
+          }
+        }
+      }
+    },
     "draft.error.topic" : {
       "comment" : "Error on the draft-a-script screen when the AI declines the topic.",
       "extractionState" : "manual",

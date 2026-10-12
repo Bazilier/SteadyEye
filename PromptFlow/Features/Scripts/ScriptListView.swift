@@ -37,6 +37,8 @@ struct ScriptListView: View {
     @State private var editorMode: EditorMode?
     /// "What's your video about?", offered after the first take.
     @State private var showDraftScript = false
+    /// The draft sheet closed through one of its outcomes, not the X.
+    @State private var draftOutcomeTaken = false
     @State private var scriptToRecord: Script?
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
@@ -176,7 +178,12 @@ struct ScriptListView: View {
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
             }
-            .sheet(isPresented: $showDraftScript) {
+            .sheet(isPresented: $showDraftScript, onDismiss: {
+                // Closed without an outcome: the user declined the own
+                // script, so the guided run is over.
+                if !draftOutcomeTaken { OnboardingFlow.finish(reason: "declined_draft") }
+                draftOutcomeTaken = false
+            }) {
                 DraftScriptView(onFinish: handleDraftOutcome)
                     // Burned once it is really on screen, so an offer that
                     // never got shown is retried.
@@ -478,10 +485,13 @@ struct ScriptListView: View {
                 if subscriptionManager.isSubscribed
                     || defaults.bool(forKey: "postFirstOwnRecordingPaywallShown") {
                     defaults.set(false, forKey: "ownTakePaywallDue")
-                } else if PromptArbiter.shared.canPresent(.firstOwnRecordingPaywall) {
+                    OnboardingFlow.finish(reason: subscriptionManager.isSubscribed ? "subscribed" : "paywall_already_shown")
+                } else if PromptArbiter.shared.canPresent(.onboardingPaywall) {
                     defaults.set(false, forKey: "ownTakePaywallDue")
                     defaults.set(true, forKey: "postFirstOwnRecordingPaywallShown")
-                    PromptArbiter.shared.didPresent(.firstOwnRecordingPaywall)
+                    PromptArbiter.shared.didPresent(.onboardingPaywall)
+                    // The flow's planned end: ordinary prompts may run again.
+                    OnboardingFlow.finish(reason: "paywall")
                     paywallPresentation = PaywallPresentation(source: "first_own_take")
                     return
                 } else {
@@ -497,6 +507,7 @@ struct ScriptListView: View {
 
     /// Where the draft screen hands off, once its sheet is down.
     private func handleDraftOutcome(_ outcome: DraftScriptView.Outcome) {
+        draftOutcomeTaken = true
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 450_000_000)
             switch outcome {

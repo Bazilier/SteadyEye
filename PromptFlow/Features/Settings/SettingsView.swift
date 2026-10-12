@@ -24,6 +24,8 @@ struct SettingsView: View {
     @AppStorage("fmv_enabled") private var fmvEnabled: Bool = false
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
+    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
@@ -41,8 +43,7 @@ struct SettingsView: View {
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
-    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
-    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
+    @State private var devConfirmFreshInstall = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -408,17 +409,16 @@ struct SettingsView: View {
 
                 #if DEV
                 Section("Debug") {
-                    Button("Replay onboarding") {
-                        // ContentView presents onboarding while this is false.
-                        // The rest makes the next take count as the first one.
-                        UserDefaults.standard.set(false, forKey: "hasCompletedFirstRecording")
-                        UserDefaults.standard.set(false, forKey: "ownTakePaywallDue")
-                        UserDefaults.standard.set(false, forKey: "postFirstOwnRecordingPaywallShown")
-                        UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
-                        UserDefaults.standard.set(false, forKey: "hasSeenCameraExplainer")
-                        UserDefaults.standard.set(0, forKey: "cameraOpenCount")
-                        UserDefaults.standard.set(false, forKey: "ownTakeCoachPending")
-                        UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
+                    Button("Reset to new install (replays onboarding)", role: .destructive) {
+                        devConfirmFreshInstall = true
+                    }
+                    .alert("Reset to a new install?", isPresented: $devConfirmFreshInstall) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Erase everything and quit", role: .destructive) {
+                            DevReset.resetToFreshInstallAndQuit()
+                        }
+                    } message: {
+                        Text("Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay.")
                     }
                     Picker("Subscription Override", selection: $subscriptionManager.devSubscriptionOverride) {
                         Text("Off (use RC)").tag("off")
