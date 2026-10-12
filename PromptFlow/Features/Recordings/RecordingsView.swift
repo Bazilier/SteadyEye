@@ -171,7 +171,7 @@ struct RecordingsView: View {
                 // The same file the card shows; read, not regenerated.
                 poster: recording.thumbnailURL.flatMap { UIImage(contentsOfFile: $0.path) }
             )
-            .previewZoomTransition(id: recording.id, in: previewZoom)
+            .cardZoomTransition(id: recording.id, in: previewZoom)
             .onPresentationComplete { cardOpener.resetCard() }
         }
         .onChange(of: playingRecording) { _, recording in
@@ -275,7 +275,7 @@ struct RecordingsView: View {
                                 // The zoom source sits inside the press scale,
                                 // so the zoom starts from the pressed frame.
                                 RecordingThumbnailCard(recording: recording)
-                                    .previewZoomSource(id: recording.id, in: previewZoom)
+                                    .cardZoomSource(id: recording.id, in: previewZoom)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(CardPressStyle(id: recording.id, opener: cardOpener))
@@ -357,33 +357,6 @@ struct RecordingsView: View {
                     ])
                 }
             }
-        }
-    }
-}
-
-// MARK: - Zoom transition
-
-private extension View {
-    /// iOS 18+: the card the preview zooms out of, clipped to the card shape.
-    @ViewBuilder
-    func previewZoomSource(id: UUID, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            matchedTransitionSource(id: id, in: namespace) { source in
-                source.clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
-            }
-        } else {
-            self
-        }
-    }
-
-    /// iOS 18+: the preview zooms in from its card; iOS 17 keeps the default
-    /// full-screen cover transition.
-    @ViewBuilder
-    func previewZoomTransition(id: UUID, in namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            navigationTransition(.zoom(sourceID: id, in: namespace))
-        } else {
-            self
         }
     }
 }

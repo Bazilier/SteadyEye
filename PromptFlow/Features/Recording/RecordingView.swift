@@ -442,6 +442,9 @@ struct RecordingView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        // Only the close button closes the camera screen: no swipe-down,
+        // edge pan or pinch from the zoom transition.
+        .interactiveDismissDisabled(true)
         .withRecordingToasts(
             showAudioToast: $showAudioToast,
             showResolutionToast: $showResolutionToast,

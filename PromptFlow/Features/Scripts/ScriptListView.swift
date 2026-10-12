@@ -40,6 +40,8 @@ struct ScriptListView: View {
     /// `CardPressStyle`).
     @State private var cardOpener = CardOpener()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Zoom from a card into the recording screen (iOS 18+).
+    @Namespace private var recordZoom
     @State private var showBulkImport = false
     @State private var paywallPresentation: PaywallPresentation?
     /// Captured at tap time and passed into BulkImportView so the
@@ -174,6 +176,7 @@ struct ScriptListView: View {
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
+                    .cardZoomTransition(id: script.id, in: recordZoom)
                     .onPresentationComplete { cardOpener.resetCard() }
             }
             .onChange(of: scriptToRecord) { _, script in
@@ -362,6 +365,9 @@ struct ScriptListView: View {
                                     .fill(Color(.secondarySystemGroupedBackground))
                             )
                             .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                            // Inside the press scale, so the zoom starts from
+                            // the pressed frame.
+                            .cardZoomSource(id: script.id, in: recordZoom)
                         }
                         .buttonStyle(CardPressStyle(id: script.id, opener: cardOpener))
                         .disabled(cardOpener.pendingID != nil)
