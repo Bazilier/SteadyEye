@@ -1883,6 +1883,36 @@
         }
       }
     },
+    "draft.use" : {
+      "comment" : "Primary button after a script was drafted from the editor: put the draft into the editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use this script"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar este guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar este roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовать этот текст"
+          }
+        }
+      }
+    },
     "draft.write_myself" : {
       "comment" : "Button on the draft-a-script screen: open an empty script editor.",
       "extractionState" : "manual",
@@ -8016,6 +8046,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Отбросить изменения?"
+          }
+        }
+      }
+    },
+    "scripts.editor.draft" : {
+      "comment" : "Large bottom button in an empty script editor: drafts the script from a topic.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft with AI"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir con IA"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever com IA"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Написать с AI"
           }
         }
       }

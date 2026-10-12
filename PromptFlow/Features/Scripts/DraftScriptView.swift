@@ -6,15 +6,25 @@ import SwiftData
 /// the one thing to do with it is record it. Few decisions on purpose:
 /// another version and writing it yourself are quiet links.
 struct DraftScriptView: View {
+    /// After onboarding the draft becomes a script to record; from the editor
+    /// it goes back into the editor's fields.
+    enum Purpose {
+        case record
+        case insert
+    }
+
     enum Outcome {
         /// Saved; record it now.
         case record(Script)
+        /// For the editor: the draft and a title from its topic. Not saved.
+        case insert(title: String, text: String)
         /// Open an empty editor.
         case writeMyself
         /// Free drafts are used up for today.
         case paywall
     }
 
+    var purpose: Purpose = .record
     let onFinish: (Outcome) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -60,7 +70,7 @@ struct DraftScriptView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { AppAnalytics.log("draft_script_shown") }
+        .onAppear { AppAnalytics.log("draft_script_shown", params: ["purpose": purposeName]) }
     }
 
     // MARK: - Form
@@ -175,13 +185,29 @@ struct DraftScriptView: View {
         VStack(spacing: 10) {
             if let draft {
                 Button {
-                    AppAnalytics.log("draft_script_record_tapped")
-                    finish(.record(save(content: draft)))
+                    switch purpose {
+                    case .record:
+                        AppAnalytics.log("draft_script_record_tapped")
+                        finish(.record(save(content: draft)))
+                    case .insert:
+                        AppAnalytics.log("draft_script_use_tapped")
+                        finish(.insert(title: scriptTitle(for: draft), text: draft))
+                    }
                 } label: {
-                    Label(
-                        String(localized: "draft.record", defaultValue: "Record it", comment: "Primary button after a script was drafted: save it and open the camera."),
-                        systemImage: "record.circle"
-                    )
+                    Group {
+                        switch purpose {
+                        case .record:
+                            Label(
+                                String(localized: "draft.record", defaultValue: "Record it", comment: "Primary button after a script was drafted: save it and open the camera."),
+                                systemImage: "record.circle"
+                            )
+                        case .insert:
+                            Label(
+                                String(localized: "draft.use", defaultValue: "Use this script", comment: "Primary button after a script was drafted from the editor: put the draft into the editor."),
+                                systemImage: "checkmark"
+                            )
+                        }
+                    }
                     .frame(maxWidth: .infinity)
                 }
                 .primaryButtonStyle()
@@ -209,11 +235,14 @@ struct DraftScriptView: View {
                 }
                 .primaryButtonStyle()
                 .disabled(trimmedTopic.isEmpty || isDrafting)
-                quietLink(String(localized: "draft.write_myself", defaultValue: "Write it myself", comment: "Button on the draft-a-script screen: open an empty script editor.")) {
-                    AppAnalytics.log("draft_script_write_myself_tapped")
-                    finish(.writeMyself)
+                // From the editor, writing it yourself is just closing this.
+                if purpose == .record {
+                    quietLink(String(localized: "draft.write_myself", defaultValue: "Write it myself", comment: "Button on the draft-a-script screen: open an empty script editor.")) {
+                        AppAnalytics.log("draft_script_write_myself_tapped")
+                        finish(.writeMyself)
+                    }
+                    .disabled(isDrafting)
                 }
-                .disabled(isDrafting)
             }
         }
         .padding(.horizontal, 24)
@@ -229,7 +258,7 @@ struct DraftScriptView: View {
         topicFocused = false
         errorMessage = nil
         isDrafting = true
-        AppAnalytics.log("draft_script_requested", params: ["kind": kind.rawValue, "length_sec": length.rawValue])
+        AppAnalytics.log("draft_script_requested", params: ["kind": kind.rawValue, "length_sec": length.rawValue, "purpose": purposeName])
         let topic = trimmedTopic, kind = kind, length = length
         Task {
             defer { isDrafting = false }
@@ -275,12 +304,18 @@ struct DraftScriptView: View {
         }
     }
 
-    /// Saves a script titled after the topic, or after its own first words.
-    private func save(content: String) -> Script {
+    private var purposeName: String { purpose == .record ? "record" : "insert" }
+
+    /// The topic, or the script's own first words, as a title.
+    private func scriptTitle(for content: String) -> String {
         let source = trimmedTopic.isEmpty ? content : trimmedTopic
         let firstLine = source.split(whereSeparator: \.isNewline).first.map(String.init) ?? source
-        let title = firstLine.count > 60 ? String(firstLine.prefix(60)) + "…" : firstLine
-        let script = Script(title: title, content: content)
+        return firstLine.count > 60 ? String(firstLine.prefix(60)) + "…" : firstLine
+    }
+
+    /// Saves a script titled after the topic, or after its own first words.
+    private func save(content: String) -> Script {
+        let script = Script(title: scriptTitle(for: content), content: content)
         modelContext.insert(script)
         try? modelContext.save()
         AppAnalytics.log("draft_script_saved")

@@ -512,6 +512,7 @@ struct ScriptListView: View {
             try? await Task.sleep(nanoseconds: 450_000_000)
             switch outcome {
             case .record(let script): scriptToRecord = script
+            case .insert: break
             case .writeMyself: editorMode = .new
             case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")
             }

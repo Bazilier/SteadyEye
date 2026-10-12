@@ -18,6 +18,8 @@ struct ScriptEditorView: View {
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showProDailyLimitAlert = false
     @State private var showEditorTip = false
+    /// "What's your video about?" in insert mode, for an empty editor.
+    @State private var showDraftSheet = false
     @AppStorage("hasSeenEditorTip") private var hasSeenEditorTip = false
     @State private var didLogOpen = false
     @AppStorage("hasSavedFirstScript") private var hasSavedFirstScript = false
@@ -118,13 +120,37 @@ struct ScriptEditorView: View {
 
                 // Large bottom CTA. Always visible — both demo and
                 // normal flows. Visual style matches BulkImportView's
-                // Import & Optimize button.
-                optimizeCTA
+                // Import & Optimize button. With nothing to optimize yet,
+                // it offers to draft the script instead.
+                if showsDraftCTA {
+                    draftCTA
+                } else {
+                    optimizeCTA
+                }
             }
             .navigationTitle(Text(
                 isNew ? "scripts.new" : "scripts.editor.title.edit",
                 comment: "Editor nav title — 'scripts.new' for new script, 'scripts.editor.title.edit' for existing"
             ))
+            // Lives here, not on the CTA: filling the editor removes the CTA.
+            .sheet(isPresented: $showDraftSheet) {
+                DraftScriptView(purpose: .insert) { outcome in
+                    switch outcome {
+                    case .insert(let draftTitle, let text):
+                        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            title = draftTitle
+                        }
+                        content = text
+                    case .paywall:
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 450_000_000)
+                            paywallPresentation = PaywallPresentation(source: "ai_draft")
+                        }
+                    case .record, .writeMyself:
+                        break
+                    }
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -336,7 +362,9 @@ struct ScriptEditorView: View {
             ))
                 .foregroundStyle(charCountColor)
             Spacer()
-            aiOptimizeCaption
+            // The optimize allowance; beside the draft button it would read
+            // as the draft's.
+            if !showsDraftCTA { aiOptimizeCaption }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -360,6 +388,37 @@ struct ScriptEditorView: View {
     /// that has not committed to trial behaves as freemium.
     private var trialRestrictionsApply: Bool {
         PaywallConfig.persistedMode == .trial && !subscriptionManager.isSubscribed
+    }
+
+    // MARK: - Draft CTA
+
+    /// Too little text to optimize, and not the editor demo: draft instead.
+    private var showsDraftCTA: Bool {
+        !isDemoMode && content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10
+    }
+
+    private var draftCTA: some View {
+        Button {
+            AppAnalytics.log("editor_draft_tapped")
+            contentFocused = false
+            titleFocused = false
+            showDraftSheet = true
+        } label: {
+            Label {
+                Text(String(
+                    localized: "scripts.editor.draft",
+                    defaultValue: "Draft with AI",
+                    comment: "Large bottom button in an empty script editor: drafts the script from a topic."
+                ))
+            } icon: {
+                Image(systemName: "sparkles")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .primaryButtonStyle()
+        .tint(Theme.accent)
+        .padding(.horizontal)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Optimize CTA
