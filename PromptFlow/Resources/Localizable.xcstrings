@@ -2293,6 +2293,246 @@
         }
       }
     },
+    "onboarding.style.anchor.detail" : {
+      "comment" : "Onboarding reading-style toggle detail: what the anchor letter does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An orange letter marks where to look, so your eyes stay still."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una letra naranja marca dónde mirar, así tus ojos no se mueven."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma letra laranja marca onde olhar, para seus olhos ficarem parados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оранжевая буква показывает, куда смотреть, — глаза не бегают."
+          }
+        }
+      }
+    },
+    "onboarding.style.anchor.title" : {
+      "comment" : "Onboarding reading-style toggle: align words on a highlighted anchor letter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anchor letter"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letra ancla"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letra-âncora"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якорная буква"
+          }
+        }
+      }
+    },
+    "onboarding.style.classic.detail" : {
+      "comment" : "Onboarding reading-style option detail for the 3-line mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The word you’re on, with the one before and after. Easiest to start."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La palabra actual, con la anterior y la siguiente. Lo más fácil para empezar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A palavra atual, com a anterior e a próxima. O mais fácil para começar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текущее слово, предыдущее и следующее. Проще всего для начала."
+          }
+        }
+      }
+    },
+    "onboarding.style.classic.title" : {
+      "comment" : "Onboarding reading-style option: the 3-line prompter mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Three lines"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tres líneas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Três linhas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Три строки"
+          }
+        }
+      }
+    },
+    "onboarding.style.subtitle" : {
+      "comment" : "Subtitle of the onboarding reading-style step.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change this later on the camera and in Settings."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedes cambiarlo luego en la cámara y en Ajustes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você pode mudar isso depois na câmera e nos Ajustes."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это можно поменять потом на камере и в настройках."
+          }
+        }
+      }
+    },
+    "onboarding.style.title" : {
+      "comment" : "Title of the onboarding step where the user picks the prompter mode and the anchor letter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How do you like to read?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Cómo prefieres leer?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como você prefere ler?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как вам удобнее читать?"
+          }
+        }
+      }
+    },
+    "onboarding.style.wbw.detail" : {
+      "comment" : "Onboarding reading-style option detail for the word-by-word mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One word at a time, right under the lens. The closest eye contact."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una palabra a la vez, justo debajo de la cámara. El contacto visual más cercano."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma palavra por vez, logo abaixo da câmera. O contato visual mais próximo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По одному слову прямо под камерой. Самый точный взгляд в камеру."
+          }
+        }
+      }
+    },
+    "onboarding.style.wbw.title" : {
+      "comment" : "Onboarding reading-style option: the one-word-at-a-time prompter mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Word by word"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palabra por palabra"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palavra por palavra"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "По слову"
+          }
+        }
+      }
+    },
     "onboarding.welcome.body" : {
       "comment" : "Body text under the headline of the first onboarding screen.",
       "extractionState" : "manual",

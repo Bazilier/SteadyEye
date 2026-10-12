@@ -6,6 +6,9 @@ import UIKit
 enum OnboardingStage {
     /// The product at a glance: the real prompter pill under the lens.
     case welcome
+    /// One word or three lines, anchor letter or not — saved as the
+    /// prompter's own settings.
+    case readingStyle
     /// What we are about to ask for, right before the system prompts.
     case access
     case permissionExplainer
@@ -19,6 +22,10 @@ struct OnboardingView: View {
     /// Reset to false by ScriptListView after consumption.
     @AppStorage("pendingDemoRecording") private var pendingDemoRecording: Bool = false
     @State private var stage: OnboardingStage = .welcome
+    /// The prompter's own settings, written live so the pill previews them.
+    @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
+    @State private var didDefaultReadingStyle = false
     @State private var cameraGranted: Bool = false
     @State private var micGranted: Bool = false
     @State private var photosGranted: Bool = false
@@ -31,6 +38,9 @@ struct OnboardingView: View {
             case .welcome:
                 welcomeView
                     .transition(.opacity)
+            case .readingStyle:
+                readingStyleView
+                    .transition(.opacity)
             case .access:
                 accessView
                     .transition(.opacity)
@@ -41,7 +51,7 @@ struct OnboardingView: View {
         .animation(.easeInOut(duration: 0.25), value: stage)
         // Welcome shows the pill where it sits on the camera, whose screen
         // hides the status bar; the clock would collide with the pill's eye.
-        .statusBarHidden(stage == .welcome)
+        .statusBarHidden(stage == .welcome || stage == .readingStyle)
         .preferredColorScheme(.dark)
         .onAppear {
             if !didLogStart {
@@ -51,6 +61,8 @@ struct OnboardingView: View {
         }
         .onChange(of: stage) { _, newStage in
             switch newStage {
+            case .readingStyle:
+                AppAnalytics.log("onboarding_reading_style_shown")
             case .access:
                 AppAnalytics.log("onboarding_access_shown")
             case .permissionExplainer:
@@ -65,14 +77,7 @@ struct OnboardingView: View {
 
     private var welcomeView: some View {
         ZStack(alignment: .top) {
-            // Lighter at the top than `backgroundGradient`, so the black pill
-            // reads against it the way it does against a camera image.
-            LinearGradient(
-                colors: [Color(white: 0.16), Color(red: 0.1, green: 0.04, blue: 0)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            pillBackdrop
             OnboardingPrompterPill(phrase: String(
                 localized: "onboarding.welcome.pill_phrase",
                 defaultValue: "Read your script and keep your eyes on the camera",
@@ -119,7 +124,7 @@ struct OnboardingView: View {
                 Spacer()
                 Button {
                     AppAnalytics.log("onboarding_continue_tapped")
-                    stage = .access
+                    stage = .readingStyle
                 } label: {
                     Text("Continue")
                         .frame(maxWidth: .infinity)
@@ -139,6 +144,136 @@ struct OnboardingView: View {
             // Clear of the pill: cutout band plus its three rows.
             .padding(.top, 180)
         }
+    }
+
+    /// Lighter at the top than `backgroundGradient`, so the black pill reads
+    /// against it the way it does against a camera image.
+    private var pillBackdrop: some View {
+        LinearGradient(
+            colors: [Color(white: 0.16), Color(red: 0.1, green: 0.04, blue: 0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    private var readingStyleView: some View {
+        ZStack(alignment: .top) {
+            pillBackdrop
+            OnboardingPrompterPill(
+                phrase: String(
+                    localized: "onboarding.welcome.pill_phrase",
+                    defaultValue: "Read your script and keep your eyes on the camera",
+                    comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
+                ),
+                isClassicMode: displayMode == "classic"
+            )
+            VStack(alignment: .leading, spacing: 14) {
+                Spacer()
+                Text(String(
+                    localized: "onboarding.style.title",
+                    defaultValue: "How do you like to read?",
+                    comment: "Title of the onboarding step where the user picks the prompter mode and the anchor letter."
+                ))
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "onboarding.style.subtitle",
+                    defaultValue: "You can change this later on the camera and in Settings.",
+                    comment: "Subtitle of the onboarding reading-style step."
+                ))
+                    .font(.body)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 6)
+
+                styleOption(
+                    mode: "classic",
+                    title: String(localized: "onboarding.style.classic.title", defaultValue: "Three lines", comment: "Onboarding reading-style option: the 3-line prompter mode."),
+                    detail: String(localized: "onboarding.style.classic.detail", defaultValue: "The word you’re on, with the one before and after. Easiest to start.", comment: "Onboarding reading-style option detail for the 3-line mode.")
+                )
+                styleOption(
+                    mode: "wbw",
+                    title: String(localized: "onboarding.style.wbw.title", defaultValue: "Word by word", comment: "Onboarding reading-style option: the one-word-at-a-time prompter mode."),
+                    detail: String(localized: "onboarding.style.wbw.detail", defaultValue: "One word at a time, right under the lens. The closest eye contact.", comment: "Onboarding reading-style option detail for the word-by-word mode.")
+                )
+
+                Toggle(isOn: $orpAlignmentEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "onboarding.style.anchor.title", defaultValue: "Anchor letter", comment: "Onboarding reading-style toggle: align words on a highlighted anchor letter."))
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text(String(localized: "onboarding.style.anchor.detail", defaultValue: "An orange letter marks where to look, so your eyes stay still.", comment: "Onboarding reading-style toggle detail: what the anchor letter does."))
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Theme.accent)
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
+
+                Spacer()
+                Button {
+                    AppAnalytics.log("onboarding_reading_style_chosen", params: [
+                        "display_mode": displayMode,
+                        "anchor": orpAlignmentEnabled
+                    ])
+                    stage = .access
+                } label: {
+                    Text("Continue")
+                        .frame(maxWidth: .infinity)
+                }
+                .primaryButtonStyle()
+                .padding(.bottom, 16)
+            }
+            .padding(.horizontal, 24)
+            // Clear of the pill: cutout band plus its three rows.
+            .padding(.top, 180)
+        }
+        .onAppear {
+            // Three lines is the new-user default: it shows the next word,
+            // which the eyes want before the voice gets there.
+            guard !didDefaultReadingStyle else { return }
+            didDefaultReadingStyle = true
+            displayMode = "classic"
+        }
+    }
+
+    private func styleOption(mode: String, title: String, detail: String) -> some View {
+        let isSelected = displayMode == mode
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { displayMode = mode }
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Theme.accent : Color.white.opacity(0.3))
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    .fill(isSelected ? Theme.accent.opacity(0.14) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var accessView: some View {
