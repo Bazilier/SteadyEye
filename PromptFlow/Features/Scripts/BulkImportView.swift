@@ -79,21 +79,18 @@ struct BulkImportView: View {
                         editorView
                     }
                 }
-
-                if showExplainer {
-                    ExplainerOverlay(
-                        isPresented: $showExplainer,
-                        icon: "doc.on.doc",
-                        title: "scripts.import.explainer.title",
-                        message: "scripts.import.explainer.body",
-                        buttonLabel: "scripts.import.explainer.button",
-                        onDismiss: {
-                            hasSeenBulkImportExplainer = true
-                            AppAnalytics.log("bulk_import_explainer_dismissed")
-                        }
-                    )
-                }
             }
+            .coachSheet(
+                isPresented: $showExplainer,
+                icon: "doc.on.doc",
+                title: "scripts.import.explainer.title",
+                message: "scripts.import.explainer.body",
+                buttonLabel: "scripts.import.explainer.button",
+                onDismiss: {
+                    hasSeenBulkImportExplainer = true
+                    AppAnalytics.log("bulk_import_explainer_dismissed")
+                }
+            )
             .navigationTitle(Text("scripts.import.navTitle", comment: "Bulk import sheet nav title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

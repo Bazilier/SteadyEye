@@ -270,31 +270,25 @@ struct ScriptEditorView: View {
                 AppAnalytics.log("editor_demo_cancelled")
             }
         }
-        .overlay {
-            if showEditorTip {
-                ExplainerOverlay(
-                    isPresented: $showEditorTip,
-                    icon: "lightbulb",
-                    title: "common.tip.title",
-                    message: "scripts.editor.tip.body",
-                    buttonLabel: "common.tip.gotIt",
-                    onDismiss: {
-                        hasSeenEditorTip = true
-                        // Focus the editor on the next runloop tick so
-                        // SwiftUI's overlay-unmount commit doesn't
-                        // collide with the focus state change. New
-                        // scripts (no `script`) are the only opens
-                        // that benefit; existing-script edits don't
-                        // auto-focus content in either branch.
-                        if isNew {
-                            Task { @MainActor in
-                                contentFocused = true
-                            }
-                        }
+        .coachSheet(
+            isPresented: $showEditorTip,
+            icon: "lightbulb",
+            title: "common.tip.title",
+            message: "scripts.editor.tip.body",
+            buttonLabel: "common.tip.gotIt",
+            onDismiss: {
+                hasSeenEditorTip = true
+                // Runs once the tip's sheet is gone, so focusing the editor
+                // does not fight the dismissal. New scripts (no `script`)
+                // are the only opens that benefit; existing-script edits
+                // don't auto-focus content in either branch.
+                if isNew {
+                    Task { @MainActor in
+                        contentFocused = true
                     }
-                )
+                }
             }
-        }
+        )
     }
 
     // MARK: - Stats bar

@@ -90,7 +90,11 @@ struct RecordingView: View {
     /// is consumed in ScriptListView before this view mounts, so
     /// `script.isDemo` is the only signal that survives down here).
     @AppStorage("hasSeenCameraExplainer") private var hasSeenCameraExplainer: Bool = false
-    @State private var showCameraExplainer: Bool = false
+    /// Ordinary camera opens (the onboarding demo not counted). The tip on
+    /// moving the text waits for the third: by then the user has recorded and
+    /// has a reason to care where the text sits.
+    @AppStorage("cameraOpenCount") private var cameraOpenCount: Int = 0
+    @State private var showDragTip = false
 
     /// Orientation this screen renders in, read ONCE when the view is first
     /// created so the very first frame is already correct: the user opens the
@@ -359,6 +363,7 @@ struct RecordingView: View {
                 gazeAttention.beginTake()
                 firstTakeFlowActive = false
                 showFirstTakeCoach = false
+                showDragTip = false
             } else {
                 stopFMV()
                 lastTakeGaze = gazeAttention.endTake()
@@ -496,17 +501,22 @@ struct RecordingView: View {
         } message: {
             Text("recording.mic_alert.body", comment: "Body of the alert shown when the user taps record but mic permission is denied")
         }
-        .overlay {
-            if showCameraExplainer {
-                ExplainerOverlay(
-                    isPresented: $showCameraExplainer,
-                    icon: "hand.point.up.left",
-                    title: "common.tip.title",
-                    message: "scripts.recording.tip.body",
-                    buttonLabel: "common.tip.gotIt",
-                    onDismiss: { hasSeenCameraExplainer = true }
-                )
+        // The pill stays usable under it: trying the drag is the point, and
+        // the first drag closes it.
+        .coachSheet(
+            isPresented: $showDragTip,
+            icon: "hand.point.up.left",
+            title: "common.tip.title",
+            message: "scripts.recording.tip.body",
+            buttonLabel: "common.tip.gotIt",
+            allowsBackgroundInteraction: true,
+            onDismiss: {
+                hasSeenCameraExplainer = true
+                AppAnalytics.log("drag_tip_dismissed")
             }
+        )
+        .onChange(of: isTextEditMode) { _, editing in
+            if editing, showDragTip { showDragTip = false }
         }
         .onAppear {
             let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
@@ -520,11 +530,16 @@ struct RecordingView: View {
                     AppAnalytics.log("first_take_coach_shown")
                 }
             }
-            guard cameraAuthStatus == .authorized,
-                  !wasOnboardingAuto,
-                  !hasSeenCameraExplainer
-            else { return }
-            showCameraExplainer = true
+            guard cameraAuthStatus == .authorized, !wasOnboardingAuto else { return }
+            cameraOpenCount += 1
+            // Portrait only, like the coach: the interface is portrait-locked.
+            guard cameraOpenCount >= 3, !hasSeenCameraExplainer, !isLandscape else { return }
+            // After the pill has expanded, so the tip points at something.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                guard !cameraManager.isRecording, !isCountingDown else { return }
+                showDragTip = true
+                AppAnalytics.log("drag_tip_shown", params: ["camera_open": cameraOpenCount])
+            }
         }
     }
 
