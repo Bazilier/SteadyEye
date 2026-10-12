@@ -54,6 +54,9 @@ final class PlaybackController: ObservableObject {
     /// the periodic time observer to suppress `currentTime` writes
     /// during a drag.
     @Published var isScrubbing: Bool = false
+    /// True once the take has played through to its last frame — the
+    /// moment the user has actually watched it.
+    @Published private(set) var didPlayToEnd: Bool = false
 
     private var timeObserverToken: Any?
     private var endObserver: NSObjectProtocol?
@@ -73,6 +76,7 @@ final class PlaybackController: ObservableObject {
     /// Idempotent only insofar as the caller pairs each `setup` with
     /// a `teardown` — calling twice without teardown leaks observers.
     func setup(url: URL, initialDuration: TimeInterval) {
+        didPlayToEnd = false
         duration = initialDuration
         currentTime = 0
         isPlaying = false
@@ -103,6 +107,7 @@ final class PlaybackController: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             self.player?.pause()
+            self.didPlayToEnd = true
             // The periodic observer above ticks at 1/30s, so its last
             // tick before the end can land just short of `duration` and
             // leave the thumb inside the track on a finished video.

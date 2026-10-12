@@ -45,6 +45,7 @@ struct SettingsView: View {
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
     @State private var devConfirmFreshInstall = false
     @State private var devShowSatisfactionPrompt = false
+    @AppStorage("dev_review_prompt_enabled") private var devReviewPromptEnabled = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
     /// `onDismiss`, never stacked on top of it.
@@ -451,9 +452,14 @@ struct SettingsView: View {
                     Button("Preview Satisfaction Prompt") {
                         devShowSatisfactionPrompt = true
                     }
+                    // Remote Config is off in DEV, and its default keeps the
+                    // prompt off: this stands in for review_prompt_enabled=on.
+                    Toggle("Satisfaction prompt enabled (stands in for RC)", isOn: $devReviewPromptEnabled)
+                        .tint(Theme.accent)
                     Button("Reset satisfaction prompt state") {
                         UserDefaults.standard.removeObject(forKey: "satisfactionPromptAnsweredYes")
                         UserDefaults.standard.removeObject(forKey: "satisfactionPromptLastShownAt")
+                        UserDefaults.standard.removeObject(forKey: "satisfactionExportedAt")
                     }
                     HStack {
                         Text("AI optimize used today")
@@ -707,6 +713,8 @@ struct SettingsView: View {
                 devShowFounderChat = true
             }) {
                 SatisfactionPromptView(
+                    trigger: .greatTake,
+                    eyeContactPercent: 92,
                     onYes: { ReviewPromptManager.openWriteReviewPage() },
                     onNo: { devPendingFounderChat = true }
                 )

@@ -32,6 +32,9 @@ struct VideoPreviewView: View {
     /// Set only for the user's very first take: shows the result sheet over
     /// the preview (see `FirstTakeResultSheet`).
     var firstTakeResult: FirstTakeResult? = nil
+    /// Eye contact over the take just recorded, 0...1; nil when it was not
+    /// tracked or the preview was opened from the Recordings tab.
+    var takeEyeContact: Double? = nil
     /// The result sheet's main action: leave and write an own script.
     var onRecordOwnScript: (() -> Void)? = nil
 
@@ -65,6 +68,7 @@ struct VideoPreviewView: View {
     private var isLandscapeVideo: Bool { frameSize.width > frameSize.height }
     @State private var showPostSavePaywall = false
     @State private var showSatisfactionPrompt = false
+    @State private var satisfactionTrigger: ReviewPromptManager.Trigger = .greatTake
     @State private var showFounderChat = false
     /// Set when the user answers No, so the chat is presented from the
     /// satisfaction sheet's `onDismiss` rather than stacked on top of it.
@@ -265,6 +269,10 @@ struct VideoPreviewView: View {
             showFounderChat = true
         }) {
             SatisfactionPromptView(
+                trigger: satisfactionTrigger,
+                eyeContactPercent: satisfactionTrigger == .greatTake
+                    ? takeEyeContact.map { Int(($0 * 100).rounded()) }
+                    : nil,
                 onYes: {
                     ReviewPromptManager.noteAnsweredYes()
                     ReviewPromptManager.openWriteReviewPage()
@@ -290,6 +298,20 @@ struct VideoPreviewView: View {
         .onAppear {
             isVisible = true
             setupPlayer()
+        }
+        // The happy moment: the user just watched a take of their own script
+        // that held eye contact. Ask then, not while they are on the way out.
+        .onChange(of: playback.didPlayToEnd) { _, finished in
+            guard finished,
+                  firstTakeResult == nil,
+                  let eyeContact = takeEyeContact,
+                  eyeContact >= ReviewPromptManager.greatTakeThreshold,
+                  !showPostSavePaywall, !showSatisfactionPrompt,
+                  scenePhase == .active,
+                  ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: isUserWrittenScript)
+            else { return }
+            satisfactionTrigger = .greatTake
+            showSatisfactionPrompt = true
         }
         .onDisappear {
             isVisible = false
@@ -591,18 +613,11 @@ struct VideoPreviewView: View {
                                 pendingPostSavePaywall = true
                             }
                         }
-                    } else {
-                        // No paywall due for this save, so the same slot is the
-                        // satisfaction prompt's moment. The origin bit, the
-                        // one-shot Yes flag, the 14-day re-ask window and the
-                        // arbiter are all checked inside.
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            guard isVisible, scenePhase == .active else { return }
-                            guard ReviewPromptManager.shouldPresentSatisfactionPrompt(
-                                isUserWrittenScript: isUserWrittenScript
-                            ) else { return }
-                            showSatisfactionPrompt = true
-                        }
+                    } else if isUserWrittenScript {
+                        // No paywall due for this save. The user saved it to
+                        // share it, so don't stand in the way now: ask how it
+                        // turned out once they are back (see ScriptListView).
+                        ReviewPromptManager.noteOwnScriptExported()
                     }
                 } else {
                     AppAnalytics.log("recording_export_failed", params: [
