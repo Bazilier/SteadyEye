@@ -41,6 +41,23 @@ final class GazeAttention: ObservableObject {
     /// Set from the prompter: baseline samples are taken only while it plays.
     var isReading = false
 
+    /// Eye contact over one take.
+    struct TakeSummary: Equatable {
+        /// Share of tracked time spent looking at the lens, 0...1. Time before
+        /// the baseline exists (idle, calibrating) is not counted.
+        var lookingFraction: Double
+        /// When each look-away began, seconds into the take.
+        var awayMoments: [TimeInterval]
+    }
+
+    private var takeStart: Date?
+    private var lastTick: Date?
+    private var lookingTime: TimeInterval = 0
+    private var awayTime: TimeInterval = 0
+    private var awayMoments: [TimeInterval] = []
+    /// Below this much tracked time a percentage would mean nothing.
+    private static let minimumTrackedTime: TimeInterval = 3
+
     private weak var probe: GazeProbe?
     /// ~0.3 s median at the probe's ~10 Hz, to drop blinks and single-frame
     /// landmark jumps.
@@ -72,6 +89,36 @@ final class GazeAttention: ObservableObject {
         }
     }
 
+    func beginTake() {
+        takeStart = Date()
+        lastTick = takeStart
+        lookingTime = 0
+        awayTime = 0
+        awayMoments = []
+    }
+
+    /// Ends the take; nil when too little of it was tracked to summarise.
+    func endTake() -> TakeSummary? {
+        tick()
+        defer { takeStart = nil; lastTick = nil }
+        let tracked = lookingTime + awayTime
+        guard takeStart != nil, tracked >= Self.minimumTrackedTime else { return nil }
+        return TakeSummary(lookingFraction: lookingTime / tracked, awayMoments: awayMoments)
+    }
+
+    /// Credits the time since the last reading to the state it was spent in.
+    private func tick() {
+        guard takeStart != nil, let last = lastTick else { return }
+        let now = Date()
+        let elapsed = now.timeIntervalSince(last)
+        lastTick = now
+        switch state {
+        case .looking: lookingTime += elapsed
+        case .away: awayTime += elapsed
+        case .idle, .calibrating: break
+        }
+    }
+
     func stop() {
         probe?.stop()
         probe = nil
@@ -83,6 +130,7 @@ final class GazeAttention: ObservableObject {
     }
 
     private func ingest(_ reading: GazeProbe.Reading?) {
+        tick()
         self.reading = reading
         guard let reading, reading.eyeOpen > 0 else {
             recent.removeAll()
@@ -121,7 +169,18 @@ final class GazeAttention: ObservableObject {
             let since = awaySince ?? Date()
             awaySince = since
             if state != .away, Date().timeIntervalSince(since) >= Self.awayDelay {
-                awayOnset = since.addingTimeInterval(-Self.pipelineLag)
+                let onset = since.addingTimeInterval(-Self.pipelineLag)
+                awayOnset = onset
+                if let start = takeStart {
+                    awayMoments.append(max(0, onset.timeIntervalSince(start)))
+                }
+                // Credit the confirmation delay to away, not looking.
+                if takeStart != nil {
+                    let delay = Date().timeIntervalSince(onset)
+                    let moved = min(delay, lookingTime)
+                    lookingTime -= moved
+                    awayTime += moved
+                }
                 state = .away
             }
         } else {

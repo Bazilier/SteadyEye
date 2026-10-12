@@ -189,6 +189,13 @@ struct RecordingView: View {
     private var gazeAutoPauses: Bool { gazeAutoPauseEnabled }
     /// The onboarding demo's coach over the record button.
     @State private var showFirstTakeCoach = false
+    /// The coach is guiding this screen until the first take starts recording.
+    @State private var firstTakeFlowActive = false
+    @State private var coachAfterRehearsal = false
+    /// Eye contact over the take that just ended, for its preview.
+    @State private var lastTakeGaze: GazeAttention.TakeSummary?
+    /// The preview on screen is of the user's very first take.
+    @State private var previewIsFirstTake = false
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { displayMode == "classic" }
@@ -296,6 +303,12 @@ struct RecordingView: View {
         }
         .onChange(of: player.isPlaying) { _, playing in
             gazeAttention.isReading = playing
+            // A first-take rehearsal ran to the end: say what comes next.
+            if !playing, firstTakeFlowActive, !cameraManager.isRecording, player.progress >= 1 {
+                coachAfterRehearsal = true
+                withAnimation { showFirstTakeCoach = true }
+                AppAnalytics.log("first_take_coach_after_rehearsal_shown")
+            }
             if playing && player.currentChunkIndex < player.chunks.count {
                 animateProgressForChunk(at: player.currentChunkIndex)
             }
@@ -343,8 +356,12 @@ struct RecordingView: View {
             if recording {
                 withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
                 startFMVIfEnabled()
+                gazeAttention.beginTake()
+                firstTakeFlowActive = false
+                showFirstTakeCoach = false
             } else {
                 stopFMV()
+                lastTakeGaze = gazeAttention.endTake()
             }
         }
         .onChange(of: gazeAttention.state) { _, state in
@@ -443,7 +460,16 @@ struct RecordingView: View {
             // The origin bit on its own. The closure above fuses it with
             // subscription state and the paywall's one-shot flag, so the
             // satisfaction prompt cannot reuse that answer.
-            isUserWrittenScript: !script.isDemo && !script.isSample)
+            isUserWrittenScript: !script.isDemo && !script.isSample,
+            firstTakeResult: previewIsFirstTake
+                ? FirstTakeResult(duration: recording.duration, gaze: lastTakeGaze)
+                : nil,
+            onRecordOwnScript: {
+                // ScriptListView picks this up once the camera is gone:
+                // paywall first, then a new script.
+                UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                close()
+            })
         }
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(source: "record_button", onPurchaseSuccess: { startCountdown() })
@@ -490,6 +516,7 @@ struct RecordingView: View {
                 // Portrait only: the interface is portrait-locked, so in
                 // landscape the card would read sideways.
                 if cameraAuthStatus == .authorized, !isLandscape {
+                    firstTakeFlowActive = true
                     showFirstTakeCoach = true
                     AppAnalytics.log("first_take_coach_shown")
                 }
@@ -680,14 +707,18 @@ struct RecordingView: View {
                 GeometryReader { proxy in
                     FirstTakeCoach(
                         spotlight: anchor.map { proxy[$0] },
+                        afterRehearsal: coachAfterRehearsal,
                         onRecord: {
-                            AppAnalytics.log("first_take_coach_record_tapped")
+                            AppAnalytics.log("first_take_coach_record_tapped", params: ["after_rehearsal": coachAfterRehearsal])
+                            firstTakeFlowActive = false
                             withAnimation { showFirstTakeCoach = false }
                             toggleRecording()
                         },
                         onRehearse: {
-                            AppAnalytics.log("first_take_coach_rehearse_tapped")
+                            AppAnalytics.log("first_take_coach_rehearse_tapped", params: ["after_rehearsal": coachAfterRehearsal])
                             withAnimation { showFirstTakeCoach = false }
+                            // From the end of a rehearsal, start over.
+                            if player.progress >= 1 { resetDisplay() }
                             togglePlay()
                         },
                         onDismiss: {
@@ -1991,7 +2022,11 @@ struct RecordingView: View {
                     "was_first": wasFirst,
                     "via": "auto_persist"
                 ])
+                previewIsFirstTake = wasFirst
                 if wasFirst {
+                    // The first value moment: the paywall follows it, once,
+                    // whichever way the user leaves (see ScriptListView).
+                    UserDefaults.standard.set(true, forKey: "firstTakePaywallDue")
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())

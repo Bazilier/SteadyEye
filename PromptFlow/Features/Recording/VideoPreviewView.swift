@@ -29,8 +29,15 @@ struct VideoPreviewView: View {
     /// draws its first frame, so the zoom from the card never shows black.
     /// `nil` (the recording screen right after a take) keeps today's look.
     var poster: UIImage? = nil
+    /// Set only for the user's very first take: shows the result sheet over
+    /// the preview (see `FirstTakeResultSheet`).
+    var firstTakeResult: FirstTakeResult? = nil
+    /// The result sheet's main action: leave and write an own script.
+    var onRecordOwnScript: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
+    @State private var isResultSheetHidden = false
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
     @StateObject private var playback = PlaybackController()
@@ -130,6 +137,40 @@ struct VideoPreviewView: View {
                 topBar
                 Spacer()
             }
+
+            if let result = firstTakeResult, !isResultSheetHidden {
+                VStack {
+                    Spacer()
+                    FirstTakeResultSheet(
+                        result: result,
+                        autoPause: $gazeAutoPauseEnabled,
+                        onOwnScript: {
+                            AppAnalytics.log("take_result_own_script_tapped")
+                            onRecordOwnScript?()
+                        },
+                        onWatch: {
+                            AppAnalytics.log("take_result_watch_tapped")
+                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
+                            if !playback.isPlaying { playback.togglePlayPause() }
+                        },
+                        onSave: {
+                            AppAnalytics.log("take_result_save_tapped")
+                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
+                            handleSaveTap()
+                        }
+                    )
+                }
+                .transition(.move(edge: .bottom))
+                .onAppear {
+                    AppAnalytics.log("take_result_shown", params: [
+                        "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
+                    ])
+                }
+            }
+        }
+        .onChange(of: gazeAutoPauseEnabled) { _, enabled in
+            guard firstTakeResult != nil else { return }
+            AppAnalytics.log("take_result_autopause_toggled", params: ["enabled": enabled])
         }
         .statusBarHidden()
         .toolbar(.hidden, for: .navigationBar)

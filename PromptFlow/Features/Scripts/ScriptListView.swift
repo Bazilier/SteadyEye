@@ -181,12 +181,15 @@ struct ScriptListView: View {
             }
             .onChange(of: scriptToRecord) { _, script in
                 // Closed before the presentation completed.
-                if script == nil { cardOpener.resetCard() }
+                if script == nil {
+                    cardOpener.resetCard()
+                    continueAfterFirstTake()
+                }
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView(entryPoint: bulkImportEntryPoint)
             }
-            .fullScreenCover(item: $paywallPresentation) { presentation in
+            .fullScreenCover(item: $paywallPresentation, onDismiss: openOwnScriptIfPending) { presentation in
                 PaywallView(source: presentation.source)
             }
         }
@@ -422,6 +425,38 @@ struct ScriptListView: View {
 
     private func deleteScript(_ script: Script) {
         modelContext.delete(script)
+    }
+
+    // MARK: - After the first take
+
+    /// Runs once the camera closes. After the user's first take — the first
+    /// value moment — free users see the paywall, whichever way they left
+    /// the preview. If they chose "record your own script" there, a new
+    /// script follows (after the paywall, when there is one).
+    private func continueAfterFirstTake() {
+        let defaults = UserDefaults.standard
+        let paywallDue = defaults.bool(forKey: "firstTakePaywallDue")
+        guard paywallDue || defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") else { return }
+        defaults.set(false, forKey: "firstTakePaywallDue")
+        Task { @MainActor in
+            // Let the camera's cover finish dismissing first.
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            if paywallDue, !subscriptionManager.isSubscribed {
+                paywallPresentation = PaywallPresentation(source: "first_take")
+            } else {
+                openOwnScriptIfPending()
+            }
+        }
+    }
+
+    private func openOwnScriptIfPending() {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") else { return }
+        defaults.set(false, forKey: "pendingOwnScriptAfterFirstTake")
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            editorMode = .new
+        }
     }
 
     /// Decision tree shared by every "Import Multiple Scripts" entry

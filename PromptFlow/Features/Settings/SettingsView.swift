@@ -410,6 +410,10 @@ struct SettingsView: View {
                 Section("Debug") {
                     Button("Replay onboarding") {
                         // ContentView presents onboarding while this is false.
+                        // The rest makes the next take count as the first one.
+                        UserDefaults.standard.set(false, forKey: "hasCompletedFirstRecording")
+                        UserDefaults.standard.set(false, forKey: "firstTakePaywallDue")
+                        UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
                         UserDefaults.standard.set(false, forKey: "hasSeenCameraExplainer")
                         UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
                     }

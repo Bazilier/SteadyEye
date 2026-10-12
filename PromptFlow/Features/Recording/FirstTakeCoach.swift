@@ -15,6 +15,8 @@ struct RecordButtonBoundsKey: PreferenceKey {
 struct FirstTakeCoach: View {
     /// Record button frame in this view's coordinates; nil centres the card.
     let spotlight: CGRect?
+    /// Shown again once a rehearsal reaches the end: "now record it".
+    var afterRehearsal = false
     let onRecord: () -> Void
     let onRehearse: () -> Void
     let onDismiss: () -> Void
@@ -72,18 +74,30 @@ struct FirstTakeCoach: View {
                 .background(Theme.accent.opacity(0.16), in: Capsule())
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(String(
-                    localized: "first_take.title",
-                    defaultValue: "Tap record and read the words",
-                    comment: "Title of the first-take coach card on the camera screen."
-                ))
+                Text(afterRehearsal
+                    ? String(
+                        localized: "first_take.after.title",
+                        defaultValue: "Now record it",
+                        comment: "Title of the first-take coach card shown again after the user rehearsed the sample script to the end."
+                    )
+                    : String(
+                        localized: "first_take.title",
+                        defaultValue: "Tap record and read the words",
+                        comment: "Title of the first-take coach card on the camera screen."
+                    ))
                     .font(.title3.bold())
                     .foregroundStyle(.white)
-                Text(String(
-                    localized: "first_take.body",
-                    defaultValue: "They run right under the lens. Keep your eyes up there and the eye turns green.",
-                    comment: "Body of the first-take coach card. 'The eye' is the eye-contact indicator in the corner of the prompter pill."
-                ))
+                Text(afterRehearsal
+                    ? String(
+                        localized: "first_take.after.body",
+                        defaultValue: "Same words, same spot under the lens. The eye shows how you did.",
+                        comment: "Body of the first-take coach card after a rehearsal. 'The eye' is the eye-contact indicator on the prompter pill."
+                    )
+                    : String(
+                        localized: "first_take.body",
+                        defaultValue: "They run right under the lens. Keep your eyes up there and the eye turns green.",
+                        comment: "Body of the first-take coach card. 'The eye' is the eye-contact indicator in the corner of the prompter pill."
+                    ))
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
             }
@@ -108,11 +122,17 @@ struct FirstTakeCoach: View {
                         .background(Theme.accent, in: Capsule())
                 }
                 Button(action: onRehearse) {
-                    Text(String(
-                        localized: "first_take.rehearse",
-                        defaultValue: "Just rehearse",
-                        comment: "Secondary button on the first-take coach card: plays the prompter without recording."
-                    ))
+                    Text(afterRehearsal
+                        ? String(
+                            localized: "first_take.rehearse_again",
+                            defaultValue: "Rehearse again",
+                            comment: "Secondary button on the first-take coach card after a rehearsal: plays the sample script again without recording."
+                        )
+                        : String(
+                            localized: "first_take.rehearse",
+                            defaultValue: "Just rehearse",
+                            comment: "Secondary button on the first-take coach card: plays the prompter without recording."
+                        ))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)

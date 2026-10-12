@@ -1328,6 +1328,66 @@
     "Fire trial_started in 5s" : {
 
     },
+    "first_take.after.body" : {
+      "comment" : "Body of the first-take coach card after a rehearsal. 'The eye' is the eye-contact indicator on the prompter pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same words, same spot under the lens. The eye shows how you did."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las mismas palabras, en el mismo lugar bajo la cámara. El ojo te muestra cómo te fue."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As mesmas palavras, no mesmo lugar sob a câmera. O olho mostra como foi."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Те же слова, то же место под камерой. Глаз покажет, как получилось."
+          }
+        }
+      }
+    },
+    "first_take.after.title" : {
+      "comment" : "Title of the first-take coach card shown again after the user rehearsed the sample script to the end.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now record it"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora grábalo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora grave"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Теперь запишите"
+          }
+        }
+      }
+    },
     "first_take.body" : {
       "comment" : "Body of the first-take coach card. 'The eye' is the eye-contact indicator in the corner of the prompter pill.",
       "extractionState" : "manual",
@@ -1534,6 +1594,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Просто прогнать"
+          }
+        }
+      }
+    },
+    "first_take.rehearse_again" : {
+      "comment" : "Secondary button on the first-take coach card after a rehearsal: plays the sample script again without recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rehearse again"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensayar de nuevo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensaiar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прогнать ещё раз"
           }
         }
       }
@@ -9394,6 +9484,216 @@
     },
     "Subscription Override" : {
 
+    },
+    "take_result.autopause.body" : {
+      "comment" : "Explanation under the pause-when-you-look-away toggle on the first-take result sheet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The script waits for you and picks up on the same word."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El guion te espera y sigue desde la misma palabra."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O roteiro espera você e continua da mesma palavra."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст подождёт вас и продолжит с того же слова."
+          }
+        }
+      }
+    },
+    "take_result.away_none" : {
+      "comment" : "First-take result sheet: the user never looked away during the take.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You kept your eyes on the lens the whole time."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantuviste la mirada en la cámara todo el tiempo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você manteve o olhar na câmera o tempo todo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы всё время смотрели в камеру."
+          }
+        }
+      }
+    },
+    "take_result.away_some" : {
+      "comment" : "First-take result sheet: when the user looked away, e.g. 'You looked down at 0:04 and 0:09.' The placeholder is a localized list of m:ss times.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You looked down at %@."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Miraste hacia abajo en %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você olhou para baixo em %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вы смотрели вниз на %@."
+          }
+        }
+      }
+    },
+    "take_result.own_script" : {
+      "comment" : "Primary button on the first-take result sheet: leads to writing and recording the user's own script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now record your own script"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora graba tu propio guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora grave seu próprio roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Теперь запишите свой текст"
+          }
+        }
+      }
+    },
+    "take_result.subtitle" : {
+      "comment" : "Subtitle on the first-take result sheet: the take is already saved in the app's Recordings tab.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to Recordings"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardada en Grabaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva em Gravações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранено в «Записи»"
+          }
+        }
+      }
+    },
+    "take_result.title" : {
+      "comment" : "Title of the sheet shown over the preview of the user's very first recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nice first take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Buena primera toma!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ótima primeira gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отличный первый дубль"
+          }
+        }
+      }
+    },
+    "take_result.watch" : {
+      "comment" : "Button on the first-take result sheet: hides the sheet and plays the take.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver la toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver a gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посмотреть дубль"
+          }
+        }
+      }
     },
     "Test SpeechAnalyzer (DEV)" : {
       "comment" : "A label for a button that starts/stops the SpeechAnalyzer for development purposes.",
