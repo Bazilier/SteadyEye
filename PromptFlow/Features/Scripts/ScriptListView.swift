@@ -43,6 +43,10 @@ struct ScriptListView: View {
     @State private var showDraftScript = false
     /// The draft sheet closed through one of its outcomes, not the X.
     @State private var draftOutcomeTaken = false
+    @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
+    /// "Pick up where you left off?" after a relaunch mid-run.
+    @State private var showResumeAlert = false
+    @State private var pendingResumeStep: OnboardingFlow.ResumeStep?
     @State private var scriptToRecord: Script?
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
@@ -185,7 +189,7 @@ struct ScriptListView: View {
             .sheet(isPresented: $showDraftScript, onDismiss: {
                 // Closed without an outcome: the user declined the own
                 // script, so the guided run is over.
-                if !draftOutcomeTaken { OnboardingFlow.finish(reason: "declined_draft") }
+                if !draftOutcomeTaken { OnboardingFlow.abandon(reason: "declined_draft") }
                 draftOutcomeTaken = false
             }) {
                 DraftScriptView(onFinish: handleDraftOutcome)
@@ -215,6 +219,22 @@ struct ScriptListView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .alert(
+            String(localized: "onboarding_flow.resume.title", defaultValue: "Pick up where you left off?", comment: "Alert on launch when the guided first run was left unfinished."),
+            isPresented: $showResumeAlert
+        ) {
+            Button(String(localized: "onboarding_flow.resume.no", defaultValue: "No, thanks", comment: "Button: do not resume the guided first run; it will not come back."), role: .cancel) {
+                AppAnalytics.log("onboarding_flow_resume_declined")
+                OnboardingFlow.abandon(reason: "declined_resume")
+                pendingResumeStep = nil
+            }
+            Button(String(localized: "onboarding_flow.resume.yes", defaultValue: "Continue", comment: "Button: resume the guided first run where it stopped.")) {
+                if let step = pendingResumeStep { resume(step) }
+                pendingResumeStep = nil
+            }
+        } message: {
+            Text(String(localized: "onboarding_flow.resume.message", defaultValue: "You were setting up your first video.", comment: "Message of the alert offering to resume the guided first run."))
+        }
         .sheet(isPresented: $showNotificationSoftAsk) {
             SoftAskNotificationView {
                 Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
@@ -264,12 +284,12 @@ struct ScriptListView: View {
                     ])
                 }
             }
-            // Resume an unfinished post-onboarding flow after a relaunch. Late
-            // enough that the cold-start paywall (0.5s) and the soft-ask
-            // (1.5s) decide first; the arbiter sorts out any overlap.
+            // An unfinished guided run after a relaunch: offer to pick it up.
+            // (The cold-start paywall and soft-ask stand down while it is
+            // active, so nothing competes with this.)
             if !Self.didResumeFlowThisLaunch, !pendingDemoRecording {
                 Self.didResumeFlowThisLaunch = true
-                continueOnboardingFlow(after: 2.5)
+                offerToResumeFlow()
             }
             // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
             // reliably fire when a fullScreenCover dismisses on top of an
@@ -509,13 +529,64 @@ struct ScriptListView: View {
         }
     }
 
+    /// After a relaunch mid-run: ask whether to continue, then go to the
+    /// step it stopped at, or count the run as done. The planned paywall,
+    /// if that is all that is left, is shown without asking — a "continue?"
+    /// that leads to a paywall would be a trap.
+    private func offerToResumeFlow() {
+        guard hasSeenOnboarding else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            guard scriptToRecord == nil, editorMode == nil, paywallPresentation == nil,
+                  !showDraftScript, !showBulkImport
+            else { return }
+            switch OnboardingFlow.resumeStep(hasRecordedAnything: hasCompletedFirstRecording) {
+            case .none:
+                OnboardingFlow.finish(reason: "nothing_left")
+            case .paywall:
+                continueOnboardingFlow(after: 0)
+            case .some(let step):
+                pendingResumeStep = step
+                showResumeAlert = true
+                AppAnalytics.log("onboarding_flow_resume_offered")
+            }
+        }
+    }
+
+    private func resume(_ step: OnboardingFlow.ResumeStep) {
+        AppAnalytics.log("onboarding_flow_resumed")
+        switch step {
+        case .paywall:
+            continueOnboardingFlow(after: 0)
+        case .sampleTake:
+            if let demo = scripts.first(where: { $0.isDemo }) {
+                scriptToRecord = demo
+            } else {
+                OnboardingFlow.abandon(reason: "sample_missing")
+            }
+        case .draft:
+            UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+            showDraftScript = true
+        case .ownTake(let id):
+            if let script = scripts.first(where: { $0.id == id }) {
+                scriptToRecord = script
+            } else {
+                UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                showDraftScript = true
+            }
+        }
+    }
+
     /// Where the draft screen hands off, once its sheet is down.
     private func handleDraftOutcome(_ outcome: DraftScriptView.Outcome) {
         draftOutcomeTaken = true
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 450_000_000)
             switch outcome {
-            case .record(let script): scriptToRecord = script
+            case .record(let script):
+                // Remembered so a relaunch can resume on this script's take.
+                UserDefaults.standard.set(script.id.uuidString, forKey: OnboardingFlow.flowScriptIDKey)
+                scriptToRecord = script
             case .insert: break
             case .writeMyself: editorMode = .newSelfWritten
             case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")

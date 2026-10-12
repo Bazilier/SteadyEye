@@ -40,4 +40,61 @@ enum OnboardingFlow {
         AppAnalytics.log("onboarding_flow_finished", params: ["reason": reason])
     }
 
+    // MARK: - Leaving and resuming
+
+    /// The own script the flow drafted and is waiting to see recorded.
+    static let flowScriptIDKey = "onboardingFlowScriptID"
+
+    /// The user chose to skip the rest: the run counts as done, and every
+    /// mark that would continue it is cleared, so nothing comes back.
+    static func abandon(reason: String) {
+        finish(reason: reason)
+        let defaults = UserDefaults.standard
+        for key in ["pendingOwnScriptAfterFirstTake", "ownTakeCoachPending",
+                    "ownTakePaywallDue", flowScriptIDKey] {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    /// Where an unfinished run picks up after a relaunch.
+    enum ResumeStep: Equatable {
+        /// Only the planned paywall is left: shown without asking.
+        case paywall
+        case sampleTake
+        case draft
+        case ownTake(scriptID: UUID)
+    }
+
+    static func resumeStep(hasRecordedAnything: Bool) -> ResumeStep? {
+        guard isActive else { return nil }
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "ownTakePaywallDue") { return .paywall }
+        if !hasRecordedAnything { return .sampleTake }
+        if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") { return .draft }
+        if defaults.bool(forKey: "ownTakeCoachPending") {
+            if let id = defaults.string(forKey: flowScriptIDKey).flatMap(UUID.init) {
+                return .ownTake(scriptID: id)
+            }
+            return .draft
+        }
+        return nil
+    }
+
+}
+
+/// Copy for the "leave the setup?" confirmation, shared by every place the
+/// guided run can be walked out of.
+enum LeaveSetupCopy {
+    static var title: String {
+        String(localized: "onboarding_flow.leave.title", defaultValue: "Skip the rest of the setup?", comment: "Alert title when the user tries to leave the guided first run (onboarding) before it is finished.")
+    }
+    static var message: String {
+        String(localized: "onboarding_flow.leave.message", defaultValue: "You can always record and write scripts from the main screen.", comment: "Alert message when the user tries to leave the guided first run.")
+    }
+    static var skip: String {
+        String(localized: "onboarding_flow.leave.skip", defaultValue: "Skip", comment: "Destructive button: leave the guided first run; it will not come back.")
+    }
+    static var stay: String {
+        String(localized: "onboarding_flow.leave.stay", defaultValue: "Continue setup", comment: "Cancel button: stay in the guided first run.")
+    }
 }
