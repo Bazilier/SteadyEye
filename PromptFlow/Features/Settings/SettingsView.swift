@@ -40,6 +40,9 @@ struct SettingsView: View {
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
+    @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
+    @AppStorage("dev_gaze_indicator") private var devGazeIndicator: Bool = false
+    @AppStorage("dev_gaze_autopause") private var devGazeAutoPause: Bool = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -455,6 +458,31 @@ struct SettingsView: View {
                     }
                     .tint(Theme.accent)
                     Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+
+                Section("Gaze probe (DEV)") {
+                    Toggle(isOn: $devGazeIndicator) {
+                        Text("Eye-contact indicator on the pill")
+                    }
+                    .tint(Theme.accent)
+                    Text("Green eye while you look at the lens, grey when you look down at the screen or away (or before tracking starts), orange while it calibrates itself during the first seconds of playback.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devGazeAutoPause) {
+                        Text("Pause the prompter when you look away")
+                    }
+                    .tint(Theme.accent)
+                    Text("Freezes the prompter while the eye is grey and resumes on the same word when you look back. Shows the eye too.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devGazeProbe) {
+                        Text("Gaze readout on the camera")
+                    }
+                    .tint(Theme.accent)
+                    Text("Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

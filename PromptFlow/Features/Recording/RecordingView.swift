@@ -170,6 +170,35 @@ struct RecordingView: View {
     private let fontSize: CGFloat = 32
     @AppStorage("speedSliderValue") private var speedSlider: Double = 0.5
     @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    #if DEV
+    @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
+    @AppStorage("dev_gaze_indicator") private var devGazeIndicator: Bool = false
+    @AppStorage("dev_gaze_autopause") private var devGazeAutoPause: Bool = false
+    #endif
+    /// Eye-contact tracking. Off outside DEV builds until the feature ships.
+    @StateObject private var gazeAttention = GazeAttention()
+    private var gazeTrackingEnabled: Bool {
+        #if DEV
+        devGazeProbe || devGazeIndicator || devGazeAutoPause
+        #else
+        false
+        #endif
+    }
+    private var showsGazeIndicator: Bool {
+        #if DEV
+        devGazeIndicator || devGazeAutoPause
+        #else
+        false
+        #endif
+    }
+    /// Freeze the prompter while the user looks away from the lens.
+    private var gazeAutoPauses: Bool {
+        #if DEV
+        devGazeAutoPause
+        #else
+        false
+        #endif
+    }
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { displayMode == "classic" }
@@ -259,6 +288,9 @@ struct RecordingView: View {
             if cameraAuthStatus == .authorized {
                 cameraManager.start(position: .front)
             }
+            if gazeTrackingEnabled {
+                gazeAttention.start(probe: cameraManager.gazeProbe)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isExpanded = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -273,6 +305,7 @@ struct RecordingView: View {
             animateProgressForChunk(at: newIndex)
         }
         .onChange(of: player.isPlaying) { _, playing in
+            gazeAttention.isReading = playing
             if playing && player.currentChunkIndex < player.chunks.count {
                 animateProgressForChunk(at: player.currentChunkIndex)
             }
@@ -324,8 +357,26 @@ struct RecordingView: View {
                 stopFMV()
             }
         }
+        .onChange(of: gazeAttention.state) { _, state in
+            guard gazeAutoPauses else { return }
+            if state == .away {
+                // Freeze first so the seek below does not reschedule, then
+                // take back the words that ran during the confirmation delay:
+                // resume on the word that was showing when the eyes left.
+                player.gazeFrozen = true
+                if let onset = gazeAttention.awayOnset,
+                   let index = player.chunkIndex(shownAt: onset),
+                   index < player.currentChunkIndex {
+                    player.seekTo(index: index)
+                }
+            } else {
+                player.gazeFrozen = false
+            }
+        }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            gazeAttention.stop()
+            player.gazeFrozen = false
             player.pause()
             cameraManager.stopRecording()
             cameraManager.stop()
@@ -528,6 +579,15 @@ struct RecordingView: View {
 
             // 2. Black container expanding from top cutout area
             prompterContainerPanel
+
+            #if DEV
+            // 2a. Gaze prototype readout, mid-screen on the leading side.
+            if devGazeProbe {
+                GazeProbeOverlay(attention: gazeAttention)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+            }
+            #endif
 
             // 2b. Top-leading close button
             if !cameraManager.isRecording {
@@ -1000,7 +1060,11 @@ struct RecordingView: View {
                 height: isExpanded ? g.thickness : 0,
                 overlayAlignment: .top,
                 // On Duo the top-trailing corner can hold the lens.
-                toggleAlignment: g.duo?.toggleAlignment ?? .topTrailing
+                toggleAlignment: g.duo?.toggleAlignment ?? .topTrailing,
+                // The corner opposite the toggle. On Duo only when the toggle
+                // sits in a bottom corner; its side positions leave the
+                // opposite side to the lens.
+                indicatorAlignment: g.duo.map { $0.toggleAlignment == .bottomTrailing ? .bottomLeading : nil } ?? .topLeading
             ) {
                 if showTextContent {
                     wordDisplay
@@ -1115,6 +1179,27 @@ struct RecordingView: View {
             )
     }
 
+    /// Eye-contact indicator (see `GazeAttention`): grey while idle or when
+    /// the user looks away, accent while it calibrates, green on eye contact.
+    /// Decorative — no hit area.
+    private var gazeIndicator: some View {
+        Image(systemName: gazeAttention.state == .idle ? "eye" : "eye.fill")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(gazeIndicatorColor)
+            .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
+            .frame(width: 44, height: 44)
+            .animation(.easeInOut(duration: 0.2), value: gazeAttention.state)
+            .allowsHitTesting(false)
+    }
+
+    private var gazeIndicatorColor: Color {
+        switch gazeAttention.state {
+        case .idle, .away: return .white.opacity(0.35)
+        case .calibrating: return Theme.accent
+        case .looking: return .green
+        }
+    }
+
     /// Word-by-word / 3-line mode toggle.
     private var modeToggleButton: some View {
         Group {
@@ -1144,6 +1229,7 @@ struct RecordingView: View {
         height: CGFloat,
         overlayAlignment: Alignment,
         toggleAlignment: Alignment = .topTrailing,
+        indicatorAlignment: Alignment? = .topLeading,
         @ViewBuilder textOverlay: () -> Overlay
     ) -> some View {
         UnevenRoundedRectangle(
@@ -1159,6 +1245,11 @@ struct RecordingView: View {
         .overlay(alignment: overlayAlignment) { textOverlay() }
         .clipped()
         .overlay(alignment: toggleAlignment) { modeToggleButton }
+        .overlay(alignment: indicatorAlignment ?? .topLeading) {
+            if showsGazeIndicator, isExpanded, indicatorAlignment != nil {
+                gazeIndicator
+            }
+        }
         .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
         .overlay(
             UnevenRoundedRectangle(

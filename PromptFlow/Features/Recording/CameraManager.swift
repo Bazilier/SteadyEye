@@ -57,6 +57,9 @@ final class CameraManager: NSObject, ObservableObject {
     /// Read concurrently across `sampleBufferQueue` and the main thread
     /// (when set/cleared) — the `ifNotNil` check tolerates the race.
     var audioBufferBroadcast: ((CMSampleBuffer) -> Void)?
+    /// DEV gaze prototype. Fed every video frame; idle (one lock check per
+    /// frame) unless a `GazeProbeOverlay` has started it.
+    nonisolated let gazeProbe = GazeProbe()
     private var assetWriterRecorder: AssetWriterRecorder?
     private var watermarkComposer: RealtimeWatermarkComposer?
     /// Writer geometry frozen at record start by `startWriterPipeline`. Read on
@@ -1242,6 +1245,9 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             return
         }
         guard var pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        if output === videoDataOutput {
+            gazeProbe.submit(pixelBuffer)
+        }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         var bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
         var bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
