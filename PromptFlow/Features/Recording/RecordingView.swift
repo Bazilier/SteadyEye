@@ -859,7 +859,7 @@ struct RecordingView: View {
             safeAreaTop: geo.safeAreaInsets.top
         )
         let wbwContentHeight: CGFloat = fontSize + 4 + 10
-        let classicContentHeight: CGFloat = 28 * 3 + 10
+        let classicContentHeight: CGFloat = ClassicThreeLineView.lineHeight(for: fontSize) * 3 + 10
         if !isLandscape, let duoState = duoMonitor?.state {
             return duoPrompterGeometry(
                 duoState,
@@ -1432,7 +1432,7 @@ struct RecordingView: View {
         Group {
             if hasStartedPlayback && player.isReady {
                 if isClassicMode {
-                    ClassicThreeLineView(player: player)
+                    ClassicThreeLineView(player: player, fontSize: fontSize)
                 } else {
                     WordByWordView(player: player, fontSize: fontSize)
                 }
