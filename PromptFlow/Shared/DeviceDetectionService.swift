@@ -111,8 +111,8 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: topPad,
                 textTopOffset: max(0, safeAreaTop - topPad - 6),
-                bottomCornerRadius: 28,
-                topCornerRadius: 28,
+                bottomCornerRadius: 32,
+                topCornerRadius: 32,
                 collapsedWidth: 126,
                 dragEnabled: true,
                 defaultOffset: 20,
@@ -122,7 +122,7 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: 0,
                 textTopOffset: max(0, safeAreaTop - 6),
-                bottomCornerRadius: 28,
+                bottomCornerRadius: 32,
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: true,
@@ -133,7 +133,7 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: 0,
                 textTopOffset: 4,
-                bottomCornerRadius: 28,
+                bottomCornerRadius: 32,
                 topCornerRadius: 0,
                 collapsedWidth: 126,
                 dragEnabled: false,
@@ -149,8 +149,8 @@ struct CutoutLayoutConfig {
             return CutoutLayoutConfig(
                 topPadding: 0,
                 textTopOffset: 0,
-                bottomCornerRadius: 28,
-                topCornerRadius: 28,
+                bottomCornerRadius: 32,
+                topCornerRadius: 32,
                 collapsedWidth: 126,
                 dragEnabled: false,
                 defaultOffset: 0,
