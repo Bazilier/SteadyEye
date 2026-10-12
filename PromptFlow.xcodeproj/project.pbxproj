@@ -488,7 +488,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script, and to show on your device whether you are looking at the lens.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
 				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous.";
@@ -532,7 +532,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script, and to show on your device whether you are looking at the lens.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
 				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous.";
@@ -641,7 +641,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = SteadyEye;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SteadyEye uses the camera so you can record yourself while reading your script, and to show on your device whether you are looking at the lens.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SteadyEye uses the microphone to record audio while you film your video.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PromptFlow saves your recorded videos to your Photo Library.";
 				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Allow SteadyEye to measure how ads help new creators find our app. Your data stays anonymous.";
