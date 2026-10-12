@@ -1343,36 +1343,6 @@
         }
       }
     },
-    "draft.edit" : {
-      "comment" : "Button after a script was drafted: save it and open it in the editor.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Edit"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editar"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Редактировать"
-          }
-        }
-      }
-    },
     "draft.error.generic" : {
       "comment" : "Error on the draft-a-script screen when drafting fails (network, server).",
       "extractionState" : "manual",
@@ -1399,36 +1369,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не получилось написать черновик. Попробуйте ещё раз или напишите сами."
-          }
-        }
-      }
-    },
-    "draft.error.paste_empty" : {
-      "comment" : "Error on the draft-a-script screen when Paste my text finds no text on the clipboard.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your clipboard is empty. Copy your text first."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu portapapeles está vacío. Copia tu texto primero."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sua área de transferência está vazia. Copie seu texto primeiro."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Буфер обмена пуст. Сначала скопируйте текст."
           }
         }
       }
@@ -1613,36 +1553,6 @@
         }
       }
     },
-    "draft.kind.youtube" : {
-      "comment" : "Video type on the draft-a-script screen: a YouTube video.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "YouTube"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "YouTube"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "YouTube"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "YouTube"
-          }
-        }
-      }
-    },
     "draft.length.label" : {
       "comment" : "Label above the script-length choices on the draft-a-script screen.",
       "extractionState" : "manual",
@@ -1699,36 +1609,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld сек"
-          }
-        }
-      }
-    },
-    "draft.paste" : {
-      "comment" : "Button on the draft-a-script screen: create a script from the clipboard.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paste my text"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pegar mi texto"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Colar meu texto"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставить свой текст"
           }
         }
       }

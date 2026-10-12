@@ -195,6 +195,14 @@ struct RecordingView: View {
     @State private var showFirstTakeCoach = false
     /// The coach is guiding this screen until the first take starts recording.
     @State private var firstTakeFlowActive = false
+    /// The coach is due: the sample before anything was ever recorded, or an
+    /// own script from the onboarding flow before its first take
+    /// (`ownTakeCoachPending` is set only by that flow, so existing users
+    /// never see it).
+    private var needsGuidedTake: Bool {
+        if script.isDemo { return !hasCompletedFirstRecording }
+        return !script.isSample && UserDefaults.standard.bool(forKey: "ownTakeCoachPending")
+    }
     @State private var coachAfterRehearsal = false
     /// Eye contact over the take that just ended, for its preview.
     @State private var lastTakeGaze: GazeAttention.TakeSummary?
@@ -531,13 +539,16 @@ struct RecordingView: View {
             let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
             if wasOnboardingAuto {
                 UserDefaults.standard.set(false, forKey: "nextRecordingIsOnboardingAuto")
-                // Portrait only: the interface is portrait-locked, so in
-                // landscape the card would read sideways.
-                if cameraAuthStatus == .authorized, !isLandscape {
-                    firstTakeFlowActive = true
-                    showFirstTakeCoach = true
-                    AppAnalytics.log("first_take_coach_shown")
-                }
+            }
+            // Coach every open until the take it is for exists, so closing the
+            // camera early never loses it. Portrait only: the interface is
+            // portrait-locked, so in landscape the card would read sideways.
+            if cameraAuthStatus == .authorized, !isLandscape, needsGuidedTake {
+                firstTakeFlowActive = true
+                showFirstTakeCoach = true
+                AppAnalytics.log("first_take_coach_shown", params: [
+                    "script_source": script.isDemo ? "demo" : "user"
+                ])
             }
             guard cameraAuthStatus == .authorized, !wasOnboardingAuto else { return }
             cameraOpenCount += 1
@@ -2045,19 +2056,27 @@ struct RecordingView: View {
                     "was_first": wasFirst,
                     "via": "auto_persist"
                 ])
-                previewIsFirstTake = wasFirst
+                // The result sheet and the own-script follow-up belong to the
+                // sample take; a first take of an own script skips them.
+                previewIsFirstTake = wasFirst && script.isDemo
                 // The paywall waits for real value: a successful take of the
                 // user's own script, not the sample. Shown once the camera
                 // closes (see ScriptListView), once per install — the same
                 // one-shot flag as the post-save paywall, so never both.
-                if !script.isDemo, !script.isSample,
-                   !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown") {
-                    UserDefaults.standard.set(true, forKey: "ownTakePaywallDue")
+                if !script.isDemo, !script.isSample {
+                    UserDefaults.standard.set(false, forKey: "ownTakeCoachPending")
+                    if !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                        UserDefaults.standard.set(true, forKey: "ownTakePaywallDue")
+                    }
                 }
                 if wasFirst {
-                    // After the first take, whichever way the user leaves the
-                    // preview, the list offers to write an own script.
-                    UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                    if script.isDemo {
+                        // After the sample take, whichever way the user leaves
+                        // the preview, the list offers to write an own script,
+                        // and the camera coaches that script's first take.
+                        UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                        UserDefaults.standard.set(true, forKey: "ownTakeCoachPending")
+                    }
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())

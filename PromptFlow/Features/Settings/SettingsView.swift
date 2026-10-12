@@ -417,6 +417,7 @@ struct SettingsView: View {
                         UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
                         UserDefaults.standard.set(false, forKey: "hasSeenCameraExplainer")
                         UserDefaults.standard.set(0, forKey: "cameraOpenCount")
+                        UserDefaults.standard.set(false, forKey: "ownTakeCoachPending")
                         UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
                     }
                     Picker("Subscription Override", selection: $subscriptionManager.devSubscriptionOverride) {

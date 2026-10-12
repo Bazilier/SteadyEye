@@ -1,17 +1,14 @@
 import SwiftUI
 import SwiftData
-import UIKit
 
 /// "What's your video about?" — the bridge from the sample take to the user's
-/// own script. A one-line topic becomes a draft written by the AI proxy, or
-/// the user pastes or writes their own text. Every way out ends in a saved
-/// script handed back through `onFinish`.
+/// own script. A one-line topic becomes a draft written by the AI proxy, and
+/// the one thing to do with it is record it. Few decisions on purpose:
+/// another version and writing it yourself are quiet links.
 struct DraftScriptView: View {
     enum Outcome {
         /// Saved; record it now.
         case record(Script)
-        /// Saved; open it in the editor.
-        case edit(Script)
         /// Open an empty editor.
         case writeMyself
         /// Free drafts are used up for today.
@@ -188,17 +185,15 @@ struct DraftScriptView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .primaryButtonStyle()
-                HStack(spacing: 10) {
-                    secondaryButton(String(localized: "draft.edit", defaultValue: "Edit", comment: "Button after a script was drafted: save it and open it in the editor.")) {
-                        AppAnalytics.log("draft_script_edit_tapped")
-                        finish(.edit(save(content: draft)))
-                    }
-                    secondaryButton(String(localized: "draft.retry", defaultValue: "Another version", comment: "Button after a script was drafted: draft it again.")) {
-                        AppAnalytics.log("draft_script_retry_tapped")
-                        requestDraft()
-                    }
-                    .disabled(isDrafting)
+                .disabled(isDrafting)
+                quietLink(isDrafting
+                    ? String(localized: "draft.drafting", defaultValue: "Writing your script…", comment: "Shown on the draft button while the AI writes the script.")
+                    : String(localized: "draft.retry", defaultValue: "Another version", comment: "Button after a script was drafted: draft it again.")
+                ) {
+                    AppAnalytics.log("draft_script_retry_tapped")
+                    requestDraft()
                 }
+                .disabled(isDrafting)
             } else {
                 Button(action: requestDraft) {
                     HStack(spacing: 8) {
@@ -214,14 +209,9 @@ struct DraftScriptView: View {
                 }
                 .primaryButtonStyle()
                 .disabled(trimmedTopic.isEmpty || isDrafting)
-                HStack(spacing: 10) {
-                    secondaryButton(String(localized: "draft.paste", defaultValue: "Paste my text", comment: "Button on the draft-a-script screen: create a script from the clipboard.")) {
-                        pasteText()
-                    }
-                    secondaryButton(String(localized: "draft.write_myself", defaultValue: "Write it myself", comment: "Button on the draft-a-script screen: open an empty script editor.")) {
-                        AppAnalytics.log("draft_script_write_myself_tapped")
-                        finish(.writeMyself)
-                    }
+                quietLink(String(localized: "draft.write_myself", defaultValue: "Write it myself", comment: "Button on the draft-a-script screen: open an empty script editor.")) {
+                    AppAnalytics.log("draft_script_write_myself_tapped")
+                    finish(.writeMyself)
                 }
                 .disabled(isDrafting)
             }
@@ -274,20 +264,6 @@ struct DraftScriptView: View {
         }
     }
 
-    private func pasteText() {
-        let pasted = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        AppAnalytics.log("draft_script_paste_tapped", params: ["had_text": !pasted.isEmpty])
-        guard !pasted.isEmpty else {
-            errorMessage = String(
-                localized: "draft.error.paste_empty",
-                defaultValue: "Your clipboard is empty. Copy your text first.",
-                comment: "Error on the draft-a-script screen when Paste my text finds no text on the clipboard."
-            )
-            return
-        }
-        finish(.edit(save(content: pasted)))
-    }
-
     /// Saves a script titled after the topic, or after its own first words.
     private func save(content: String) -> Script {
         let source = trimmedTopic.isEmpty ? content : trimmedTopic
@@ -332,15 +308,12 @@ struct DraftScriptView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
+    private func quietLink(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.plain)
     }
@@ -348,7 +321,6 @@ struct DraftScriptView: View {
     private static func title(for kind: AnthropicService.DraftKind) -> String {
         switch kind {
         case .short: return String(localized: "draft.kind.short", defaultValue: "Reels, TikTok, Shorts", comment: "Video type on the draft-a-script screen: short vertical videos.")
-        case .youtube: return String(localized: "draft.kind.youtube", defaultValue: "YouTube", comment: "Video type on the draft-a-script screen: a YouTube video.")
         case .sales: return String(localized: "draft.kind.sales", defaultValue: "Sales or pitch", comment: "Video type on the draft-a-script screen: a sales or pitch video.")
         case .lesson: return String(localized: "draft.kind.lesson", defaultValue: "Lesson", comment: "Video type on the draft-a-script screen: a lesson or course segment.")
         case .other: return String(localized: "draft.kind.other", defaultValue: "Something else", comment: "Video type on the draft-a-script screen: anything else.")

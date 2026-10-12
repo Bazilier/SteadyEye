@@ -178,6 +178,11 @@ struct ScriptListView: View {
             }
             .sheet(isPresented: $showDraftScript) {
                 DraftScriptView(onFinish: handleDraftOutcome)
+                    // Burned once it is really on screen, so an offer that
+                    // never got shown is retried.
+                    .onAppear {
+                        UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
+                    }
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
@@ -188,13 +193,13 @@ struct ScriptListView: View {
                 // Closed before the presentation completed.
                 if script == nil {
                     cardOpener.resetCard()
-                    continueAfterRecording()
+                    continueOnboardingFlow()
                 }
             }
             .sheet(isPresented: $showBulkImport) {
                 BulkImportView(entryPoint: bulkImportEntryPoint)
             }
-            .fullScreenCover(item: $paywallPresentation, onDismiss: openOwnScriptIfPending) { presentation in
+            .fullScreenCover(item: $paywallPresentation, onDismiss: { continueOnboardingFlow() }) { presentation in
                 PaywallView(source: presentation.source)
             }
         }
@@ -211,6 +216,7 @@ struct ScriptListView: View {
             }
             .onDisappear {
                 PromptArbiter.shared.didDismiss()
+                continueOnboardingFlow()
             }
         }
         .onAppear {
@@ -246,6 +252,13 @@ struct ScriptListView: View {
                         "cold_start_count": countAtTrigger
                     ])
                 }
+            }
+            // Resume an unfinished post-onboarding flow after a relaunch. Late
+            // enough that the cold-start paywall (0.5s) and the soft-ask
+            // (1.5s) decide first; the arbiter sorts out any overlap.
+            if !Self.didResumeFlowThisLaunch, !pendingDemoRecording {
+                Self.didResumeFlowThisLaunch = true
+                continueOnboardingFlow(after: 2.5)
             }
             // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
             // reliably fire when a fullScreenCover dismisses on top of an
@@ -432,37 +445,53 @@ struct ScriptListView: View {
         modelContext.delete(script)
     }
 
-    // MARK: - After a take
+    // MARK: - Onboarding flow, resumable
 
-    /// Runs once the camera closes, whichever way the user left the preview.
-    /// After the sample take: the offer to write an own script. After the
-    /// first successful take of an own script — the real value moment — free
-    /// users see the paywall, once per install.
-    private func continueAfterRecording() {
+    /// In-memory, per-process: the launch-time resume runs once.
+    private static var didResumeFlowThisLaunch = false
+
+    /// Continues the post-onboarding flow wherever it was left, from any of
+    /// its natural moments: the camera closing, a paywall closing, or the app
+    /// launching. Two persisted marks drive it, and each is cleared only once
+    /// its screen is really up, so a kill or a collision just defers it:
+    ///  - `ownTakePaywallDue`: the first successful take of an own script —
+    ///    the real value moment — earns free users the paywall, once.
+    ///  - `pendingOwnScriptAfterFirstTake`: after the sample take, offer
+    ///    "What's your video about?".
+    private func continueOnboardingFlow(after delay: TimeInterval = 0.45) {
         let defaults = UserDefaults.standard
-        let paywallDue = defaults.bool(forKey: "ownTakePaywallDue")
-        guard paywallDue || defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") else { return }
-        defaults.set(false, forKey: "ownTakePaywallDue")
+        guard hasSeenOnboarding,
+              defaults.bool(forKey: "ownTakePaywallDue")
+                || defaults.bool(forKey: "pendingOwnScriptAfterFirstTake")
+        else { return }
         Task { @MainActor in
-            // Let the camera's cover finish dismissing first.
-            try? await Task.sleep(nanoseconds: 450_000_000)
-            if paywallDue, !subscriptionManager.isSubscribed,
-               !defaults.bool(forKey: "postFirstOwnRecordingPaywallShown") {
-                defaults.set(true, forKey: "postFirstOwnRecordingPaywallShown")
-                paywallPresentation = PaywallPresentation(source: "first_own_take")
-            } else {
-                openOwnScriptIfPending()
+            // Let whatever just closed finish dismissing.
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            // Something else is on screen: its own dismissal comes back here,
+            // or the next launch does.
+            guard scriptToRecord == nil, editorMode == nil, paywallPresentation == nil,
+                  !showDraftScript, !showBulkImport, !showNotificationSoftAsk,
+                  !PromptArbiter.shared.isPromptVisible
+            else { return }
+
+            if defaults.bool(forKey: "ownTakePaywallDue") {
+                if subscriptionManager.isSubscribed
+                    || defaults.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                    defaults.set(false, forKey: "ownTakePaywallDue")
+                } else if PromptArbiter.shared.canPresent(.firstOwnRecordingPaywall) {
+                    defaults.set(false, forKey: "ownTakePaywallDue")
+                    defaults.set(true, forKey: "postFirstOwnRecordingPaywallShown")
+                    PromptArbiter.shared.didPresent(.firstOwnRecordingPaywall)
+                    paywallPresentation = PaywallPresentation(source: "first_own_take")
+                    return
+                } else {
+                    // Too soon after another prompt: keep the mark, retry later.
+                    return
+                }
             }
-        }
-    }
-
-    private func openOwnScriptIfPending() {
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") else { return }
-        defaults.set(false, forKey: "pendingOwnScriptAfterFirstTake")
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            showDraftScript = true
+            if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") {
+                showDraftScript = true
+            }
         }
     }
 
@@ -472,7 +501,6 @@ struct ScriptListView: View {
             try? await Task.sleep(nanoseconds: 450_000_000)
             switch outcome {
             case .record(let script): scriptToRecord = script
-            case .edit(let script): editorMode = .edit(script)
             case .writeMyself: editorMode = .new
             case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")
             }

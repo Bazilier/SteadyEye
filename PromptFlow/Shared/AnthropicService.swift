@@ -81,9 +81,10 @@ enum AnthropicService {
         var id: Int { rawValue }
     }
 
-    /// What the video is for. Raw values are the server's closed enum.
+    /// What the video is for. Raw values are the server's closed enum (which
+    /// also accepts `youtube`; the app is about vertical video for now).
     enum DraftKind: String, CaseIterable, Identifiable {
-        case short, youtube, sales, lesson, other
+        case short, sales, lesson, other
         var id: String { rawValue }
     }
 
