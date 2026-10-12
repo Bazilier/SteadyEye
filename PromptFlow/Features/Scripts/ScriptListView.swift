@@ -5,18 +5,22 @@ import SwiftData
 /// is passed into .sheet(item:), avoiding the stale-state capture bug.
 enum EditorMode: Identifiable {
     case new
+    /// A new script the user chose to write themselves, from the draft
+    /// screen: the editor does not offer the AI draft again.
+    case newSelfWritten
     case edit(Script)
 
     var id: String {
         switch self {
         case .new: return "new"
+        case .newSelfWritten: return "newSelfWritten"
         case .edit(let s): return s.id.uuidString
         }
     }
 
     var script: Script? {
         switch self {
-        case .new: return nil
+        case .new, .newSelfWritten: return nil
         case .edit(let s): return s
         }
     }
@@ -176,7 +180,7 @@ struct ScriptListView: View {
                 }
             }
             .sheet(item: $editorMode) { mode in
-                ScriptEditorView(script: mode.script)
+                ScriptEditorView(script: mode.script, offersDraft: mode.id != EditorMode.newSelfWritten.id)
             }
             .sheet(isPresented: $showDraftScript, onDismiss: {
                 // Closed without an outcome: the user declined the own
@@ -513,7 +517,7 @@ struct ScriptListView: View {
             switch outcome {
             case .record(let script): scriptToRecord = script
             case .insert: break
-            case .writeMyself: editorMode = .new
+            case .writeMyself: editorMode = .newSelfWritten
             case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")
             }
         }

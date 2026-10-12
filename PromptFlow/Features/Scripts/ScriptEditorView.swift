@@ -8,6 +8,8 @@ struct ScriptEditorView: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
     let script: Script?
+    /// False when the user just chose to write it themselves instead.
+    var offersDraft = true
 
     @State private var title: String = ""
     @State private var content: String = ""
@@ -395,7 +397,7 @@ struct ScriptEditorView: View {
 
     /// Too little text to optimize: draft instead.
     private var showsDraftCTA: Bool {
-        content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10
+        offersDraft && content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10
     }
 
     private var draftCTA: some View {
