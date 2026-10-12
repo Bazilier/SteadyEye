@@ -452,6 +452,15 @@ struct RecordingView: View {
             VideoPreviewView(recording: recording, onDismiss: {
                 previewRecording = nil
                 resetDisplay()
+                // Leaving the first take's preview by any path (back, save,
+                // delete) moves on: close the camera, and the scripts list
+                // offers the own script. Staying on the sample would strand
+                // the user.
+                if previewIsFirstTake,
+                   UserDefaults.standard.bool(forKey: "pendingOwnScriptAfterFirstTake") {
+                    previewIsFirstTake = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { close() }
+                }
             }, shouldShowPaywallAfterSave: {
                 // First successful Camera Roll save of a user-written script
                 // (not the onboarding demo, not an app-provided sample), once
