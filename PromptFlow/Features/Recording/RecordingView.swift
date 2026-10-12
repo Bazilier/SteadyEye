@@ -200,9 +200,12 @@ struct RecordingView: View {
     /// (`ownTakeCoachPending` is set only by that flow, so existing users
     /// never see it).
     private var needsGuidedTake: Bool {
+        guard OnboardingFlow.isActive else { return false }
         if script.isDemo { return !hasCompletedFirstRecording }
         return !script.isSample && UserDefaults.standard.bool(forKey: "ownTakeCoachPending")
     }
+    /// "Skip the rest of the setup?", for closing the camera mid-run.
+    @State private var showLeaveSetupAlert = false
     @State private var coachAfterRehearsal = false
     /// Eye contact over the take that just ended, for its preview.
     @State private var lastTakeGaze: GazeAttention.TakeSummary?
@@ -534,6 +537,18 @@ struct RecordingView: View {
         )
         .onChange(of: isTextEditMode) { _, editing in
             if editing, showDragTip { showDragTip = false }
+        }
+        .alert(LeaveSetupCopy.title, isPresented: $showLeaveSetupAlert) {
+            Button(LeaveSetupCopy.stay, role: .cancel) {
+                AppAnalytics.log("onboarding_flow_leave_cancelled", params: ["from": "camera"])
+            }
+            Button(LeaveSetupCopy.skip, role: .destructive) {
+                OnboardingFlow.abandon(reason: script.isDemo ? "left_sample_camera" : "left_own_camera")
+                showFirstTakeCoach = false
+                close()
+            }
+        } message: {
+            Text(LeaveSetupCopy.message)
         }
         // The record button can be tapped straight through the coach's
         // spotlight: clear the coach as soon as the countdown starts.
@@ -1462,8 +1477,18 @@ struct RecordingView: View {
         dismiss()
     }
 
+    /// Closing the camera before the guided take exists walks out of the
+    /// guided run: confirm first.
+    private func requestClose() {
+        if needsGuidedTake, !cameraManager.isRecording, !isCountingDown {
+            showLeaveSetupAlert = true
+        } else {
+            close()
+        }
+    }
+
     private func closeChevron(size: CGFloat) -> some View {
-        Button { close() } label: {
+        Button { requestClose() } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)

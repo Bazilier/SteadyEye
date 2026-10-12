@@ -37,6 +37,10 @@ struct DraftScriptView: View {
     @State private var isDrafting = false
     @State private var errorMessage: String?
     @FocusState private var topicFocused: Bool
+    @State private var showLeaveSetupAlert = false
+
+    /// Closing this mid-run walks out of the guided first run.
+    private var leavingEndsSetup: Bool { purpose == .record && OnboardingFlow.isActive }
 
     private var trimmedTopic: String { topic.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -60,8 +64,12 @@ struct DraftScriptView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
-                        AppAnalytics.log("draft_script_closed", params: ["had_draft": draft != nil])
-                        dismiss()
+                        if leavingEndsSetup {
+                            showLeaveSetupAlert = true
+                        } else {
+                            AppAnalytics.log("draft_script_closed", params: ["had_draft": draft != nil])
+                            dismiss()
+                        }
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -70,6 +78,19 @@ struct DraftScriptView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // Mid-run only the X closes it, and it asks first.
+        .interactiveDismissDisabled(leavingEndsSetup)
+        .alert(LeaveSetupCopy.title, isPresented: $showLeaveSetupAlert) {
+            Button(LeaveSetupCopy.stay, role: .cancel) {
+                AppAnalytics.log("onboarding_flow_leave_cancelled", params: ["from": "draft"])
+            }
+            Button(LeaveSetupCopy.skip, role: .destructive) {
+                AppAnalytics.log("draft_script_closed", params: ["had_draft": draft != nil])
+                dismiss()
+            }
+        } message: {
+            Text(LeaveSetupCopy.message)
+        }
         .onAppear { AppAnalytics.log("draft_script_shown", params: ["purpose": purposeName]) }
     }
 
