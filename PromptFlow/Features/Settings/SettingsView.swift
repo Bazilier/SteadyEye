@@ -374,6 +374,11 @@ struct SettingsView: View {
 
                 #if DEV
                 Section("Debug") {
+                    Button("Replay onboarding") {
+                        // ContentView presents onboarding while this is false.
+                        UserDefaults.standard.set(false, forKey: "hasSeenCameraExplainer")
+                        UserDefaults.standard.set(false, forKey: "hasSeenOnboarding")
+                    }
                     Picker("Subscription Override", selection: $subscriptionManager.devSubscriptionOverride) {
                         Text("Off (use RC)").tag("off")
                         Text("Force Free").tag("free")

@@ -5,6 +5,10 @@ import SwiftUI
 struct PlaceholderLoopView: View {
     let fontSize: CGFloat
     let isClassicMode: Bool
+    /// Text to cycle. Nil: the "your script will appear here" placeholder.
+    var phrase: String? = nil
+    /// Word brightness. Dimmed by default, since it stands in for a script.
+    var textOpacity: Double = 0.5
 
     @AppStorage("orpAlignmentEnabled") private var orpAlignmentEnabled: Bool = true
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
@@ -65,7 +69,7 @@ struct PlaceholderLoopView: View {
                     word: currentChunk,
                     fontSize: fontSize,
                     highlightAnchor: orpHighlightAnchor,
-                    textColor: .white.opacity(0.5)
+                    textColor: .white.opacity(textOpacity)
                 )
                 .opacity(opacity)
                 .lineLimit(1)
@@ -75,7 +79,7 @@ struct PlaceholderLoopView: View {
             } else {
                 Text(currentChunk)
                     .font(.system(size: fontSize, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(textOpacity))
                     .opacity(opacity)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -100,13 +104,13 @@ struct PlaceholderLoopView: View {
                             word: text,
                             fontSize: fontSize,
                             highlightAnchor: orpHighlightAnchor,
-                            textColor: .white.opacity(0.5)
+                            textColor: .white.opacity(textOpacity)
                         )
                         .lineLimit(1)
                     } else {
                         Text(text)
                             .font(.system(size: fontSize, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.white.opacity(textOpacity))
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                     }
@@ -123,7 +127,7 @@ struct PlaceholderLoopView: View {
     // MARK: - Chunking
 
     private func recomputeChunks() {
-        let phrase = String(
+        let phrase = self.phrase ?? String(
             localized: "recording.placeholder.phrase",
             defaultValue: "Your script will appear here when you hit record",
             comment: "Placeholder phrase shown in the recording screen when no script is loaded. Cycled word-by-word as a demo of the teleprompter. Should read naturally when split on spaces and hint that the user needs to tap record to start."

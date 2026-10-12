@@ -1179,25 +1179,8 @@ struct RecordingView: View {
             )
     }
 
-    /// Eye-contact indicator (see `GazeAttention`): grey while idle or when
-    /// the user looks away, accent while it calibrates, green on eye contact.
-    /// Decorative — no hit area.
     private var gazeIndicator: some View {
-        Image(systemName: gazeAttention.state == .idle ? "eye" : "eye.fill")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(gazeIndicatorColor)
-            .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
-            .frame(width: 44, height: 44)
-            .animation(.easeInOut(duration: 0.2), value: gazeAttention.state)
-            .allowsHitTesting(false)
-    }
-
-    private var gazeIndicatorColor: Color {
-        switch gazeAttention.state {
-        case .idle, .away: return .white.opacity(0.35)
-        case .calibrating: return Theme.accent
-        case .looking: return .green
-        }
+        GazeIndicator(state: gazeAttention.state, isLandscape: isLandscape)
     }
 
     /// Word-by-word / 3-line mode toggle.
