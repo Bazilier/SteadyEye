@@ -466,8 +466,7 @@ struct RecordingView: View {
                 : nil,
             onRecordOwnScript: {
                 // ScriptListView picks this up once the camera is gone:
-                // paywall first, then a new script.
-                UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
+                // paywall first, then the own-script offer.
                 close()
             })
         }
@@ -2025,8 +2024,10 @@ struct RecordingView: View {
                 previewIsFirstTake = wasFirst
                 if wasFirst {
                     // The first value moment: the paywall follows it, once,
-                    // whichever way the user leaves (see ScriptListView).
+                    // then the offer to write an own script — whichever way
+                    // the user leaves the preview (see ScriptListView).
                     UserDefaults.standard.set(true, forKey: "firstTakePaywallDue")
+                    UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())

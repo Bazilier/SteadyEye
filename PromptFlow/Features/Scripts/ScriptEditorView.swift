@@ -545,6 +545,7 @@ struct ScriptEditorView: View {
                     case .rateLimited: reason = "rate_limited"
                     case .aiDisabled: reason = "ai_disabled"
                     case .inputTooLong: reason = "input_too_long"
+                    case .cannotDraft: reason = "cannot_draft"
                     }
                 } else {
                     reason = String(describing: type(of: error))

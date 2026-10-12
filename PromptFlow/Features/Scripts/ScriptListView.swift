@@ -35,6 +35,8 @@ struct ScriptListView: View {
 
     @State private var searchText = ""
     @State private var editorMode: EditorMode?
+    /// "What's your video about?", offered after the first take.
+    @State private var showDraftScript = false
     @State private var scriptToRecord: Script?
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
@@ -173,6 +175,9 @@ struct ScriptListView: View {
             }
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script)
+            }
+            .sheet(isPresented: $showDraftScript) {
+                DraftScriptView(onFinish: handleDraftOutcome)
             }
             .fullScreenCover(item: $scriptToRecord) { script in
                 RecordingView(script: script, selectedTab: $selectedTab)
@@ -455,7 +460,20 @@ struct ScriptListView: View {
         defaults.set(false, forKey: "pendingOwnScriptAfterFirstTake")
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 350_000_000)
-            editorMode = .new
+            showDraftScript = true
+        }
+    }
+
+    /// Where the draft screen hands off, once its sheet is down.
+    private func handleDraftOutcome(_ outcome: DraftScriptView.Outcome) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            switch outcome {
+            case .record(let script): scriptToRecord = script
+            case .edit(let script): editorMode = .edit(script)
+            case .writeMyself: editorMode = .new
+            case .paywall: paywallPresentation = PaywallPresentation(source: "ai_draft")
+            }
         }
     }
 
