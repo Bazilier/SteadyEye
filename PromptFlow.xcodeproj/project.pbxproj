@@ -729,8 +729,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
 			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 5.66.0;
+				kind = exactVersion;
+				version = 5.89.0;
 			};
 		};
 		117704102F912F15001E40FC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
