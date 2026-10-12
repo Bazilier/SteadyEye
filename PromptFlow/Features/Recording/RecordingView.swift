@@ -159,77 +159,12 @@ struct RecordingView: View {
     /// Raise it if any part of the cutout still shows against the preview.
     private static let landscapeMinThickness: CGFloat = 190
 
-    /// Gap between the record button and the reset/play pair above it.
-    ///
-    /// Aesthetic, but the resulting footprint is not: the column's physical
-    /// VERTICAL extent is 72 (record) + this + 56 (the pair's width) = 148pt,
-    /// down from 240pt when the three sat in a line. The column is centred
-    /// across view X, so at 240 it reached ~33pt into the bottom bar's
-    /// 8–128pt band; at 148 it stops ~13pt clear of it. That is what lets the
-    /// two coexist without moving the bar.
-    private static let landscapeTransportSpacing: CGFloat = 20
-
-    /// Gap between play and reset within the pair, along the physical
-    /// horizontal. Kept tight so the pair reads as one unit above the record
-    /// button rather than as two separate controls.
-    private static let landscapeTransportPairSpacing: CGFloat = 16
-
-    /// Frame sizes of the transport buttons. Named so `landscapeTransportBalance`
-    /// is derived from the real sizes rather than a number that happens to look
-    /// right and then drifts when a frame changes.
+    /// Frame sizes of the transport buttons.
     private static let recordButtonSize: CGFloat = 72
     private static let transportButtonSize: CGFloat = 56
 
-    /// Padding on the physically LOWER side of the landscape transport group,
-    /// making the group symmetric about the record button so that the RECORD
-    /// button's centre — not the group's — lands on the screen's vertical
-    /// midpoint. Equal to the pair's extent above it: one transport button plus
-    /// the gap.
-    private static let landscapeTransportBalance: CGFloat =
-        transportButtonSize + landscapeTransportSpacing
-
-    /// Horizontal inset shared by the landscape bar's top row and its scrub
-    /// bar, so the two span exactly the same extent.
-    private static let landscapeBarRowInset: CGFloat = 12
-
-    /// Inset of the landscape transport column from the physical right edge —
-    /// which, with the interface portrait-locked, is the view's bottom.
-    private static let landscapeTransportInset: CGFloat = 24
-
-    /// Tappable size of the gear in the landscape bar. 44 is the documented
-    /// minimum touch target, not a value tuned until taps started landing: the
-    /// glyph alone measures ~22x20, which the bar's quarter turn presents as a
-    /// ~20pt band in view x with dead row margin either side of it.
-    ///
-    /// Landscape only. Portrait shares `settingsGearButton`, and framing it
-    /// there would grow portrait's row by the same amount.
-    private static let landscapeGearHitTarget: CGFloat = 44
-
-    /// Height of the scrub bar, and therefore of the landscape bar's lower
-    /// slot. ONE constant with two consumers rather than two literals that have
-    /// to agree: the slot exists precisely to hold this height constant across
-    /// the exposure swap, so a drift between the two would be the very bug it
-    /// is there to prevent. Shared with portrait, like the transport sizes.
+    /// Height of the scrub bar.
     private static let scrubBarHeight: CGFloat = 44
-
-    /// Thickness of the landscape bottom bar — how far it reaches up from the
-    /// physical bottom edge. Aesthetic, not derived: sized to clear the two
-    /// rows (the status/gear/slider row, then the `scrubBarHeight` lower slot)
-    /// with slack, since the content is framed to this height rather than
-    /// measuring itself.
-    ///
-    /// CONSTANT, and now trivially so: the gear SWAPS the lower slot's occupant
-    /// rather than inserting a third row, so there is nothing to make room for.
-    /// An earlier attempt grew this 120 → 184 on disclosure, which looked
-    /// reasonable and was wrong — the bar is pinned at the physical bottom edge
-    /// and therefore grows AWAY from it, so the growth travelled up through the
-    /// content and moved the status row ~66pt, the very row whose gear had just
-    /// been tapped, while the scrub bar stayed put.
-    private static let landscapeBarThickness: CGFloat = 120
-    /// Inset from the physical bottom edge — the view's leading edge.
-    private static let landscapeBarInset: CGFloat = 8
-    /// Inset at each end of the bar, along the physical horizontal.
-    private static let landscapeBarEndInset: CGFloat = 16
 
     // Display settings
     private let fontSize: CGFloat = 32
@@ -554,14 +489,29 @@ struct RecordingView: View {
             // 1c. Bottom scrim so the portrait controls stay legible over
             // bright camera content. A SwiftUI layer only — recorded frames
             // come from the capture output, never from this view tree.
-            // Portrait only: landscape's bar sits along the view's leading
-            // edge, and sizing a scrim there would need new constants.
-            //
             // Full width always, so it has no edge along a Duo crease. With
             // the Duo controls in the top half it hangs from the top edge,
             // darkest there, and fades out at the crease.
-            if !isLandscape {
-                let topScrimHeight = duoTopScrimHeight
+            //
+            // Landscape: the controls block sits at the physical right with
+            // its contents on the physical bottom, so the scrim fans out from
+            // the physical bottom-right corner — view bottom-LEADING, since the
+            // interface is portrait-locked (physical right is view +Y,
+            // physical up is view +X).
+            let topScrimHeight = duoTopScrimHeight
+            if isLandscape {
+                RadialGradient(
+                    colors: [.black.opacity(0.86), .black.opacity(0.68), .clear],
+                    center: .bottomLeading,
+                    startRadius: 0,
+                    // Reaches past the block's far corner (~436 x 360pt from
+                    // the screen corner) so the status chips there keep about
+                    // the scrim portrait gives them near its top.
+                    endRadius: 650
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            } else {
                 VStack {
                     if topScrimHeight == nil { Spacer() }
                     LinearGradient(
@@ -585,10 +535,10 @@ struct RecordingView: View {
                     .transition(.opacity)
             }
 
-            // 3. Controls. Portrait keeps one stack at the bottom; landscape
-            // splits it into the bottom bar here and the transport column (3b).
+            // 3. Controls. One block in both orientations; landscape turns it
+            // a quarter turn against the physical right edge.
             if isLandscape {
-                landscapeBottomBar
+                landscapeControlsBlock
             } else {
                 inDuoControlsRegion {
                     VStack {
@@ -601,14 +551,6 @@ struct RecordingView: View {
                 // the recording screen has no tab rail, so the controls take
                 // the full width.
                 .ignoresSafeArea(edges: duoPosture == .folded ? .horizontal : [])
-            }
-
-            // 3b. Landscape transport column — the same three buttons against
-            // the physical right edge. Layered after the controls so its hit
-            // areas win where the two still overlap, which they do until the
-            // bottom bar moves in the next step.
-            if isLandscape {
-                landscapeTransportColumn
             }
 
             // 4. Countdown
@@ -1120,8 +1062,7 @@ struct RecordingView: View {
         //
         // TRAILING, physically ABOVE the panel. `Alignment.trailing` is the
         // large-view-x edge, and view +X is physically up with the device
-        // turned left — the same mapping that puts `landscapeBottomBar`, which
-        // is pinned at view-LEADING, along the physical bottom. So a positive
+        // turned left, so view-LEADING is the physical bottom. So a positive
         // x offset carries the badge off the panel's upper side. It used to be
         // `.leading` with a negative offset, the mirror image of this, which
         // placed it physically below the panel — directly in the band the
@@ -1573,12 +1514,11 @@ struct RecordingView: View {
             scrubBar
                 .padding(.horizontal, 24)
 
-            // `controlsOverlay` is portrait-only — landscape mounts
-            // `landscapeBottomBar` and `landscapeTransportColumn` instead — so
-            // this is unconditional.
             transportRow
         }
-        .padding(.bottom, 48)
+        // Landscape: the block's bottom is the physical bottom edge, which
+        // has no home indicator to clear.
+        .padding(.bottom, isLandscape ? 24 : 48)
         .padding(.top, 12)
     }
 
@@ -1633,9 +1573,6 @@ struct RecordingView: View {
     }
 
     /// The exposure row itself — label, slider, EV readout — with no chrome.
-    /// Shared, so the two orientations differ only in what surrounds it:
-    /// portrait wraps it in the card below, landscape drops it bare into the
-    /// bar's lower slot, where the card's vertical padding would not fit.
     private var exposureControl: some View {
         HStack {
             Text("camera.exposure.label", comment: "Label for the exposure compensation slider")
@@ -1654,7 +1591,7 @@ struct RecordingView: View {
     ///
     /// Restarted ONLY by a touch on the exposure control. Interaction elsewhere
     /// deliberately does not restart it: the neighbouring controls — speed,
-    /// transport, and in portrait the scrub bar — have nothing to do with
+    /// transport and the scrub bar — have nothing to do with
     /// exposure, so letting them hold it open would mean a user scrubbing
     /// through a script keeps an exposure slider on screen indefinitely, which
     /// is the situation auto-hide exists to prevent.
@@ -1672,9 +1609,8 @@ struct RecordingView: View {
         exposureAutoHideTask = nil
     }
 
-    /// The exposure disclosure, shown when the gear is toggled. PORTRAIT only —
-    /// landscape swaps `exposureControl` into its bar instead, without this
-    /// card, so this view and its position are exactly what they were.
+    /// The exposure disclosure, shown when the gear is toggled. Landscape shows
+    /// it too, turned with the rest of the controls block.
     private var cameraSettingsPanel: some View {
         VStack(spacing: 12) {
             // Exposure
@@ -1719,111 +1655,43 @@ struct RecordingView: View {
         }
     }
 
-    // MARK: - Landscape bottom bar
+    // MARK: - Landscape controls block
 
-    /// Status line, gear and speed slider in one row, with the scrub bar
-    /// beneath, along the physical bottom edge.
+    /// Landscape: the portrait `controlsOverlay`, unchanged, turned a quarter
+    /// turn so it reads upright for a viewer holding the device turned left,
+    /// and pinned to the view's bottom — the physical right edge, since the
+    /// interface is portrait-locked (physical up is view +X, physical right is
+    /// view +Y).
     ///
-    /// This group rotates as ONE unit — unlike every other landscape element,
-    /// which turns only its inner content and keeps an axis-aligned hit area.
-    /// It has to: two of its children are drag targets that must track along
-    /// the physical horizontal, and a `Slider` tracks along its own x-axis, so
-    /// the control itself must turn. The DEV spike proved on device that a
-    /// rotated `Slider` follows a sustained drag correctly, which is why this
-    /// uses the native control rather than a hand-rolled gesture.
+    /// The block is square: its physical height is the view's width, and it is
+    /// given the same physical width so it lays out exactly as in portrait.
+    /// A square box is unchanged by a quarter turn about its centre, so the
+    /// layout box already equals the drawn result. Inside, a `Spacer` sits the
+    /// controls on the block's own bottom — the physical bottom edge.
     ///
-    /// The explicit `.frame` AFTER the rotation is the other half of what the
-    /// spike established: `rotationEffect` does not change layout, so without
-    /// it the content centres on its unrotated box and lands mid-screen
-    /// instead of at the edge.
-    private var landscapeBottomBar: some View {
+    /// The whole block rotates, drag targets included. The DEV spike proved on
+    /// device that a rotated `Slider` follows a sustained drag correctly, and
+    /// the previous landscape bar shipped the rotated slider and scrub bar.
+    private var landscapeControlsBlock: some View {
         GeometryReader { geo in
-            let length = max(0, geo.size.height - Self.landscapeBarEndInset * 2)
-            let thickness = Self.landscapeBarThickness
-            HStack {
-                landscapeBottomBarContent
-                    .frame(width: length, height: thickness)
-                    .rotationEffect(.degrees(90))
-                    // Swapped dimensions so the layout box equals the drawn
-                    // result and the bar sits where it appears to sit.
-                    .frame(width: thickness, height: length)
-                    .padding(.leading, Self.landscapeBarInset)
-                Spacer()
-            }
-            .frame(maxHeight: .infinity)
-            .animation(.spring(duration: 0.25), value: showCameraSettings)
-        }
-    }
-
-    /// The bar's contents, in their own unrotated space. A `VStack` stacks
-    /// along its local +Y, which the quarter turn maps to physically downward,
-    /// so the first child is the upper row as the user sees it; an `HStack`
-    /// stacks along local +X, which maps to physically rightward. Both read in
-    /// the natural order with nothing reversed.
-    ///
-    /// The exposure panel sits between the two rows — the same relative place
-    /// it occupies in portrait, below the status line and above the scrub bar.
-    private var landscapeBottomBarContent: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                statusLine
-                if !cameraManager.isRecording {
-                    // Explicit hit region — the one interactive control in this
-                    // bar that lacked one. Nothing intercepts these taps: the
-                    // file's only other hit-testing participants are the dim
-                    // overlay (hit testing off), the prompter pill's gestures
-                    // (bounded by the pill, and a lower ZStack layer than this
-                    // bar), the scrub bar's contentShape (the slot below), and
-                    // statusLine's two buttons. There was simply very little to
-                    // hit: a ~22x20 glyph, which the quarter turn renders as a
-                    // ~20pt band in view x.
-                    //
-                    // `contentShape` so the whole frame is tappable rather than
-                    // just where the symbol's strokes fall.
-                    settingsGearButton
-                        .frame(
-                            width: Self.landscapeGearHitTarget,
-                            height: Self.landscapeGearHitTarget
-                        )
-                        .contentShape(Rectangle())
+            let side = geo.size.width
+            VStack {
+                Spacer(minLength: 0)
+                VStack {
+                    Spacer(minLength: 0)
+                    controlsOverlay
                 }
-                speedSliderRow
+                .frame(width: side, height: side)
+                .rotationEffect(.degrees(90))
+                .animation(.spring(duration: 0.25), value: showCameraSettings)
             }
-            .padding(.horizontal, Self.landscapeBarRowInset)
-
-            // One slot, two occupants. The gear SWAPS the scrub bar for the
-            // exposure row rather than inserting anything, so the content is
-            // the same height either way: nothing is pushed, nothing needs
-            // reserving, and the row above cannot move.
-            //
-            // The slot is pinned to `scrubBarHeight` because the two occupants
-            // are NOT the same height — the scrub bar declares 44, the exposure
-            // row is ~33 of slider. Without the frame the bar would shrink by
-            // 11 on every swap and the row would drift ~5.5. The shorter
-            // occupant centres in the slot; the taller one, portrait's ~57pt
-            // card, never enters this path.
-            //
-            // Hidden by conditional insertion, not opacity: the occupant that
-            // is not showing is not mounted, so it leaves the accessibility
-            // tree rather than lurking in it as a silent, swipeable control.
-            //
-            // The same inset as the row above, from the same constant, so the
-            // two span identical extents and cannot drift apart again.
-            Group {
-                if showCameraSettings {
-                    exposureControl
-                } else {
-                    scrubBar
-                }
-            }
-            .frame(height: Self.scrubBarHeight)
-            .padding(.horizontal, Self.landscapeBarRowInset)
         }
     }
 
     // MARK: - Transport controls
 
-    /// Portrait: the three transport buttons in a row, unchanged.
+    /// The three transport buttons in a row. Landscape turns them with the
+    /// whole block, so no glyph turns on its own.
     private var transportRow: some View {
         HStack(spacing: 48) {
             playPauseButton
@@ -1832,60 +1700,11 @@ struct RecordingView: View {
         }
     }
 
-    /// Landscape: the record button on the screen's vertical centre line, with
-    /// the play/reset pair side by side above it, against the physical RIGHT
-    /// edge.
-    ///
-    /// Two axes are in play and both follow from one mapping — the interface is
-    /// portrait-locked, so physical up is view +X and physical right is view +Y:
-    ///
-    /// * The outer `HStack` lays out along +X, i.e. bottom-to-top on screen, so
-    ///   listing `recordButton` FIRST puts it lowest with the pair above it.
-    /// * The inner `VStack` lays out along +Y, i.e. left-to-right on screen, so
-    ///   listing `playPauseButton` first puts play on the left and reset on the
-    ///   right — the same left-to-right relationship the two have in portrait's
-    ///   row. Swapping the two lines is all it takes to reverse that.
-    ///
-    /// `landscapeTransportBalance` is what centres the RECORD button rather
-    /// than the group, and the arithmetic is checkable. Without it the group is
-    /// 72 + 20 + 56 = 148 wide and the enclosing `VStack` centres it across
-    /// [mid-74, mid+74]; the record button, as the leading child, occupies
-    /// [mid-74, mid-2], putting its centre 38pt BELOW the midpoint — which is
-    /// exactly the dead space that appeared above the pair. Padding the leading
-    /// (physically lower) side by the pair's own extent, 56 + 20 = 76, makes
-    /// the padded box 224 wide, centred across [mid-112, mid+112]; the leading
-    /// padding consumes [mid-112, mid-36], so the record button lands at
-    /// [mid-36, mid+36] — its centre exactly on the midpoint.
-    ///
-    /// The pair stays in layout flow rather than becoming an overlay: an
-    /// overlay would draw outside the record button's bounds, and content drawn
-    /// outside a parent's bounds is not reliably hit-testable. These are
-    /// buttons, so that risk is not worth taking for a tidier expression.
-    private var landscapeTransportColumn: some View {
-        VStack {
-            Spacer()
-            HStack(spacing: Self.landscapeTransportSpacing) {
-                recordButton
-                VStack(spacing: Self.landscapeTransportPairSpacing) {
-                    playPauseButton
-                    resetButton
-                }
-            }
-            .padding(.leading, Self.landscapeTransportBalance)
-            .padding(.bottom, Self.landscapeTransportInset)
-        }
-    }
-
     private var playPauseButton: some View {
         Button { togglePlay() } label: {
             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.white)
-                // Glyph turned, frame applied AFTER, so the tappable bounds
-                // stay an axis-aligned square. Same pattern as `closeChevron`,
-                // `modeToggleButton` and the timer badge — the interactive
-                // control is never itself rotated.
-                .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
                 .modifier(GlassCircleModifier())
         }
@@ -1921,7 +1740,6 @@ struct RecordingView: View {
             Image(systemName: "arrow.counterclockwise")
                 .font(.system(size: 22))
                 .foregroundStyle(.white)
-                .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
                 .modifier(GlassCircleModifier())
         }
