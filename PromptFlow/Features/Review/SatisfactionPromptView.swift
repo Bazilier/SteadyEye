@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Satisfaction pre-prompt shown after the first Camera Roll save of a
-/// recording made from a user-written script.
+/// Satisfaction pre-prompt, asked at a happy moment (see
+/// `ReviewPromptManager.Trigger`): after watching a take that held eye
+/// contact, with its score up top, or after coming back from sharing one.
 ///
 /// Yes routes to the App Store review page, No opens the founder chat — so
 /// the App Store only ever hears from people who already said they were
@@ -13,7 +14,9 @@ import SwiftUI
 struct SatisfactionPromptView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    var trigger: ReviewPromptManager.Trigger = .afterExport
+    /// The take's eye contact, 0...100, shown above the question.
+    var eyeContactPercent: Int? = nil
     let onYes: () -> Void
     let onNo: () -> Void
 
@@ -21,23 +24,36 @@ struct SatisfactionPromptView: View {
     /// Reduce Motion — see `pulseStarOnce()`.
     @State private var starScale: CGFloat = 1
 
-    /// A fixed-height detent cannot grow with its content, so it has to clear
-    /// the tallest layout it will ever hold. Same ladder as the soft-ask:
-    /// identical icon block, body width and two-button stack.
-    private var detentHeight: CGFloat {
-        if dynamicTypeSize >= .accessibility1 { return 620 }
-        if dynamicTypeSize >= .xxLarge { return 520 }
-        return 420
-    }
+    /// Measured, so the sheet is exactly as tall as its content at any
+    /// text size.
+    @State private var contentHeight: CGFloat = 420
 
     var body: some View {
         VStack(spacing: 0) {
             iconBlock
 
-            Text("review.satisfaction.title")
+            if let percent = eyeContactPercent {
+                Label {
+                    Text(String(
+                        localized: "review.satisfaction.eye_contact",
+                        defaultValue: "\(percent)% eye contact",
+                        comment: "Pill above the satisfaction question after a take: the take's eye contact score, e.g. '92% eye contact'."
+                    ))
+                } icon: {
+                    Image(systemName: "eye.fill")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.green.opacity(0.16), in: Capsule())
+                .padding(.top, 20)
+            }
+
+            Text(title)
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
-                .padding(.top, 24)
+                .padding(.top, eyeContactPercent == nil ? 24 : 12)
 
             Text("review.satisfaction.body")
                 .font(.body)
@@ -49,11 +65,11 @@ struct SatisfactionPromptView: View {
                 .frame(maxWidth: 300)
                 .padding(.top, 10)
 
-            Spacer(minLength: 32)
+            Spacer().frame(height: 28)
 
             VStack(spacing: 12) {
                 Button {
-                    AppAnalytics.log("satisfaction_prompt_yes")
+                    AppAnalytics.log("satisfaction_prompt_yes", params: ["trigger": trigger.rawValue])
                     onYes()
                     dismiss()
                 } label: {
@@ -68,7 +84,7 @@ struct SatisfactionPromptView: View {
                 .tint(Theme.accent)
 
                 Button {
-                    AppAnalytics.log("satisfaction_prompt_no")
+                    AppAnalytics.log("satisfaction_prompt_no", params: ["trigger": trigger.rawValue])
                     onNo()
                     dismiss()
                 } label: {
@@ -83,11 +99,28 @@ struct SatisfactionPromptView: View {
         .padding(.horizontal, 20)
         .padding(.top, 24)
         .padding(.bottom, 16)
-        .presentationDetents([.height(detentHeight)])
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { contentHeight = $0 }
+        .presentationDetents([.height(contentHeight)])
         .presentationDragIndicator(.visible)
+        .presentationCornerRadius(32)
+        .presentationBackground(Color(white: 0.11))
+        .preferredColorScheme(.dark)
         .onAppear {
-            AppAnalytics.log("satisfaction_prompt_shown")
+            AppAnalytics.log("satisfaction_prompt_shown", params: [
+                "trigger": trigger.rawValue,
+                "eye_contact_pct": eyeContactPercent ?? -1
+            ])
             pulseStarOnce()
+        }
+    }
+
+    private var title: String {
+        switch trigger {
+        case .greatTake:
+            return String(localized: "review.satisfaction.title.take", defaultValue: "Happy with this take?", comment: "Satisfaction question right after the user watched a take that held eye contact.")
+        case .afterExport:
+            return String(localized: "review.satisfaction.title.export", defaultValue: "How did your video turn out?", comment: "Satisfaction question when the user comes back to the app after exporting a take to share.")
         }
     }
 

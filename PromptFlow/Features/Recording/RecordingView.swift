@@ -489,6 +489,7 @@ struct RecordingView: View {
             firstTakeResult: previewIsFirstTake
                 ? FirstTakeResult(duration: recording.duration, gaze: lastTakeGaze)
                 : nil,
+            takeEyeContact: lastTakeGaze?.lookingFraction,
             onRecordOwnScript: {
                 // ScriptListView picks this up once the camera is gone:
                 // paywall first, then the own-script offer.

@@ -47,6 +47,11 @@ struct ScriptListView: View {
     /// "Pick up where you left off?" after a relaunch mid-run.
     @State private var showResumeAlert = false
     @State private var pendingResumeStep: OnboardingFlow.ResumeStep?
+    @Environment(\.scenePhase) private var scenePhase
+    /// "How did your video turn out?", once the user is back after exporting.
+    @State private var showAfterExportPrompt = false
+    @State private var pendingFounderChat = false
+    @State private var showFounderChat = false
     @State private var scriptToRecord: Script?
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
@@ -219,6 +224,34 @@ struct ScriptListView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: scenePhase) { _, phase in
+            // Back from posting the video they exported: a good moment to ask.
+            if phase == .active { offerAfterExportReviewIfDue() }
+        }
+        .sheet(isPresented: $showAfterExportPrompt, onDismiss: {
+            // Sequenced, not stacked: the chat waits for this sheet to close.
+            guard pendingFounderChat else { return }
+            pendingFounderChat = false
+            showFounderChat = true
+        }) {
+            SatisfactionPromptView(
+                trigger: .afterExport,
+                onYes: {
+                    ReviewPromptManager.noteAnsweredYes()
+                    ReviewPromptManager.openWriteReviewPage()
+                },
+                onNo: { pendingFounderChat = true }
+            )
+            .onAppear {
+                ReviewPromptManager.notePresented()
+                ReviewPromptManager.clearExport()
+                PromptArbiter.shared.didPresent(.reviewPrompt)
+            }
+            .onDisappear { PromptArbiter.shared.didDismiss() }
+        }
+        .sheet(isPresented: $showFounderChat) {
+            ChatView(pinnedMessage: .satisfactionFollowUp)
+        }
         .alert(
             String(localized: "onboarding_flow.resume.title", defaultValue: "Pick up where you left off?", comment: "Alert on launch when the guided first run was left unfinished."),
             isPresented: $showResumeAlert
@@ -290,6 +323,7 @@ struct ScriptListView: View {
             if !Self.didResumeFlowThisLaunch, !pendingDemoRecording {
                 Self.didResumeFlowThisLaunch = true
                 offerToResumeFlow()
+                offerAfterExportReviewIfDue()
             }
             // Defensive backup auto-open. SwiftUI's `.onAppear` does NOT
             // reliably fire when a fullScreenCover dismisses on top of an
@@ -574,6 +608,22 @@ struct ScriptListView: View {
                 UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
                 showDraftScript = true
             }
+        }
+    }
+
+    /// The deferred after-export ask (see `ReviewPromptManager`), when it is
+    /// due and nothing else is on screen; otherwise it waits for the next
+    /// return to the app.
+    private func offerAfterExportReviewIfDue() {
+        Task { @MainActor in
+            // After launch-time prompts have had their turn.
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard scenePhase == .active, scriptToRecord == nil, editorMode == nil,
+                  paywallPresentation == nil, !showDraftScript, !showBulkImport,
+                  !showNotificationSoftAsk, !showResumeAlert, !showAfterExportPrompt,
+                  ReviewPromptManager.shouldPresentAfterExport()
+            else { return }
+            showAfterExportPrompt = true
         }
     }
 

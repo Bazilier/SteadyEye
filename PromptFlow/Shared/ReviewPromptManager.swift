@@ -1,8 +1,13 @@
 import Foundation
 import UIKit
 
-/// Eligibility and side effects for the satisfaction pre-prompt shown after
-/// the first Camera Roll save of a recording made from a user-written script.
+/// Eligibility and side effects for the satisfaction pre-prompt.
+///
+/// Asked at a happy moment rather than on the way out: right after the user
+/// has watched a take of their own script that held eye contact well
+/// (`Trigger.greatTake`), or — when they exported a take to share it — once
+/// they come back to the app later (`Trigger.afterExport`), instead of
+/// standing between the saved video and wherever they were posting it.
 ///
 /// Replaces the native `SKStoreReviewController` prompt. Apple's review
 /// guidelines discourage putting a pre-prompt in front of the system dialog,
@@ -34,6 +39,39 @@ enum ReviewPromptManager {
     /// Re-ask window after a No or a silent dismissal. Both are treated the
     /// same: neither is a yes, and neither is a reason to never ask again.
     private static let retryInterval: TimeInterval = 14 * 86400
+
+    /// Why the prompt is showing; logged with every satisfaction event.
+    enum Trigger: String {
+        case greatTake = "great_take"
+        case afterExport = "after_export"
+    }
+
+    /// Eye contact a take needs before it counts as a happy moment.
+    static let greatTakeThreshold = 0.85
+
+    /// An own-script take was exported; ask once the user is back.
+    private static let exportedAtKey = "satisfactionExportedAt"
+    /// How long after the export "back" means: long enough to have posted.
+    private static let afterExportDelay: TimeInterval = 15 * 60
+
+    static func noteOwnScriptExported() {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: exportedAtKey)
+    }
+
+    /// The after-export ask is due: an export long enough ago, and every
+    /// ordinary rule (`shouldPresentSatisfactionPrompt`) passes.
+    static func shouldPresentAfterExport() -> Bool {
+        let exportedAt = UserDefaults.standard.double(forKey: exportedAtKey)
+        guard exportedAt > 0,
+              Date().timeIntervalSince1970 - exportedAt >= afterExportDelay
+        else { return false }
+        return shouldPresentSatisfactionPrompt(isUserWrittenScript: true)
+    }
+
+    /// The after-export ask reached the screen (or no longer applies).
+    static func clearExport() {
+        UserDefaults.standard.removeObject(forKey: exportedAtKey)
+    }
 
     /// App Store ID 6761066976 — see `AppsFlyerAttributionProvider.appleAppID`.
     private static let writeReviewURL = URL(
@@ -68,6 +106,10 @@ enum ReviewPromptManager {
     /// entry is not a silent no-op. Everything else — the seeded `"off"`, an
     /// empty value, a typo — leaves the prompt disabled.
     static var isSatisfactionPromptEnabled: Bool {
+        #if DEV
+        // No Remote Config in DEV: a Settings toggle stands in for it.
+        if UserDefaults.standard.bool(forKey: "dev_review_prompt_enabled") { return true }
+        #endif
         let raw = RemoteConfigManager.shared
             .string("review_prompt_enabled")
             .trimmingCharacters(in: .whitespacesAndNewlines)
