@@ -1946,6 +1946,126 @@
     "Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only." : {
 
     },
+    "editor.optimize_tip.body" : {
+      "comment" : "Body of the tip shown the first time the editor holds the user's own text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optimize prepares your text for reading aloud: numbers become words, abbreviations are spelled out, long sentences get shorter."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Optimizar prepara tu texto para leerlo en voz alta: los números se vuelven palabras, las abreviaturas se escriben completas y las frases largas se acortan."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otimizar prepara seu texto para ler em voz alta: números viram palavras, abreviações são escritas por extenso e frases longas ficam mais curtas."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оптимизация подготовит текст для чтения вслух: цифры станут словами, сокращения раскроются, длинные фразы станут короче."
+          }
+        }
+      }
+    },
+    "editor.optimize_tip.example" : {
+      "comment" : "Example line in the optimize tip, taken from the user's own text. First placeholder: a number as digits; second: the same number spelled out in words.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example, “%1$@” becomes “%2$@”."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por ejemplo, «%1$@» se convierte en «%2$@»."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por exemplo, “%1$@” vira “%2$@”."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Например, «%1$@» станет «%2$@»."
+          }
+        }
+      }
+    },
+    "editor.optimize_tip.pause" : {
+      "comment" : "Last line of the optimize tip: how to add a pause marker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tip: type // where you want a pause."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consejo: escribe // donde quieras una pausa."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dica: digite // onde quiser uma pausa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Совет: поставьте // там, где нужна пауза."
+          }
+        }
+      }
+    },
+    "editor.optimize_tip.title" : {
+      "comment" : "Title of the tip shown the first time the editor holds the user's own text: what Optimize does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make it easy to say"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para leerlo en voz alta sin trabas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para ler em voz alta sem tropeçar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы легко читалось вслух"
+          }
+        }
+      }
+    },
     "Fire inactive_3_days in 5s" : {
 
     },
@@ -7930,36 +8050,6 @@
         }
       }
     },
-    "scripts.editor.demo.title" : {
-      "comment" : "Mock title pre-filled into the script editor's title field during the editor demo flow (the same first-run path that pre-fills DemoEditorBefore.<lang>.txt into the content area). Read-only until the user taps Optimize, then editable. Short marketing-style title that hints at the demo content's topic.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sample: see how AI optimization works"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ejemplo: así funciona la optimización con IA"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exemplo: veja como funciona a otimização com IA"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пример: как работает AI-оптимизация"
-          }
-        }
-      }
-    },
     "scripts.editor.discardAlert.discard" : {
       "comment" : "Destructive button on the discard-changes alert in the script editor.",
       "extractionState" : "manual",
@@ -8196,36 +8286,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Оптимизация не удалась"
-          }
-        }
-      }
-    },
-    "scripts.editor.tip.body" : {
-      "comment" : "First-run tip body in the script editor. The // characters are LITERAL pause-marker syntax used by the teleprompter — DO NOT translate or alter the // characters. Translate only the surrounding prose. The word 'Optimize' refers to the button labelled scripts.editor.optimize and should match it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap \"Optimize\" to let AI clean up your script for reading aloud.\n\nUse // to add a pause between sections."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toca \"Optimizar\" para que la IA limpie tu guion para leerlo en voz alta.\n\nUsa // para agregar una pausa entre secciones."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toque em \"Otimizar\" para a IA preparar seu roteiro para leitura em voz alta.\n\nUse // para adicionar uma pausa entre seções."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нажми «Оптимизировать», чтобы AI почистил твой скрипт для чтения вслух.\n\nИспользуй // для паузы между блоками."
           }
         }
       }

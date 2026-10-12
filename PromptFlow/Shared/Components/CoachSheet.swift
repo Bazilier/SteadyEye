@@ -6,7 +6,9 @@ import SwiftUI
 /// card, which dimmed the screen and blocked it until read.
 ///
 /// `allowsBackgroundInteraction` keeps the screen behind usable, so a tip can
-/// sit there while the user tries what it describes.
+/// sit there while the user tries what it describes. `onPrimary` makes the
+/// button do the thing the tip is about; it runs after `onDismiss`, and only
+/// for the button, not a swipe.
 extension View {
     func coachSheet(
         isPresented: Binding<Bool>,
@@ -17,14 +19,69 @@ extension View {
         allowsBackgroundInteraction: Bool = false,
         onDismiss: @escaping () -> Void
     ) -> some View {
-        sheet(isPresented: isPresented, onDismiss: onDismiss) {
+        coachSheet(
+            isPresented: isPresented,
+            icon: icon,
+            title: Text(title),
+            message: Text(message),
+            buttonLabel: Text(buttonLabel),
+            allowsBackgroundInteraction: allowsBackgroundInteraction,
+            onDismiss: onDismiss
+        )
+    }
+
+    func coachSheet(
+        isPresented: Binding<Bool>,
+        icon: String,
+        title: Text,
+        message: Text,
+        buttonLabel: Text,
+        allowsBackgroundInteraction: Bool = false,
+        onDismiss: @escaping () -> Void,
+        onPrimary: (() -> Void)? = nil
+    ) -> some View {
+        modifier(CoachSheetModifier(
+            isPresented: isPresented,
+            icon: icon,
+            title: title,
+            message: message,
+            buttonLabel: buttonLabel,
+            allowsBackgroundInteraction: allowsBackgroundInteraction,
+            onDismiss: onDismiss,
+            onPrimary: onPrimary
+        ))
+    }
+}
+
+private struct CoachSheetModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let icon: String
+    let title: Text
+    let message: Text
+    let buttonLabel: Text
+    let allowsBackgroundInteraction: Bool
+    let onDismiss: () -> Void
+    let onPrimary: (() -> Void)?
+
+    /// Whether this presentation closed through the button.
+    @State private var primaryTapped = false
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented, onDismiss: {
+            onDismiss()
+            if primaryTapped { onPrimary?() }
+            primaryTapped = false
+        }) {
             CoachSheetContent(
                 icon: icon,
                 title: title,
                 message: message,
                 buttonLabel: buttonLabel,
                 allowsBackgroundInteraction: allowsBackgroundInteraction,
-                dismiss: { isPresented.wrappedValue = false }
+                dismiss: {
+                    primaryTapped = true
+                    isPresented = false
+                }
             )
         }
     }
@@ -32,9 +89,9 @@ extension View {
 
 private struct CoachSheetContent: View {
     let icon: String
-    let title: LocalizedStringKey
-    let message: LocalizedStringKey
-    let buttonLabel: LocalizedStringKey
+    let title: Text
+    let message: Text
+    let buttonLabel: Text
     let allowsBackgroundInteraction: Bool
     let dismiss: () -> Void
 
@@ -49,16 +106,16 @@ private struct CoachSheetContent: View {
                     .foregroundStyle(Theme.accent)
                     .frame(width: 44, height: 44)
                     .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
-                Text(title)
+                title
                     .font(.title3.bold())
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(message)
+            message
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button(action: dismiss) {
-                Text(buttonLabel)
+                buttonLabel
                     .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
