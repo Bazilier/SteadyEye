@@ -1328,6 +1328,246 @@
     "Fire trial_started in 5s" : {
 
     },
+    "first_take.body" : {
+      "comment" : "Body of the first-take coach card. 'The eye' is the eye-contact indicator in the corner of the prompter pill.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They run right under the lens. Keep your eyes up there and the eye turns green."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aparecen justo debajo de la cámara. Mantén la mirada ahí y el ojo se pondrá verde."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elas passam logo abaixo da câmera. Mantenha o olhar ali e o olho fica verde."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Они идут прямо под камерой. Смотрите туда — и глаз загорится зелёным."
+          }
+        }
+      }
+    },
+    "first_take.chip" : {
+      "comment" : "Small label at the top of the coach card shown on the user's first recording (onboarding demo).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primera toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primeira gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Первый дубль"
+          }
+        }
+      }
+    },
+    "first_take.legend.calibrating" : {
+      "comment" : "Eye indicator legend: orange eye, learning the user's eye contact in the first seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calibrating"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calibrando"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calibrando"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Калибровка"
+          }
+        }
+      }
+    },
+    "first_take.legend.contact" : {
+      "comment" : "Eye indicator legend: green eye, the user is looking at the lens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eye contact"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacto visual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contato visual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Взгляд в камеру"
+          }
+        }
+      }
+    },
+    "first_take.legend.ready" : {
+      "comment" : "Eye indicator legend: grey eye, tracking not started yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готов"
+          }
+        }
+      }
+    },
+    "first_take.record" : {
+      "comment" : "Primary button on the first-take coach card: starts the recording countdown.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start recording"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empezar a grabar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar a gravar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать запись"
+          }
+        }
+      }
+    },
+    "first_take.rehearse" : {
+      "comment" : "Secondary button on the first-take coach card: plays the prompter without recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just rehearse"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo ensayar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só ensaiar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Просто прогнать"
+          }
+        }
+      }
+    },
+    "first_take.title" : {
+      "comment" : "Title of the first-take coach card on the camera screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap record and read the words"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca grabar y lee las palabras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em gravar e leia as palavras"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите запись и читайте слова"
+          }
+        }
+      }
+    },
     "Force Free" : {
 
     },
@@ -8238,6 +8478,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Затемнять экран при записи"
+          }
+        }
+      }
+    },
+    "settings.recording.eyeContact" : {
+      "comment" : "Toggle: show the eye on the prompter that turns green while the user looks at the lens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eye-contact indicator"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indicador de contacto visual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indicador de contato visual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Индикатор взгляда"
+          }
+        }
+      }
+    },
+    "settings.recording.eyeContactFooter" : {
+      "comment" : "Helper text below the eye-contact indicator toggle.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An eye on the prompter turns green while you look at the lens. Beta."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un ojo en el teleprompter se pone verde mientras miras a la cámara. Beta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um olho no teleprompter fica verde enquanto você olha para a câmera. Beta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Глаз на суфлёре горит зелёным, пока вы смотрите в камеру. Бета."
+          }
+        }
+      }
+    },
+    "settings.recording.gazeAutoPause" : {
+      "comment" : "Toggle: freeze the prompter while the user looks away from the lens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause when you look away"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausar cuando apartas la mirada"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausar quando você desvia o olhar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пауза, когда отводите взгляд"
+          }
+        }
+      }
+    },
+    "settings.recording.gazeAutoPauseFooter" : {
+      "comment" : "Helper text below the pause-when-you-look-away toggle.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The prompter waits while you look down at the screen and picks up on the same word. Beta."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El teleprompter espera mientras miras la pantalla y sigue desde la misma palabra. Beta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O teleprompter espera enquanto você olha para a tela e continua da mesma palavra. Beta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Суфлёр ждёт, пока вы смотрите на экран, и продолжает с того же слова. Бета."
           }
         }
       }

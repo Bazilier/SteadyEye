@@ -172,33 +172,23 @@ struct RecordingView: View {
     @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
     #if DEV
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
-    @AppStorage("dev_gaze_indicator") private var devGazeIndicator: Bool = false
-    @AppStorage("dev_gaze_autopause") private var devGazeAutoPause: Bool = false
     #endif
-    /// Eye-contact tracking. Off outside DEV builds until the feature ships.
+    /// Eye-contact tracking (beta), from Settings → Recording.
+    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
     @StateObject private var gazeAttention = GazeAttention()
     private var gazeTrackingEnabled: Bool {
         #if DEV
-        devGazeProbe || devGazeIndicator || devGazeAutoPause
-        #else
-        false
+        if devGazeProbe { return true }
         #endif
+        return gazeIndicatorEnabled || gazeAutoPauseEnabled
     }
-    private var showsGazeIndicator: Bool {
-        #if DEV
-        devGazeIndicator || devGazeAutoPause
-        #else
-        false
-        #endif
-    }
+    /// Auto-pause shows the eye too: it is what explains a paused prompter.
+    private var showsGazeIndicator: Bool { gazeIndicatorEnabled || gazeAutoPauseEnabled }
     /// Freeze the prompter while the user looks away from the lens.
-    private var gazeAutoPauses: Bool {
-        #if DEV
-        devGazeAutoPause
-        #else
-        false
-        #endif
-    }
+    private var gazeAutoPauses: Bool { gazeAutoPauseEnabled }
+    /// The onboarding demo's coach over the record button.
+    @State private var showFirstTakeCoach = false
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { displayMode == "classic" }
@@ -497,6 +487,12 @@ struct RecordingView: View {
             let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
             if wasOnboardingAuto {
                 UserDefaults.standard.set(false, forKey: "nextRecordingIsOnboardingAuto")
+                // Portrait only: the interface is portrait-locked, so in
+                // landscape the card would read sideways.
+                if cameraAuthStatus == .authorized, !isLandscape {
+                    showFirstTakeCoach = true
+                    AppAnalytics.log("first_take_coach_shown")
+                }
             }
             guard cameraAuthStatus == .authorized,
                   !wasOnboardingAuto,
@@ -676,6 +672,33 @@ struct RecordingView: View {
                     }
                 }
                 .transition(.opacity)
+            }
+        }
+        // 8. First-take coach, spotlighting the record button.
+        .overlayPreferenceValue(RecordButtonBoundsKey.self) { anchor in
+            if showFirstTakeCoach {
+                GeometryReader { proxy in
+                    FirstTakeCoach(
+                        spotlight: anchor.map { proxy[$0] },
+                        onRecord: {
+                            AppAnalytics.log("first_take_coach_record_tapped")
+                            withAnimation { showFirstTakeCoach = false }
+                            toggleRecording()
+                        },
+                        onRehearse: {
+                            AppAnalytics.log("first_take_coach_rehearse_tapped")
+                            withAnimation { showFirstTakeCoach = false }
+                            togglePlay()
+                        },
+                        onDismiss: {
+                            AppAnalytics.log("first_take_coach_dismissed")
+                            withAnimation { showFirstTakeCoach = false }
+                        }
+                    )
+                }
+                // Same full-screen space as the coach's own reader, so the
+                // spotlight lands on the button.
+                .ignoresSafeArea()
             }
         }
     }
@@ -1793,6 +1816,11 @@ struct RecordingView: View {
     /// under a quarter turn, so a `rotationEffect` here would be a no-op
     /// transform carrying a comment that implied otherwise.
     private var recordButton: some View {
+        recordButtonCore
+            .anchorPreference(key: RecordButtonBoundsKey.self, value: .bounds) { $0 }
+    }
+
+    private var recordButtonCore: some View {
         Button { toggleRecording() } label: {
             ZStack {
                 Circle()

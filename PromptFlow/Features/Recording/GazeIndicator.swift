@@ -7,13 +7,16 @@ import SwiftUI
 struct GazeIndicator: View {
     let state: GazeAttention.State
     var isLandscape = false
+    var glyphSize: CGFloat = 13
+    /// Layout box; 44 on the pill so it lines up with the mode toggle.
+    var frameSize: CGFloat = 44
 
     var body: some View {
         Image(systemName: state == .idle ? "eye" : "eye.fill")
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: glyphSize, weight: .semibold))
             .foregroundStyle(color)
             .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
-            .frame(width: 44, height: 44)
+            .frame(width: frameSize, height: frameSize)
             .animation(.easeInOut(duration: 0.2), value: state)
             .allowsHitTesting(false)
             .accessibilityHidden(true)

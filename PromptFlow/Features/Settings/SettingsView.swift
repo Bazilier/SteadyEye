@@ -41,8 +41,8 @@ struct SettingsView: View {
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
-    @AppStorage("dev_gaze_indicator") private var devGazeIndicator: Bool = false
-    @AppStorage("dev_gaze_autopause") private var devGazeAutoPause: Bool = false
+    @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
+    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
     @State private var devShowSatisfactionPrompt = false
     @State private var devShowFounderChat = false
     /// Mirrors `VideoPreviewView`: the chat is raised from the prompt sheet's
@@ -331,6 +331,40 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $gazeIndicatorEnabled) {
+                            Text(String(
+                                localized: "settings.recording.eyeContact",
+                                defaultValue: "Eye-contact indicator",
+                                comment: "Toggle: show the eye on the prompter that turns green while the user looks at the lens."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.eyeContactFooter",
+                            defaultValue: "An eye on the prompter turns green while you look at the lens. Beta.",
+                            comment: "Helper text below the eye-contact indicator toggle."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $gazeAutoPauseEnabled) {
+                            Text(String(
+                                localized: "settings.recording.gazeAutoPause",
+                                defaultValue: "Pause when you look away",
+                                comment: "Toggle: freeze the prompter while the user looks away from the lens."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.gazeAutoPauseFooter",
+                            defaultValue: "The prompter waits while you look down at the screen and picks up on the same word. Beta.",
+                            comment: "Helper text below the pause-when-you-look-away toggle."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
                         Toggle(isOn: $useBluetoothMic) {
                             Text("settings.allowBluetoothMics", comment: "Toggle: allow Bluetooth microphones (AirPods etc.) as audio input. Off by default because BT forces 16kHz HFP audio.")
                         }
@@ -469,20 +503,6 @@ struct SettingsView: View {
                 .listRowSeparator(.hidden)
 
                 Section("Gaze probe (DEV)") {
-                    Toggle(isOn: $devGazeIndicator) {
-                        Text("Eye-contact indicator on the pill")
-                    }
-                    .tint(Theme.accent)
-                    Text("Green eye while you look at the lens, grey when you look down at the screen or away (or before tracking starts), orange while it calibrates itself during the first seconds of playback.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle(isOn: $devGazeAutoPause) {
-                        Text("Pause the prompter when you look away")
-                    }
-                    .tint(Theme.accent)
-                    Text("Freezes the prompter while the eye is grey and resumes on the same word when you look back. Shows the eye too.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     Toggle(isOn: $devGazeProbe) {
                         Text("Gaze readout on the camera")
                     }
