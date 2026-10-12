@@ -188,7 +188,7 @@ struct ScriptListView: View {
                 // Closed before the presentation completed.
                 if script == nil {
                     cardOpener.resetCard()
-                    continueAfterFirstTake()
+                    continueAfterRecording()
                 }
             }
             .sheet(isPresented: $showBulkImport) {
@@ -432,22 +432,24 @@ struct ScriptListView: View {
         modelContext.delete(script)
     }
 
-    // MARK: - After the first take
+    // MARK: - After a take
 
-    /// Runs once the camera closes. After the user's first take — the first
-    /// value moment — free users see the paywall, whichever way they left
-    /// the preview. If they chose "record your own script" there, a new
-    /// script follows (after the paywall, when there is one).
-    private func continueAfterFirstTake() {
+    /// Runs once the camera closes, whichever way the user left the preview.
+    /// After the sample take: the offer to write an own script. After the
+    /// first successful take of an own script — the real value moment — free
+    /// users see the paywall, once per install.
+    private func continueAfterRecording() {
         let defaults = UserDefaults.standard
-        let paywallDue = defaults.bool(forKey: "firstTakePaywallDue")
+        let paywallDue = defaults.bool(forKey: "ownTakePaywallDue")
         guard paywallDue || defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") else { return }
-        defaults.set(false, forKey: "firstTakePaywallDue")
+        defaults.set(false, forKey: "ownTakePaywallDue")
         Task { @MainActor in
             // Let the camera's cover finish dismissing first.
             try? await Task.sleep(nanoseconds: 450_000_000)
-            if paywallDue, !subscriptionManager.isSubscribed {
-                paywallPresentation = PaywallPresentation(source: "first_take")
+            if paywallDue, !subscriptionManager.isSubscribed,
+               !defaults.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                defaults.set(true, forKey: "postFirstOwnRecordingPaywallShown")
+                paywallPresentation = PaywallPresentation(source: "first_own_take")
             } else {
                 openOwnScriptIfPending()
             }

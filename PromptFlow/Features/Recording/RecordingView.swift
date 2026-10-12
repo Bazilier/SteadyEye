@@ -2022,11 +2022,17 @@ struct RecordingView: View {
                     "via": "auto_persist"
                 ])
                 previewIsFirstTake = wasFirst
+                // The paywall waits for real value: a successful take of the
+                // user's own script, not the sample. Shown once the camera
+                // closes (see ScriptListView), once per install — the same
+                // one-shot flag as the post-save paywall, so never both.
+                if !script.isDemo, !script.isSample,
+                   !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown") {
+                    UserDefaults.standard.set(true, forKey: "ownTakePaywallDue")
+                }
                 if wasFirst {
-                    // The first value moment: the paywall follows it, once,
-                    // then the offer to write an own script — whichever way
-                    // the user leaves the preview (see ScriptListView).
-                    UserDefaults.standard.set(true, forKey: "firstTakePaywallDue")
+                    // After the first take, whichever way the user leaves the
+                    // preview, the list offers to write an own script.
                     UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
