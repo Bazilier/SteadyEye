@@ -91,8 +91,9 @@ struct PlaceholderLoopView: View {
     private var classicPlaceholder: some View {
         VStack(spacing: 0) {
             ForEach(0..<3, id: \.self) { row in
+                let idx = currentIndex - 1 + row
                 let count = max(chunks.count, 1)
-                let text = chunks.isEmpty ? "" : chunks[(currentIndex + row) % count]
+                let text = (idx < 0 || chunks.isEmpty) ? "" : chunks[idx % count]
                 Group {
                     if useORP {
                         ORPWord(
@@ -346,13 +347,16 @@ struct ClassicThreeLineView: View {
         (fontSize * 1.2).rounded()
     }
 
-    /// Opacity per row of the queue: the current word on top, then the two
-    /// upcoming words fading out.
+    /// Opacity per row: previous word, current word (middle), next word.
+    /// The eyes run a word or two ahead of the voice when reading aloud, so
+    /// the word being spoken is usually the one above the highlighted row —
+    /// keeping it on screen gives the voice an anchor and the eyes a place
+    /// to regress to.
     static func rowOpacity(_ row: Int) -> Double {
         switch row {
-        case 0: return 1.0
-        case 1: return 0.45
-        default: return 0.25
+        case 1: return 1.0
+        case 0: return 0.35
+        default: return 0.5
         }
     }
 
@@ -383,7 +387,7 @@ struct ClassicThreeLineView: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(0..<3, id: \.self) { row in
-                line(chunkText(at: displayIndex + row))
+                line(chunkText(at: displayIndex - 1 + row))
                     .opacity(Self.rowOpacity(row))
                     .frame(maxWidth: .infinity)
                     .frame(height: lineHeight)
