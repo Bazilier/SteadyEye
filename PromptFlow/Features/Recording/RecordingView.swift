@@ -535,6 +535,15 @@ struct RecordingView: View {
         .onChange(of: isTextEditMode) { _, editing in
             if editing, showDragTip { showDragTip = false }
         }
+        // The record button can be tapped straight through the coach's
+        // spotlight: clear the coach as soon as the countdown starts.
+        .onChange(of: isCountingDown) { _, counting in
+            if counting, showFirstTakeCoach {
+                AppAnalytics.log("first_take_coach_record_tapped", params: ["via": "spotlight"])
+                firstTakeFlowActive = false
+                withAnimation { showFirstTakeCoach = false }
+            }
+        }
         .onAppear {
             let wasOnboardingAuto = UserDefaults.standard.bool(forKey: "nextRecordingIsOnboardingAuto")
             if wasOnboardingAuto {
@@ -742,6 +751,8 @@ struct RecordingView: View {
                     FirstTakeCoach(
                         spotlight: anchor.map { proxy[$0] },
                         afterRehearsal: coachAfterRehearsal,
+                        // The sample taught it all; an own script needs one line.
+                        compact: !script.isDemo,
                         onRecord: {
                             AppAnalytics.log("first_take_coach_record_tapped", params: ["after_rehearsal": coachAfterRehearsal])
                             firstTakeFlowActive = false

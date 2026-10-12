@@ -17,6 +17,9 @@ struct FirstTakeCoach: View {
     let spotlight: CGRect?
     /// Shown again once a rehearsal reaches the end: "now record it".
     var afterRehearsal = false
+    /// For a user who has already done the sample take: no card, just a line
+    /// above the spotlit record button, which takes the tap itself.
+    var compact = false
     let onRecord: () -> Void
     let onRehearse: () -> Void
     let onDismiss: () -> Void
@@ -25,7 +28,9 @@ struct FirstTakeCoach: View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 dim(in: geo.size)
-                    .contentShape(Rectangle())
+                    // The hole is not part of the dim's hit area, so a tap
+                    // there reaches the real record button underneath.
+                    .contentShape(SpotlightCutout(hole: spotlight.map(Self.hole)), eoFill: true)
                     .onTapGesture(perform: onDismiss)
                 if let spot = spotlight {
                     Circle()
@@ -35,29 +40,50 @@ struct FirstTakeCoach: View {
                         .position(x: spot.midX, y: spot.midY)
                         .allowsHitTesting(false)
                 }
-                card
-                    .padding(.horizontal, 12)
-                    .frame(width: geo.size.width)
-                    .frame(
-                        height: spotlight.map { $0.minY - 20 } ?? geo.size.height,
-                        alignment: spotlight == nil ? .center : .bottom
-                    )
+                Group {
+                    if compact { bubble } else { card }
+                }
+                .padding(.horizontal, 12)
+                .frame(width: geo.size.width)
+                .frame(
+                    height: spotlight.map { $0.minY - 20 } ?? geo.size.height,
+                    alignment: spotlight == nil ? .center : .bottom
+                )
             }
         }
         .ignoresSafeArea()
         .transition(.opacity)
     }
 
+    private static func hole(_ spot: CGRect) -> CGRect { spot.insetBy(dx: -8, dy: -8) }
+
     /// Dimmed screen with a round hole over the record button.
     private func dim(in size: CGSize) -> some View {
-        Canvas { context, canvasSize in
-            var path = Path(CGRect(origin: .zero, size: canvasSize))
-            if let spot = spotlight {
-                path.addEllipse(in: spot.insetBy(dx: -8, dy: -8))
-            }
-            context.fill(path, with: .color(.black.opacity(0.58)), style: FillStyle(eoFill: true))
+        SpotlightCutout(hole: spotlight.map(Self.hole))
+            .fill(Color.black.opacity(0.58), style: FillStyle(eoFill: true))
+            .frame(width: size.width, height: size.height)
+    }
+
+    /// The compact coach: one line pointing at the record button.
+    private var bubble: some View {
+        VStack(spacing: 0) {
+            Text(String(
+                localized: "first_take.compact",
+                defaultValue: "Tap record to start",
+                comment: "One-line coach above the spotlit record button when the user records their own script for the first time."
+            ))
+                .font(.headline)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(white: 0.11))
+                .offset(y: -3)
         }
-        .frame(width: size.width, height: size.height)
+        .allowsHitTesting(false)
     }
 
     private var card: some View {
@@ -159,5 +185,16 @@ struct FirstTakeCoach: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(Color(white: 0.17), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// The whole rect with an oval hole; drawn and hit-tested with even-odd fill.
+private struct SpotlightCutout: Shape {
+    let hole: CGRect?
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        if let hole { path.addEllipse(in: hole) }
+        return path
     }
 }

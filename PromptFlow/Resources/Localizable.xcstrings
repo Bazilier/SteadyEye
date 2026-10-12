@@ -2048,6 +2048,36 @@
         }
       }
     },
+    "first_take.compact" : {
+      "comment" : "One-line coach above the spotlit record button when the user records their own script for the first time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap record to start"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca grabar para empezar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em gravar para começar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите запись, чтобы начать"
+          }
+        }
+      }
+    },
     "first_take.legend.calibrating" : {
       "comment" : "Eye indicator legend: orange eye, learning the user's eye contact in the first seconds.",
       "extractionState" : "manual",
