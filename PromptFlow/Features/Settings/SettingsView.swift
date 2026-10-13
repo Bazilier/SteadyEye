@@ -504,7 +504,7 @@ struct SettingsView: View {
                         Text("Crop sideways takes to 9:16")
                     }
                     .tint(Theme.accent)
-                    Text("What iPhone Duo always does: with the phone held sideways, record the level horizon's vertical middle 9:16 instead of a tipped-over portrait frame. Hold this phone sideways to test it. Takes effect on next Recording open.")
+                    Text("Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle(isOn: $devDuoGeometryOverlay) {

@@ -101,12 +101,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// its vertical middle 9:16 at full height — instead of keeping a portrait
     /// angle, which records the scene tipped over by a quarter turn.
     ///
-    /// On iPhone Duo, whose inner display is used with the body on its side
-    /// (crease horizontal) and whose inner camera's mounting is unknown. On
-    /// other iPhones only through the DEV switch, to test the same pose by
-    /// holding the phone sideways.
+    /// Product default is off on every iPhone, iPhone Duo included: a phone
+    /// held sideways records a portrait frame with the scene turned, never a
+    /// crop. Kept behind the DEV switch only.
     private static var cropsSidewaysToPortrait: Bool {
-        if DuoDisplayMonitor.deviceHasHinge { return true }
         #if DEV
         return UserDefaults.standard.bool(forKey: "dev_crop_sideways_to_portrait")
         #else
@@ -231,6 +229,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// Duo cameras whose format axes were already flipped in this process —
     /// one try each, so a camera that never delivers portrait cannot loop.
     private var duoAxesFlippedThisProcess: Set<String> = []
+    /// Angle corrections learned per Duo camera in this process. Capped, so
+    /// readings that keep disagreeing cannot rebuild the session forever.
+    private var duoCorrectionsThisProcess: [String: Int] = [:]
+    private static let maxDuoCorrectionsPerProcess = 2
     /// Added to the preview's level angle on a Duo camera: the same learned
     /// correction the capture connection gets.
     @Published private(set) var previewAngleCorrection: CGFloat = 0
@@ -757,23 +759,34 @@ final class CameraManager: NSObject, ObservableObject {
     }
     #endif
 
-    /// The Duo camera should deliver portrait. A landscape buffer means its
-    /// format axes run the other way: one rebuild with them swapped. Takes are
-    /// safe either way — a landscape buffer goes down the sideways crop.
+    /// An iPhone Duo session must deliver portrait. A landscape buffer from a
+    /// Duo camera means its format axes run the other way: one rebuild with
+    /// them swapped. Failing that — or on the standard front camera, whose
+    /// level angle on Duo is landscape — the connection takes a portrait angle:
+    /// the frame stays portrait and the scene records turned, exactly as on any
+    /// iPhone held sideways. Never a landscape file, never a crop.
     private func validateDuoBufferShape(generation: Int) {
         guard generation == configurationGeneration,
-              let choice = sessionDuoCamera,
+              !sessionOrientationMode.wantsLandscapeBuffer,
               let observed = observedBuffer.withLock({ $0 }),
               observed.width > observed.height else { return }
-        let type = choice.device.deviceType.rawValue
-        guard !duoAxesFlippedThisProcess.contains(type) else {
-            CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(type) buffer=\(observed.width)x\(observed.height) action=crop")
-            return
+        let buffer = "\(observed.width)x\(observed.height)"
+        if let choice = sessionDuoCamera {
+            let type = choice.device.deviceType.rawValue
+            if !duoAxesFlippedThisProcess.contains(type) {
+                duoAxesFlippedThisProcess.insert(type)
+                UserDefaults.standard.set(!choice.axesSwapped, forKey: Self.axesKey(type))
+                CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(type) buffer=\(buffer) action=swap_axes")
+                reconfigureDuoCamera(reason: "axes_swapped", force: true)
+                return
+            }
         }
-        duoAxesFlippedThisProcess.insert(type)
-        UserDefaults.standard.set(!choice.axesSwapped, forKey: Self.axesKey(type))
-        CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(type) buffer=\(observed.width)x\(observed.height) action=swap_axes")
-        reconfigureDuoCamera(reason: "axes_swapped", force: true)
+        guard !isRecordingActive,
+              let connection = videoDataOutput?.connection(with: .video),
+              let reported = lastReportedHorizonAngle else { return }
+        let portraitAngle = CGFloat((Int(reported.rounded()) + 90) % 360)
+        CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(sessionDuoCamera?.device.deviceType.rawValue ?? "standard") buffer=\(buffer) action=portrait_angle angle=\(Int(portraitAngle))")
+        applyClampedRotation(reported: portraitAngle, to: connection)
     }
 
     /// Self-correction for a Duo camera whose RotationCoordinator angle turns
@@ -798,6 +811,8 @@ final class CameraManager: NSObject, ObservableObject {
             duoCalibrationStreak = nil
             return
         }
+        let type = choice.device.deviceType.rawValue
+        guard duoCorrectionsThisProcess[type, default: 0] < Self.maxDuoCorrectionsPerProcess else { return }
         let count = duoCalibrationStreak?.rotation == rotation ? (duoCalibrationStreak?.count ?? 0) + 1 : 1
         guard count >= Self.duoCalibrationReadings else {
             duoCalibrationStreak = (rotation, count)
@@ -805,7 +820,7 @@ final class CameraManager: NSObject, ObservableObject {
             return
         }
         duoCalibrationStreak = nil
-        let type = choice.device.deviceType.rawValue
+        duoCorrectionsThisProcess[type, default: 0] += 1
         let corrected = (choice.correction + rotation) % 360
         UserDefaults.standard.set(corrected, forKey: Self.correctionKey(type))
         let line = "event=duo_angle_corrected type=\(type) upright_cw=\(rotation) roll=\(Int(roll.rounded())) correction_before=\(choice.correction) correction_after=\(corrected)"
@@ -1070,7 +1085,7 @@ final class CameraManager: NSObject, ObservableObject {
             self.isSessionReady = true
             // A few frames in, past any buffer still in flight from the
             // previous configuration: is the Duo camera delivering portrait?
-            if duoChoice != nil {
+            if duoChoice != nil || DuoDisplayMonitor.deviceHasHinge {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                     self?.validateDuoBufferShape(generation: generation)
                 }
