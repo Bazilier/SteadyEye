@@ -832,7 +832,7 @@ struct PaywallView: View {
                 safeTop: geo.safeAreaInsets.top,
                 screenWidth: geo.size.width,
                 isClassicMode: isClassicMode,
-                spacing: 12
+                spacing: 28
             )
             ZStack(alignment: .topLeading) {
                 VStack(spacing: 0) {
