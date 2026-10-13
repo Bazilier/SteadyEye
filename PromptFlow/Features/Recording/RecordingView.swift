@@ -453,7 +453,7 @@ struct RecordingView: View {
                 stopTakeForFoldChange()
                 // Which way is up on the other display's camera. After a delay,
                 // so the buffers still in flight from before the switch are skipped.
-                if DuoReportService.isEnabled {
+                if DuoReportService.readsFaceOrientation {
                     cameraManager.faceProbe.arm(context: "posture_\(new.rawValue)", delay: 0.6)
                 }
             }

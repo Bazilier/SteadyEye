@@ -33,7 +33,18 @@ enum DuoReportService {
         if DuoDisplayMonitor.deviceHasHinge { return true }
         #if DEV
         return UserDefaults.standard.bool(forKey: "dev_duo_reports_any_device")
-            || UserDefaults.standard.bool(forKey: "dev_duo_calibration_test")
+        #else
+        return false
+        #endif
+    }
+
+    /// Whether the camera reads the face's orientation: wherever reports
+    /// run, and in the DEV calibration test, which needs the readings but
+    /// sends nothing.
+    nonisolated static var readsFaceOrientation: Bool {
+        if isEnabled { return true }
+        #if DEV
+        return UserDefaults.standard.bool(forKey: "dev_duo_calibration_test")
         #else
         return false
         #endif

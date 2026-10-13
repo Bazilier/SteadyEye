@@ -1366,7 +1366,7 @@ final class CameraManager: NSObject, ObservableObject {
             self?.startWriterPipeline(outputURL: outputURL, horizonAngle: horizonAngle)
         }
         // After the writer is set up, so the face is read off a take's frames.
-        if DuoReportService.isEnabled { faceProbe.arm(context: "take", delay: 0.5) }
+        if DuoReportService.readsFaceOrientation { faceProbe.arm(context: "take", delay: 0.5) }
 
         recordingStartTime = Date()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -1736,12 +1736,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
                 }
                 // After a pause: right after a reconfiguration the first buffer
                 // can still carry the previous connection angle.
-                if DuoReportService.isEnabled { faceProbe.arm(context: "preview", delay: 0.3) }
+                if DuoReportService.readsFaceOrientation { faceProbe.arm(context: "preview", delay: 0.3) }
             } else if let change, let previous = change.previous {
                 // Same configuration, different shape: an applied rotation, or
                 // on iPhone Duo a fold moving the session to another sensor.
                 logBufferShapeChanged(from: previous, to: change.observation)
-                if DuoReportService.isEnabled { faceProbe.arm(context: "shape_change") }
+                if DuoReportService.readsFaceOrientation { faceProbe.arm(context: "shape_change") }
             }
             faceProbe.submit(pixelBuffer, connectionAngle: connection.videoRotationAngle, mirrored: connection.isVideoMirrored)
         }
