@@ -73,9 +73,10 @@ struct PrompterPillPreview: View {
 }
 
 extension PrompterPillPreview {
-    /// Where the pill ends and where its anchor line sits, in the safe-area
+    /// Where the pill ends and where a close button goes, in the safe-area
     /// coordinates of a full-screen view: content starts below the pill, and
-    /// a close button lines up with the anchor line as it does on the camera
+    /// the close button takes the usual top-leading spot beside it, level
+    /// with the top of the pill (the camera cutout). Sized as on the camera
     /// (`RecordingView.portraitCloseButton`). The close frame is at least
     /// 44 pt, so its leading and top are pulled in by the extra.
     struct Layout {
@@ -90,19 +91,14 @@ extension PrompterPillPreview {
                 screenWidth: screenWidth,
                 safeAreaTop: safeTop
             )
-            let fontSize = PrompterPillPreview.fontSize
             let pillBottom = cfg.topPadding
                 + max(1, safeTop - cfg.topPadding)
                 + PrompterPillPreview.contentExtent(isClassicMode: isClassicMode)
-            let lineCentre = isClassicMode
-                ? ClassicThreeLineView.lineHeight(for: fontSize) * 1.5
-                : (fontSize + 4) / 2
-            let anchor = cfg.topPadding + cfg.textTopOffset + lineCentre
             let size: CGFloat = cfg.isCameraOffset ? 42 : 32
             let inset = (max(size, 44) - size) / 2
             closeSize = size
             closeLeading = (cfg.isCameraOffset ? 12 : 8) - inset
-            closeTop = anchor - safeTop - size / 2 - inset
+            closeTop = max(8, cfg.topPadding) - safeTop - inset
             contentTop = pillBottom - safeTop + spacing
         }
     }

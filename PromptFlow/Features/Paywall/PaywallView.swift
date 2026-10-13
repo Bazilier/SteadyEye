@@ -1439,6 +1439,9 @@ struct PaywallView: View {
                         badgeView
                     }
                 }
+                // Takes the width it needs before the spacer splits the rest,
+                // so the detail line stays on one line.
+                .layoutPriority(1)
 
                 Spacer(minLength: 8)
 
