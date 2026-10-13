@@ -233,6 +233,12 @@ final class CameraManager: NSObject, ObservableObject {
     /// readings that keep disagreeing cannot rebuild the session forever.
     private var duoCorrectionsThisProcess: [String: Int] = [:]
     private static let maxDuoCorrectionsPerProcess = 2
+    /// Pending rebuild after the device turned (`rebuildDuoIfTurned`), so a
+    /// turn in progress rebuilds once, after it settles.
+    private var duoTurnRebuild: DispatchWorkItem?
+    /// Duo cameras that fell back to a forced portrait angle in this process:
+    /// their formats do not follow the angle, so turning rebuilds nothing.
+    private var duoTurnRebuildDisabled: Set<String> = []
     /// Added to the preview's level angle on a Duo camera: the same learned
     /// correction the capture connection gets.
     @Published private(set) var previewAngleCorrection: CGFloat = 0
@@ -525,6 +531,9 @@ final class CameraManager: NSObject, ObservableObject {
             camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true")
             return
         }
+        if sessionDuoCamera != nil {
+            rebuildDuoIfTurned()
+        }
         applyClampedRotation(reported: reported, to: connection)
         camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=false")
     }
@@ -785,8 +794,33 @@ final class CameraManager: NSObject, ObservableObject {
               let connection = videoDataOutput?.connection(with: .video),
               let reported = lastReportedHorizonAngle else { return }
         let portraitAngle = CGFloat((Int(reported.rounded()) + 90) % 360)
+        if let type = sessionDuoCamera?.device.deviceType.rawValue {
+            duoTurnRebuildDisabled.insert(type)
+        }
         CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(sessionDuoCamera?.device.deviceType.rawValue ?? "standard") buffer=\(buffer) action=portrait_angle angle=\(Int(portraitAngle))")
         applyClampedRotation(reported: portraitAngle, to: connection)
+    }
+
+    /// iPhone Duo, however it is held: a level portrait take at full size. The
+    /// front sensors are square and offer both portrait and landscape formats,
+    /// so when the device turns a quarter, the session is rebuilt on the other
+    /// one (`duoCamera` picks it by the level angle) instead of recording the
+    /// scene turned. Never mid-take — the take keeps its start configuration,
+    /// and `stopRecording` calls this again — and once the turn settles.
+    private func rebuildDuoIfTurned() {
+        duoTurnRebuild?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let choice = self.sessionDuoCamera,
+                  !self.duoTurnRebuildDisabled.contains(choice.device.deviceType.rawValue),
+                  !self.isRecording, !self.isRecordingActive,
+                  let coordinator = self.rotationCoordinator,
+                  let residue = self.observedPortraitResidue else { return }
+            let angle = self.duoCorrected(coordinator.videoRotationAngleForHorizonLevelCapture)
+            guard !CaptureRotationGeometry.producesPortrait(angle: angle, portraitResidue: residue) else { return }
+            self.reconfigureDuoCamera(reason: "turned_\(Int(angle))", force: true)
+        }
+        duoTurnRebuild = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     /// Self-correction for a Duo camera whose RotationCoordinator angle turns
@@ -1412,6 +1446,10 @@ final class CameraManager: NSObject, ObservableObject {
                 applyClampedRotation(reported: pending, to: connection)
                 camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(pending)) suppressed=false")
             }
+        }
+        // Turned during the take: the other format now gives the level portrait.
+        if sessionDuoCamera != nil {
+            rebuildDuoIfTurned()
         }
 
         if Self.isChromakeyActive {
