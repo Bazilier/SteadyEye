@@ -20,10 +20,34 @@ struct ContentView: View {
     /// every paywall dismissal would re-evaluate the trigger.
     @State private var didCheckColdStartPaywallThisLaunch = false
     @StateObject private var chatBadgeState = ChatBadgeState.shared
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
+    @State private var showSettingsSheet = false
+
+    /// iPhone Duo unfolded: scripts and recordings side by side on the two
+    /// halves, no tab bar, settings from a button. Its crease, else nil.
+    private var splitCrease: CGRect? {
+        guard let state = duoMonitor?.state, state.posture == .unfolded else { return nil }
+        return state.creaseFrame
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            ScriptListView(selectedTab: $selectedTab)
+            // One container for both layouts, so the scripts list — and an
+            // editor open on it — survives folding, unfolding and turning.
+            CreaseSplitLayout(
+                sideBySide: (splitCrease?.height ?? 0) >= (splitCrease?.width ?? 0),
+                gap: splitCrease.map { min($0.width, $0.height) } ?? 0
+            ) {
+                ScriptListView(selectedTab: $selectedTab)
+                if splitCrease != nil {
+                    RecordingsView(selectedTab: $selectedTab, onOpenSettings: { showSettingsSheet = true })
+                }
+            }
+                // Window-wide, so the halves meet the crease; each list still
+                // keeps out of the parts of the display that are not safe.
+                .ignoresSafeArea(edges: splitCrease != nil ? .all : [])
+                .toolbar(splitCrease != nil ? .hidden : .automatic, for: .tabBar)
                 .tabItem {
                     Label {
                         Text("scripts.title", comment: "Scripts tab label / nav title")
@@ -60,6 +84,22 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
+        // Both lists are on screen when split: stay on the tab that holds
+        // them, and route a request for Settings to the sheet.
+        .onChange(of: splitCrease != nil, initial: true) { _, split in
+            if split, selectedTab != .scripts {
+                if selectedTab == .settings { showSettingsSheet = true }
+                selectedTab = .scripts
+            }
+        }
+        .onChange(of: selectedTab) { _, tab in
+            guard splitCrease != nil, tab != .scripts else { return }
+            if tab == .settings { showSettingsSheet = true }
+            selectedTab = .scripts
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            SettingsView()
+        }
         .onAppear {
             // Stamp install date on the very first app launch ever. Idempotent
             // — only writes when the key is unset (== 0). Read by Rule 0 in

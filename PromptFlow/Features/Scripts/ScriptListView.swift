@@ -206,6 +206,9 @@ struct ScriptListView: View {
             }
             .sheet(item: $editorMode) { mode in
                 ScriptEditorView(script: mode.script, offersDraft: mode.id != EditorMode.newSelfWritten.id)
+                    // Nearly the whole display on a wide screen (iPhone Duo
+                    // unfolded) rather than a small card; the same on a phone.
+                    .pageSizedSheet()
             }
             .sheet(isPresented: $showDraftScript, onDismiss: {
                 // Closed without an outcome: the user declined the own
@@ -748,5 +751,15 @@ struct ScriptRowView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension View {
+    @ViewBuilder func pageSizedSheet() -> some View {
+        if #available(iOS 18.0, *) {
+            presentationSizing(.page)
+        } else {
+            self
+        }
     }
 }
