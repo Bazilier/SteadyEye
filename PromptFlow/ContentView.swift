@@ -38,60 +38,12 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // One container for both layouts, so the scripts list — and an
-            // editor open on it — survives folding, unfolding and turning.
-            CreaseSplitLayout(
-                sideBySide: splitSideBySide,
-                gap: splitCrease.map { min($0.width, $0.height) } ?? 0
-            ) {
-                // The edge facing the crease is not an unsafe edge of the
-                // display, but a half would otherwise take the whole window's
-                // insets — the far side's camera inset included.
-                ScriptListView(selectedTab: $selectedTab)
-                    .ignoresSafeArea(edges: splitCrease == nil ? [] : (splitSideBySide ? .trailing : .bottom))
-                if splitCrease != nil {
-                    RecordingsView(selectedTab: $selectedTab, onOpenSettings: { showSettingsSheet = true })
-                        .ignoresSafeArea(edges: splitSideBySide ? .leading : .top)
-                }
+        Group {
+            if splitCrease != nil {
+                splitRoot
+            } else {
+                tabRoot
             }
-                // Window-wide, so the halves meet the crease; each list still
-                // keeps out of the parts of the display that are not safe.
-                .ignoresSafeArea(edges: splitCrease != nil ? .all : [])
-                .toolbar(splitCrease != nil ? .hidden : .automatic, for: .tabBar)
-                .tabItem {
-                    Label {
-                        Text("scripts.title", comment: "Scripts tab label / nav title")
-                    } icon: {
-                        Image(systemName: "doc.text.fill")
-                    }
-                }
-                .tag(AppTab.scripts)
-
-            RecordingsView(selectedTab: $selectedTab)
-                .tabItem {
-                    Label {
-                        Text(String(
-                            localized: "recordings.tabTitle",
-                            defaultValue: "Recordings",
-                            comment: "Recordings tab label / nav title."
-                        ))
-                    } icon: {
-                        Image(systemName: "video.fill")
-                    }
-                }
-                .tag(AppTab.recordings)
-
-            SettingsView()
-                .tabItem {
-                    Label {
-                        Text("settings.title", comment: "Settings tab label / nav title")
-                    } icon: {
-                        Image(systemName: "gearshape.fill")
-                    }
-                }
-                .badge(chatBadgeState.unreadCount)
-                .tag(AppTab.settings)
         }
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
@@ -132,6 +84,68 @@ struct ContentView: View {
         }
         .fullScreenCover(isPresented: $showColdStartPaywall) {
             PaywallView(source: "cold_start_recurring")
+        }
+    }
+
+    /// iPhone Duo unfolded: the two lists on the two halves, no tab bar. Not
+    /// inside the TabView — with its bar hidden, it still lays the halves out
+    /// as one tab and drops the scripts list's toolbar. Folding or unfolding
+    /// therefore rebuilds the lists; an open editor's text is kept for it
+    /// (`EditorDraftStore`). One layout type for both arrangements, so turning
+    /// the unfolded display keeps them.
+    private var splitRoot: some View {
+        CreaseSplitLayout(
+            sideBySide: splitSideBySide,
+            gap: splitCrease.map { min($0.width, $0.height) } ?? 0
+        ) {
+            // The edge facing the crease is no unsafe edge of the display.
+            ScriptListView(selectedTab: $selectedTab)
+                .ignoresSafeArea(edges: splitSideBySide ? .trailing : .bottom)
+            RecordingsView(selectedTab: $selectedTab, onOpenSettings: { showSettingsSheet = true })
+                .ignoresSafeArea(edges: splitSideBySide ? .leading : .top)
+        }
+        // Each half is a phone's width: both lists laid out as on a phone.
+        .environment(\.horizontalSizeClass, .compact)
+        // Window-wide, so the halves meet the crease.
+        .ignoresSafeArea()
+    }
+
+    private var tabRoot: some View {
+        TabView(selection: $selectedTab) {
+            ScriptListView(selectedTab: $selectedTab)
+                .tabItem {
+                    Label {
+                        Text("scripts.title", comment: "Scripts tab label / nav title")
+                    } icon: {
+                        Image(systemName: "doc.text.fill")
+                    }
+                }
+                .tag(AppTab.scripts)
+
+            RecordingsView(selectedTab: $selectedTab)
+                .tabItem {
+                    Label {
+                        Text(String(
+                            localized: "recordings.tabTitle",
+                            defaultValue: "Recordings",
+                            comment: "Recordings tab label / nav title."
+                        ))
+                    } icon: {
+                        Image(systemName: "video.fill")
+                    }
+                }
+                .tag(AppTab.recordings)
+
+            SettingsView()
+                .tabItem {
+                    Label {
+                        Text("settings.title", comment: "Settings tab label / nav title")
+                    } icon: {
+                        Image(systemName: "gearshape.fill")
+                    }
+                }
+                .badge(chatBadgeState.unreadCount)
+                .tag(AppTab.settings)
         }
     }
 

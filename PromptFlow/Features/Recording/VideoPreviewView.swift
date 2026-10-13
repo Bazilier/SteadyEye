@@ -40,6 +40,13 @@ struct VideoPreviewView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
+    /// A wide screen: regular width, or iPhone Duo unfolded — whose halves
+    /// tell the lists they are compact, an override that can reach here.
+    private var isWideScreen: Bool {
+        horizontalSizeClass == .regular || duoMonitor?.state?.posture == .unfolded
+    }
     /// Set by a pinch: in shows the whole frame, out fills the width. Nil
     /// keeps the default for the screen (`showsWholeFrame`).
     @State private var pinchedWholeFrame: Bool?
@@ -73,9 +80,9 @@ struct VideoPreviewView: View {
     /// The whole frame, centred, instead of full width from the top. Default
     /// on a wide screen (iPhone Duo unfolded), where a full-width portrait
     /// video would leave little more than its top on screen.
-    private var showsWholeFrame: Bool { pinchedWholeFrame ?? (horizontalSizeClass == .regular) }
+    private var showsWholeFrame: Bool { pinchedWholeFrame ?? isWideScreen }
     /// Keeps the bottom controls a comfortable width on a wide screen.
-    private var controlsMaxWidth: CGFloat { horizontalSizeClass == .regular ? 520 : .infinity }
+    private var controlsMaxWidth: CGFloat { isWideScreen ? 520 : .infinity }
     @State private var showPostSavePaywall = false
     @State private var showSatisfactionPrompt = false
     @State private var satisfactionTrigger: ReviewPromptManager.Trigger = .greatTake
@@ -109,7 +116,7 @@ struct VideoPreviewView: View {
                     // video is about the screen's shape; on a wide screen the
                     // zoomed video is centred on the screen's middle, not cut to
                     // its top.
-                    .overlay(alignment: isLandscapeVideo || showsWholeFrame || horizontalSizeClass == .regular ? .center : .top) {
+                    .overlay(alignment: isLandscapeVideo || showsWholeFrame || isWideScreen ? .center : .top) {
                         videoLayer
                     }
                     // Top scrim — keeps Back / Delete legible over the video.
