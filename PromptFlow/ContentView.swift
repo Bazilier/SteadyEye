@@ -31,17 +31,28 @@ struct ContentView: View {
         return state.creaseFrame
     }
 
+    /// The crease runs top to bottom (held like a book): halves side by side.
+    private var splitSideBySide: Bool {
+        guard let crease = splitCrease else { return false }
+        return crease.height >= crease.width
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             // One container for both layouts, so the scripts list — and an
             // editor open on it — survives folding, unfolding and turning.
             CreaseSplitLayout(
-                sideBySide: (splitCrease?.height ?? 0) >= (splitCrease?.width ?? 0),
+                sideBySide: splitSideBySide,
                 gap: splitCrease.map { min($0.width, $0.height) } ?? 0
             ) {
+                // The edge facing the crease is not an unsafe edge of the
+                // display, but a half would otherwise take the whole window's
+                // insets — the far side's camera inset included.
                 ScriptListView(selectedTab: $selectedTab)
+                    .ignoresSafeArea(edges: splitCrease == nil ? [] : (splitSideBySide ? .trailing : .bottom))
                 if splitCrease != nil {
                     RecordingsView(selectedTab: $selectedTab, onOpenSettings: { showSettingsSheet = true })
+                        .ignoresSafeArea(edges: splitSideBySide ? .leading : .top)
                 }
             }
                 // Window-wide, so the halves meet the crease; each list still
