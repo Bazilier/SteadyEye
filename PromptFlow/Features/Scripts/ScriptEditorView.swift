@@ -10,6 +10,10 @@ struct ScriptEditorView: View {
     let script: Script?
     /// False when the user just chose to write it themselves instead.
     var offersDraft = true
+    /// Matches `EditorMode.id`: which editor an unsaved draft belongs to.
+    private var draftID: String {
+        script?.id.uuidString ?? (offersDraft ? "new" : "newSelfWritten")
+    }
 
     @State private var title: String = ""
     @State private var content: String = ""
@@ -133,6 +137,7 @@ struct ScriptEditorView: View {
                         if hasChanges {
                             showingDiscardAlert = true
                         } else {
+                            EditorDraftStore.clear()
                             dismiss()
                         }
                     } label: {
@@ -161,7 +166,10 @@ struct ScriptEditorView: View {
                 Text("scripts.editor.discardAlert.title", comment: "Title of discard-changes alert"),
                 isPresented: $showingDiscardAlert
             ) {
-                Button(role: .destructive) { dismiss() } label: {
+                Button(role: .destructive) {
+                    EditorDraftStore.clear()
+                    dismiss()
+                } label: {
                     Text("scripts.editor.discardAlert.discard", comment: "Destructive button on discard-changes alert")
                 }
                 Button(role: .cancel) {} label: {
@@ -216,12 +224,20 @@ struct ScriptEditorView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: title) { _, _ in keepDraft() }
+        .onChange(of: content) { _, _ in keepDraft() }
         .onAppear {
             if let script {
                 title = script.title
                 content = script.content
             } else {
                 contentFocused = true
+            }
+            // Unsaved text from this editor's last opening, if a fold or a
+            // swipe closed it before Save or Cancel.
+            if let draft = EditorDraftStore.draft(for: draftID) {
+                title = draft.title
+                content = draft.content
             }
             if !didLogOpen {
                 didLogOpen = true
@@ -506,7 +522,18 @@ struct ScriptEditorView: View {
                 hasSavedFirstScript = true
             }
         }
+        EditorDraftStore.clear()
         dismiss()
+    }
+
+    /// Mirrors the text into `EditorDraftStore` while it differs from what is
+    /// saved, so a rebuilt editor can pick it up.
+    private func keepDraft() {
+        if hasChanges {
+            EditorDraftStore.save(.init(editorID: draftID, title: title, content: content))
+        } else {
+            EditorDraftStore.clear()
+        }
     }
 
     private func optimizeForReading() {

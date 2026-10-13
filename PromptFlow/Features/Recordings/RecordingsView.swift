@@ -5,6 +5,12 @@ import UIKit
 
 struct RecordingsView: View {
     @Binding var selectedTab: AppTab
+    /// Set when this list shares the screen with the scripts list (iPhone Duo
+    /// unfolded): a settings button takes the crown's place — the scripts
+    /// list keeps the crown — and the empty state does not send the user to
+    /// a scripts tab that is already beside it.
+    var onOpenSettings: (() -> Void)? = nil
+    @ObservedObject private var chatBadgeState = ChatBadgeState.shared
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Query(sort: \Recording.createdAt, order: .reverse) private var allRecordings: [Recording]
@@ -21,9 +27,10 @@ struct RecordingsView: View {
     @State private var cardOpener = CardOpener()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// As many columns as fit at 150 pt: two on every phone, as before; more
+    /// on a wide pane (iPhone Duo unfolded), so cards don't grow to one per row.
     private let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.adaptive(minimum: 150), spacing: 12)
     ]
 
     /// Zoom from a card into the preview (iOS 18+).
@@ -75,7 +82,18 @@ struct RecordingsView: View {
             .toolbar {
                 // Free-tier upgrade entry point — hidden for Pro users.
                 ToolbarItem(placement: .topBarLeading) {
-                    if !subscriptionManager.isSubscribed {
+                    if let onOpenSettings {
+                        Button(action: onOpenSettings) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .overlay(alignment: .topTrailing) {
+                                    if chatBadgeState.unreadCount > 0 {
+                                        Circle().fill(.red).frame(width: 8, height: 8).offset(x: 3, y: -3)
+                                    }
+                                }
+                        }
+                        .accessibilityLabel(Text("settings.title", comment: "Settings tab label / nav title"))
+                    } else if !subscriptionManager.isSubscribed {
                         Button(action: {
                             showPaywall = true
                         }) {
@@ -228,6 +246,7 @@ struct RecordingsView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
+            if onOpenSettings == nil {
             Button {
                 selectedTab = .scripts
             } label: {
@@ -239,6 +258,7 @@ struct RecordingsView: View {
                     .padding(.horizontal, 32)
             }
             .primaryButtonStyle(fullWidth: false)
+            }
             Spacer()
             Spacer()
         }
