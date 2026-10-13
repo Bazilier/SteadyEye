@@ -901,13 +901,17 @@ struct PaywallView: View {
             let origin = geo.frame(in: .global).origin
             let lens = duo.lensFrame.offsetBy(dx: -origin.x, dy: -origin.y)
             let lensOnRight = lens.midX > geo.size.width / 2
-            let pillWidth = min(210, geo.size.width * 0.48)
+            let pillWidth = min(260, geo.size.width * 0.56)
             let pillTop = max(0, lens.minY - 12)
             let pillEdgeInset = max(8, lensOnRight ? geo.size.width - lens.maxX - 12 : lens.minX - 12)
+            // The words sit beside the lens, as on the camera, not below it.
+            let lensBand = lens.width + (lensOnRight ? geo.size.width - lens.maxX : lens.minX) - pillEdgeInset + 6
             let pill = FloatingPrompterPill(
                 phrase: pillText,
                 isClassicMode: isClassicMode,
-                textTop: lens.maxY - pillTop + 6
+                textTop: 10,
+                lensSide: lensOnRight ? .trailing : .leading,
+                lensBand: lensBand
             )
             .frame(width: pillWidth)
             let side = VStack(alignment: .leading, spacing: 12) {
@@ -1193,18 +1197,21 @@ struct PaywallView: View {
             .primaryButtonStyle()
             .disabled(isTransactionInFlight)
 
-            Text(footnoteText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            legalLinks
+            // What the plan charges and the small links, packed tight under
+            // the button: they are reference, not choices.
+            VStack(spacing: 0) {
+                Text(footnoteText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                legalLinks
+            }
         }
     }
 
     private var legalLinks: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 6) {
             Button(action: restoreTapped) {
                 ZStack {
                     Text(String(
@@ -1219,18 +1226,20 @@ struct PaywallView: View {
                 }
             }
             .disabled(isTransactionInFlight)
+            Text(verbatim: "·")
             Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
                 Text("common.termsOfUse", comment: "Terms of use link in Settings")
             }
+            Text(verbatim: "·")
             Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
                 Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
             }
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.tertiary)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-        .frame(maxWidth: .infinity, minHeight: 32)
+        .frame(maxWidth: .infinity, minHeight: 28)
     }
 
     /// What the selected plan will charge, under the button.

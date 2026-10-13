@@ -113,16 +113,18 @@ extension PrompterPillPreview {
 struct FloatingPrompterPill: View {
     let phrase: String
     var isClassicMode = true
-    /// Where the words start: below the eye, or below a lens the pill
-    /// covers.
+    /// Where the words start: below the eye by default.
     var textTop: CGFloat = 26
+    /// A lens the pill covers: the words keep clear of it on that side.
+    var lensSide: HorizontalEdge = .trailing
+    var lensBand: CGFloat = 0
 
     var body: some View {
         let fontSize = PrompterPillPreview.fontSize
         RoundedRectangle(cornerRadius: 32, style: .continuous)
             .fill(Color.black)
             .frame(
-                maxWidth: 292,
+                maxWidth: 292 + lensBand,
                 minHeight: PrompterPillPreview.contentExtent(isClassicMode: isClassicMode) + textTop + 4,
                 maxHeight: PrompterPillPreview.contentExtent(isClassicMode: isClassicMode) + textTop + 4
             )
@@ -134,11 +136,22 @@ struct FloatingPrompterPill: View {
                     textOpacity: 1
                 )
                 .padding(.horizontal, 16)
+                .padding(lensSide == .trailing ? .trailing : .leading, lensBand)
                 .padding(.top, textTop)
             }
+            .overlay(alignment: lensSide == .trailing ? .bottomTrailing : .bottomLeading) {
+                // Under the lens when there is one, else in the top corner.
+                if lensBand > 0 {
+                    GazeIndicator(state: .looking, frameSize: 32)
+                        .frame(width: lensBand + 16)
+                        .padding(.bottom, 8)
+                }
+            }
             .overlay(alignment: .topLeading) {
-                GazeIndicator(state: .looking, frameSize: 32)
-                    .padding(.leading, 6)
+                if lensBand == 0 {
+                    GazeIndicator(state: .looking, frameSize: 32)
+                        .padding(.leading, 6)
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
             .accessibilityHidden(true)
