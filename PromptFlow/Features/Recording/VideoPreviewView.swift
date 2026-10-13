@@ -254,7 +254,7 @@ struct VideoPreviewView: View {
         .fullScreenCover(isPresented: $showPostSavePaywall, onDismiss: {
             scheduleSuccessToastHide(after: 2)
         }) {
-            PaywallView(source: "first_own_recording")
+            PaywallView(source: "first_own_recording", eyeContact: takeEyeContact)
                 .onAppear {
                     // Written only once the paywall actually appears.
                     UserDefaults.standard.set(true, forKey: "postFirstOwnRecordingPaywallShown")

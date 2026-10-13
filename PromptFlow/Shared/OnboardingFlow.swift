@@ -51,7 +51,8 @@ enum OnboardingFlow {
         finish(reason: reason)
         let defaults = UserDefaults.standard
         for key in ["pendingOwnScriptAfterFirstTake", "ownTakeCoachPending",
-                    "ownTakePaywallDue", flowScriptIDKey] {
+                    "ownTakePaywallDue", flowScriptIDKey,
+                    OwnTakePaywall.scriptIDKey, OwnTakePaywall.eyeContactKey] {
             defaults.removeObject(forKey: key)
         }
     }
@@ -96,5 +97,31 @@ enum LeaveSetupCopy {
     }
     static var stay: String {
         String(localized: "onboarding_flow.leave.stay", defaultValue: "Continue setup", comment: "Cancel button: stay in the guided first run.")
+    }
+}
+
+/// The paywall after the first take of an own script shows that take: the
+/// script in its pill and, when measured, the eye contact. The camera saves
+/// both when it marks the paywall due; the list reads them, once, when it
+/// shows it — possibly after a relaunch.
+enum OwnTakePaywall {
+    static let scriptIDKey = "ownTakePaywallScriptID"
+    static let eyeContactKey = "ownTakePaywallEyeContact"
+    /// Words handed to the pill, which cycles them.
+    static let pillWordLimit = 40
+
+    static func presentation(scripts: [Script]) -> PaywallPresentation {
+        let defaults = UserDefaults.standard
+        let id = defaults.string(forKey: scriptIDKey).flatMap(UUID.init)
+        let content = scripts.first { $0.id == id }?.content ?? ""
+        let words = content.split(whereSeparator: \.isWhitespace).prefix(pillWordLimit)
+        let eyeContact = defaults.object(forKey: eyeContactKey) as? Double
+        defaults.removeObject(forKey: scriptIDKey)
+        defaults.removeObject(forKey: eyeContactKey)
+        return PaywallPresentation(
+            source: "first_own_take",
+            pillPhrase: words.isEmpty ? nil : words.joined(separator: " "),
+            eyeContact: eyeContact
+        )
     }
 }

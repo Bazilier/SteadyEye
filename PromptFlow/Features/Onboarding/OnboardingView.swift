@@ -79,7 +79,7 @@ struct OnboardingView: View {
     private var welcomeView: some View {
         ZStack(alignment: .top) {
             pillBackdrop
-            OnboardingPrompterPill(phrase: String(
+            PrompterPillPreview(phrase: String(
                 localized: "onboarding.welcome.pill_phrase",
                 defaultValue: "Read your script and keep your eyes on the camera",
                 comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
@@ -161,7 +161,7 @@ struct OnboardingView: View {
     private var readingStyleView: some View {
         ZStack(alignment: .top) {
             pillBackdrop
-            OnboardingPrompterPill(
+            PrompterPillPreview(
                 phrase: String(
                     localized: "onboarding.welcome.pill_phrase",
                     defaultValue: "Read your script and keep your eyes on the camera",

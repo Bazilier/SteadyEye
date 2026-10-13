@@ -24,7 +24,7 @@ enum PaywallConfig {
     /// in defaults).
     static var headline: String {
         let key = RemoteConfigManager.shared.string("paywall_headline_key")
-        let resolvedKey = key.isEmpty ? "paywall.v2.headline.getFullAccess" : key
+        let resolvedKey = key.isEmpty ? "paywall.v2.headline.lookConfident" : key
         return NSLocalizedString(resolvedKey, comment: "Paywall headline (variant via Remote Config)")
     }
 

@@ -5077,36 +5077,6 @@
         }
       }
     },
-    "paywall.restore.prompt" : {
-      "comment" : "Caption preceding the inline Restore link at the top of the paywall. The link itself reuses settings.restore.button.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Already subscribed?"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Ya estás suscrito?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Já é assinante?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Уже подписаны?"
-          }
-        }
-      }
-    },
     "paywall.subtitle" : {
       "comment" : "Paywall header subtitle. Marketing tagline.",
       "extractionState" : "manual",
@@ -5163,36 +5133,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Открой SteadyEye"
-          }
-        }
-      }
-    },
-    "paywall.v2.allPlans" : {
-      "comment" : "Paywall v2 expand-link below the Continue button when the collapsed annual card is shown.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "All Plans"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todos los planes"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todos os planos"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все планы"
           }
         }
       }
@@ -5437,36 +5377,6 @@
         }
       }
     },
-    "paywall.v2.dismiss" : {
-      "comment" : "Inline link that dismisses the paywall and returns the user to the free tier.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Dismiss"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cerrar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fechar"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Закрыть"
-          }
-        }
-      }
-    },
     "paywall.v2.dismissA11y" : {
       "comment" : "VoiceOver label for the inline Dismiss link on the paywall.",
       "extractionState" : "extracted_with_value",
@@ -5493,246 +5403,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Закрыть и продолжить с бесплатной версией"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.fourK" : {
-      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title. '4K' is a technical resolution label.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "4K recording"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grabación en 4K"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gravação em 4K"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запись в 4K"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.fourK.subtitle" : {
-      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the 4K recording feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Cinematic quality for important shoots"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calidad cinematográfica para grabaciones importantes"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qualidade cinematográfica para gravações importantes"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Кинокачество для важных съёмок"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.noWatermark" : {
-      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "No watermark on recordings"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sin marca de agua"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sem marca d'água"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Без водяного знака"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.noWatermark.subtitle" : {
-      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the no-watermark feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Share videos without the SteadyEye watermark"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comparte videos sin la marca de agua de SteadyEye"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compartilhe vídeos sem a marca d'água do SteadyEye"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Делитесь видео без водяного знака SteadyEye"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.stabilization" : {
-      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title for the video stabilization feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Steadicam stabilization"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estabilización Steadicam"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estabilização Steadicam"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Стабилизация Steadicam"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.stabilization.subtitle" : {
-      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the video stabilization feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Smooth video while moving or walking"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video estable al moverte o caminar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vídeo estável em movimento ou caminhando"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Плавное видео в движении и на ходу"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.unlimitedAI" : {
-      "comment" : "Paywall v2 feature card title.\nPaywall v2 feature row title for the AI optimization feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "AI optimization for every script"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optimización con IA para cada guion"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Otimização com IA para cada roteiro"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI-оптимизация любого скрипта"
-          }
-        }
-      }
-    },
-    "paywall.v2.feature.unlimitedAI.subtitle" : {
-      "comment" : "Paywall v2 feature card subtitle.\nPaywall v2 feature row subtitle for the AI optimization feature.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Optimize every script you write"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optimiza cada guion que escribes"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Otimize cada roteiro que você escreve"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оптимизируйте каждый скрипт, который пишете"
           }
         }
       }
@@ -5875,36 +5545,6 @@
         }
       }
     },
-    "paywall.v2.notInterested" : {
-      "comment" : "Caption above the inline Dismiss link on the paywall.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Not interested?"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿No te interesa?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Não tem interesse?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не интересно?"
-          }
-        }
-      }
-    },
     "paywall.v2.plan.annual" : {
       "comment" : "Paywall v2 plan row title.",
       "extractionState" : "extracted_with_value",
@@ -6021,36 +5661,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Неделя"
-          }
-        }
-      }
-    },
-    "paywall.v2.showLess" : {
-      "comment" : "Paywall v2 collapse-link below the Continue button when the plan-list is expanded.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Show Less"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar menos"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar menos"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Свернуть"
           }
         }
       }
@@ -6441,6 +6051,636 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "paywall.v3.choosePlan" : {
+      "comment" : "Title above the plan list on the plans half of the paywall on iPhone Duo's unfolded screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose your plan"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige tu plan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha seu plano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите тариф"
+          }
+        }
+      }
+    },
+    "paywall.v3.eyeContactChip" : {
+      "comment" : "Chip above the paywall headline after the user's first take of their own script. %lld is the share of the take they spent looking at the lens, as a whole percent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% eye contact in your first take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% de contacto visual en tu primera toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% de contato visual na sua primeira gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% взгляда в камеру в первом дубле"
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.ai" : {
+      "comment" : "Paywall feature line, bold lead-in: AI drafting and optimizing of scripts. Followed by its detail sentence on the same line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI scripts."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guiones con IA."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roteiros com IA."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сценарии с ИИ."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.ai.detail" : {
+      "comment" : "Paywall feature line, detail after 'AI scripts.'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft and polish every video."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe y pule cada video."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escreva e refine cada vídeo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пишите и улучшайте каждый ролик."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.noWatermark" : {
+      "comment" : "Paywall feature line, bold lead-in. Followed by its detail sentence on the same line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No watermark."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin marca de agua."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem marca d'água."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без водяного знака."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.noWatermark.detail" : {
+      "comment" : "Paywall feature line, detail after 'No watermark.'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post takes as they are."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publica tus tomas tal cual."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publique suas gravações como estão."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Публикуйте дубли как есть."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.quality" : {
+      "comment" : "Paywall feature line, bold lead-in: 4K recording and video stabilization. Followed by its detail sentence on the same line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4K, stabilized."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4K, estabilizado."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4K, estabilizado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4K со стабилизацией."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.quality.detail" : {
+      "comment" : "Paywall feature line, detail after '4K, stabilized.'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharp and steady on the move."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nítido y estable en movimiento."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nítido e estável em movimento."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чётко и плавно даже в движении."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.cancelAnytime" : {
+      "comment" : "Line under the paywall button when the selected plan starts with a paid introductory price.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отмена в любой момент."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.lifetime" : {
+      "comment" : "Line under the paywall button for the lifetime plan, a single purchase.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One payment. No subscription."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un solo pago. Sin suscripción."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pagamento único. Sem assinatura."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Один платёж, без подписки."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.monthly" : {
+      "comment" : "Line under the paywall button for the monthly plan. %@ is the localized monthly price.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Billed %@ a month. Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se cobra %@ al mes. Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cobrança de %@ por mês. Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в месяц. Отмена в любой момент."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.trial" : {
+      "comment" : "Line under the paywall button when the selected plan starts with a free trial.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to pay today. Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy no pagas nada. Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada a pagar hoje. Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сегодня платить не нужно. Отмена в любой момент."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.weekly" : {
+      "comment" : "Line under the paywall button for the weekly plan. %@ is the localized weekly price.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Billed %@ a week. Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se cobra %@ a la semana. Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cobrança de %@ por semana. Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в неделю. Отмена в любой момент."
+          }
+        }
+      }
+    },
+    "paywall.v3.footnote.yearly" : {
+      "comment" : "Line under the paywall button for the annual plan. %@ is the localized yearly price.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Billed %@ a year. Cancel anytime."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se cobra %@ al año. Cancela cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cobrança de %@ por ano. Cancele quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в год. Отмена в любой момент."
+          }
+        }
+      }
+    },
+    "paywall.v3.headline.keepFilming" : {
+      "comment" : "Paywall headline shown right after the user's first take of their own script; the prompter pill above it shows that script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep filming like this"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue grabando así"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue gravando assim"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Снимайте так и дальше"
+          }
+        }
+      }
+    },
+    "paywall.v3.perMonthBilledYearly" : {
+      "comment" : "Paywall annual plan row, under the plan name. %@ is the localized yearly price divided per month.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a month, billed yearly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ al mes, pago anual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ por mês, cobrado por ano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в месяц при оплате за год"
+          }
+        }
+      }
+    },
+    "paywall.v3.perWeekBilledMonthly" : {
+      "comment" : "Paywall monthly plan row, under the plan name. %@ is the localized monthly price divided per week.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a week, billed monthly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a la semana, pago mensual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ por semana, cobrado por mês"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в неделю при оплате за месяц"
+          }
+        }
+      }
+    },
+    "paywall.v3.perWeekBilledYearly" : {
+      "comment" : "Paywall annual plan row, under the plan name. %@ is the localized yearly price divided per week.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a week, billed yearly"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a la semana, pago anual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ por semana, cobrado por ano"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ в неделю при оплате за год"
+          }
+        }
+      }
+    },
+    "paywall.v3.pillPhrase" : {
+      "comment" : "Words cycled through the prompter pill at the top of the paywall, three at a time, one word per line, when the user has no script of their own yet. Keep it short and natural.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read your script, film in one take and shine"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lee tu guion, graba en una toma y brilla"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leia seu roteiro, grave de uma vez e brilhe"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Читайте сценарий, снимайте с одного дубля и сияйте"
+          }
+        }
+      }
+    },
+    "paywall.v3.restore" : {
+      "comment" : "Short link at the bottom of the paywall that restores purchases made on this Apple ID.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить"
+          }
+        }
+      }
+    },
+    "paywall.v3.saveBadge" : {
+      "comment" : "Badge next to the paywall plan that costs least over a year. %lld is the whole percent it saves against the dearest subscription plan on screen, from store prices. Shown in capitals.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save %lld%%"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahorra %lld%%"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Economize %lld%%"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выгода %lld%%"
           }
         }
       }
