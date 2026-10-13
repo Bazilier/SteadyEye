@@ -53,6 +53,13 @@ struct ScriptListView: View {
     @State private var pendingFounderChat = false
     @State private var showFounderChat = false
     @State private var scriptToRecord: Script?
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
+    /// The recording screen is on screen. While it is, unfolding is its own
+    /// business (`RecordingView.closeForUnfold`): the cover must not vanish
+    /// under a take.
+    @State private var recordingPresented = false
+    @State private var showFoldToRecordAlert = false
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
     @State private var cardOpener = CardOpener()
@@ -149,6 +156,8 @@ struct ScriptListView: View {
         return EdgeInsets(top: 11, leading: 20, bottom: 11, trailing: 20)
     }
 
+    private var isDuoUnfolded: Bool { duoMonitor?.state?.posture == .unfolded }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -204,12 +213,35 @@ struct ScriptListView: View {
                         UserDefaults.standard.set(false, forKey: "pendingOwnScriptAfterFirstTake")
                     }
             }
-            .fullScreenCover(item: $scriptToRecord) { script in
-                RecordingView(script: script, selectedTab: $selectedTab)
+            // iPhone Duo records folded only: unfolded, every way into the
+            // camera — card, onboarding auto-open, resume, draft — ends in the
+            // fold alert instead (see `onChange` below).
+            .fullScreenCover(item: Binding(
+                get: { isDuoUnfolded && !recordingPresented ? nil : scriptToRecord },
+                set: { scriptToRecord = $0 }
+            )) { script in
+                RecordingView(
+                    script: script,
+                    selectedTab: $selectedTab,
+                    // After the cover is down, or the alert has nothing to sit on.
+                    onClosedByUnfold: {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showFoldToRecordAlert = true }
+                    }
+                )
                     .cardZoomTransition(id: script.id, in: recordZoom)
                     .onPresentationComplete { cardOpener.resetCard() }
+                    .onAppear { recordingPresented = true }
+                    .onDisappear { recordingPresented = false }
             }
             .onChange(of: scriptToRecord) { _, script in
+                if let script, isDuoUnfolded, !recordingPresented {
+                    AppAnalytics.log("duo_record_blocked_unfolded", params: [
+                        "script_source": script.isDemo ? "demo" : "user"
+                    ])
+                    scriptToRecord = nil
+                    showFoldToRecordAlert = true
+                    return
+                }
                 // Closed before the presentation completed.
                 if script == nil {
                     cardOpener.resetCard()
@@ -251,6 +283,14 @@ struct ScriptListView: View {
         }
         .sheet(isPresented: $showFounderChat) {
             ChatView(pinnedMessage: .satisfactionFollowUp)
+        }
+        .alert(
+            String(localized: "duo.fold_to_record.title", defaultValue: "Fold iPhone to record", comment: "Alert title on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera."),
+            isPresented: $showFoldToRecordAlert
+        ) {
+            Button(String(localized: "common.ok", defaultValue: "OK", comment: "Generic OK confirmation button used in alerts."), role: .cancel) {}
+        } message: {
+            Text(String(localized: "duo.fold_to_record.message", defaultValue: "SteadyEye records with the outer camera, so the text sits right under the lens. Use the big screen to write and edit your scripts.", comment: "Alert message on an unfolded iPhone Duo: recording works folded; the big screen is for writing scripts."))
         }
         .alert(
             String(localized: "onboarding_flow.resume.title", defaultValue: "Pick up where you left off?", comment: "Alert on launch when the guided first run was left unfinished."),

@@ -48,6 +48,9 @@ struct RecordingView: View {
     /// HUD indicators write `.settings` here and then dismiss this cover, so
     /// the user lands on the Settings tab when the modal stack collapses.
     @Binding var selectedTab: AppTab
+    /// Called when unfolding an iPhone Duo closed this screen
+    /// (`closeForUnfold`), so the scripts list can say why.
+    var onClosedByUnfold: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -249,6 +252,9 @@ struct RecordingView: View {
     /// The current take was ended by folding or unfolding the Duo; carried
     /// into its Duo report.
     @State private var takeStoppedByFold = false
+    /// Unfolding asked to close this screen while a take was still being
+    /// stopped, saved or previewed: it closes once that is done.
+    @State private var closeWhenTakeHandled = false
 
     // Recording countdown
     @State private var countdownValue: Int = 0
@@ -429,9 +435,20 @@ struct RecordingView: View {
         // neither, so it never stops a take.
         .onChange(of: duoMonitor?.isHingeClosed) { old, new in
             guard let old, let new, old != new else { return }
-            stopTakeForFoldChange()
+            // Opening leads the display switch: close right away.
+            if old && !new {
+                closeForUnfold()
+            } else {
+                stopTakeForFoldChange()
+            }
         }
         .onChange(of: duoMonitor?.state?.posture, initial: true) { old, new in
+            // Recording is folded only on iPhone Duo; the posture is the
+            // backup for the hinge, and covers a screen opened unfolded.
+            if new == .unfolded {
+                closeForUnfold()
+                return
+            }
             if let old, let new, old != new {
                 stopTakeForFoldChange()
                 // Which way is up on the other display's camera. After a delay,
@@ -452,6 +469,12 @@ struct RecordingView: View {
         }
         .onChange(of: cameraManager.isSessionReady) { _, ready in
             if ready { DuoReportService.scheduleCameraReport(cameraManager, monitor: duoMonitor) }
+        }
+        // A take stopped by unfolding failed to save: nothing to preview.
+        .onChange(of: isProcessingRecording) { _, processing in
+            if !processing, previewRecording == nil, closeWhenTakeHandled {
+                finishUnfoldClose()
+            }
         }
         .onChange(of: cameraManager.lastRecordedURL) { _, url in
             guard let url else { return }
@@ -480,6 +503,9 @@ struct RecordingView: View {
                    UserDefaults.standard.bool(forKey: "pendingOwnScriptAfterFirstTake") {
                     previewIsFirstTake = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { close() }
+                } else if closeWhenTakeHandled || duoMonitor?.state?.posture == .unfolded {
+                    // Unfolded while this take was saved or previewed.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { finishUnfoldClose() }
                 }
             }, shouldShowPaywallAfterSave: {
                 // First successful Camera Roll save of a user-written script
@@ -2036,6 +2062,45 @@ struct RecordingView: View {
         cameraManager.stopRecording()
         player.pause()
         AppAnalytics.log("recording_stopped_by_fold", params: nil)
+    }
+
+    /// iPhone Duo records folded only — the outer camera, with the text right
+    /// under its lens — so unfolding closes this screen, back to the scripts
+    /// list. A take in progress is stopped as the record button stops it and
+    /// saved as usual; the screen closes once its preview is dismissed (or its
+    /// save failed), never before the file is safe.
+    private func closeForUnfold() {
+        if isCountingDown {
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+            isCountingDown = false
+        }
+        if cameraManager.isRecording {
+            stopTakeForFoldChange()
+            closeWhenTakeHandled = true
+            // A take whose file never arrives must not strand the screen.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                if closeWhenTakeHandled, !isProcessingRecording, previewRecording == nil {
+                    finishUnfoldClose()
+                }
+            }
+            return
+        }
+        if closeWhenTakeHandled || isProcessingRecording || previewRecording != nil {
+            closeWhenTakeHandled = true
+            return
+        }
+        finishUnfoldClose()
+    }
+
+    private func finishUnfoldClose() {
+        let hadTake = closeWhenTakeHandled
+        closeWhenTakeHandled = false
+        // Folded again by now: stay.
+        guard duoMonitor?.state?.posture == .unfolded || duoMonitor?.isHingeClosed == false else { return }
+        AppAnalytics.log("duo_camera_closed_unfolded", params: ["had_take": hadTake])
+        onClosedByUnfold?()
+        close()
     }
 
     private func startCountdown() {
