@@ -34,12 +34,24 @@ final class GazeAttention: ObservableObject {
     /// When the current away spell actually began: the first narrowed
     /// reading, backdated by the pipeline's lag. Set together with `.away`, so
     /// a consumer can undo what happened during the confirmation delay.
-    /// Latest raw reading, for the DEV readout.
     private(set) var awayOnset: Date?
+    /// Latest raw reading, for the DEV gaze overlay. Published in DEV builds
+    /// only: at ~10 Hz it re-renders every observer, the whole recording
+    /// screen included.
+    #if DEV
     @Published private(set) var reading: GazeProbe.Reading?
+    #else
+    private(set) var reading: GazeProbe.Reading?
+    #endif
 
     /// Set from the prompter: baseline samples are taken only while it plays.
-    var isReading = false
+    /// The probe runs only while it plays or a take records (`updateProbe`):
+    /// Vision face landmarks at ~10 Hz cost ~12% of a core on an iPhone 16,
+    /// for nothing while the camera merely sits open.
+    var isReading = false {
+        didSet { if oldValue != isReading { updateProbe() } }
+    }
+    private var isProbing = false
 
     /// Eye contact over one take.
     struct TakeSummary: Equatable {
@@ -84,8 +96,26 @@ final class GazeAttention: ObservableObject {
 
     func start(probe: GazeProbe) {
         self.probe = probe
-        probe.start { [weak self] reading in
-            Task { @MainActor in self?.ingest(reading) }
+        updateProbe()
+    }
+
+    /// Runs the probe while the prompter plays or a take records, and parks
+    /// it otherwise. The baseline survives a pause; the state goes idle, as
+    /// there is nothing to track.
+    private func updateProbe() {
+        guard let probe else { return }
+        let wanted = isReading || takeStart != nil
+        guard wanted != isProbing else { return }
+        isProbing = wanted
+        if wanted {
+            probe.start { [weak self] reading in
+                Task { @MainActor in self?.ingest(reading) }
+            }
+        } else {
+            probe.stop()
+            recent.removeAll()
+            awaySince = nil
+            setState(.idle)
         }
     }
 
@@ -95,12 +125,13 @@ final class GazeAttention: ObservableObject {
         lookingTime = 0
         awayTime = 0
         awayMoments = []
+        updateProbe()
     }
 
     /// Ends the take; nil when too little of it was tracked to summarise.
     func endTake() -> TakeSummary? {
         tick()
-        defer { takeStart = nil; lastTick = nil }
+        defer { takeStart = nil; lastTick = nil; updateProbe() }
         let tracked = lookingTime + awayTime
         guard takeStart != nil, tracked >= Self.minimumTrackedTime else { return nil }
         return TakeSummary(lookingFraction: lookingTime / tracked, awayMoments: awayMoments)
@@ -122,11 +153,18 @@ final class GazeAttention: ObservableObject {
     func stop() {
         probe?.stop()
         probe = nil
+        isProbing = false
         recent.removeAll()
         awaySince = nil
         awayOnset = nil
         reading = nil
-        state = .idle
+        setState(.idle)
+    }
+
+    /// `@Published` announces every assignment, equal or not: only a real
+    /// change may re-render observers.
+    private func setState(_ new: State) {
+        if state != new { state = new }
     }
 
     private func ingest(_ reading: GazeProbe.Reading?) {
@@ -150,7 +188,7 @@ final class GazeAttention: ObservableObject {
         }
 
         guard baselineSamples.count >= Self.baselineMinimum else {
-            state = isReading ? .calibrating : .idle
+            setState(isReading ? .calibrating : .idle)
             return
         }
         let baseline = Self.percentile(baselineSamples, Self.baselinePercentile)
@@ -162,7 +200,7 @@ final class GazeAttention: ObservableObject {
 
     private func update(isNarrow: Bool, isRecovered: Bool) {
         guard baselineSamples.count >= Self.baselineMinimum else {
-            state = isReading ? .calibrating : .idle
+            setState(isReading ? .calibrating : .idle)
             return
         }
         if isNarrow {
@@ -181,11 +219,11 @@ final class GazeAttention: ObservableObject {
                     lookingTime -= moved
                     awayTime += moved
                 }
-                state = .away
+                setState(.away)
             }
         } else {
             awaySince = nil
-            if isRecovered || state != .away { state = .looking }
+            if isRecovered || state != .away { setState(.looking) }
         }
     }
 

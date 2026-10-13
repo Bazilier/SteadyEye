@@ -28,7 +28,14 @@ final class PlaybackController: ObservableObject {
     /// time observer while `isScrubbing` is false. While the user
     /// drags the scrubber thumb the View drives a local scrub-state
     /// that mirrors this, so we don't write here mid-drag.
-    @Published var currentTime: Double = 0
+    ///
+    /// Not published here: at 30 Hz it re-rendered the whole preview
+    /// screen. The scrubber and the time readout observe `clock`.
+    var currentTime: Double = 0 {
+        didSet { if clock.time != currentTime { clock.time = currentTime } }
+    }
+    /// `currentTime`, published on its own for the views that show it.
+    let clock = PlaybackClock()
 
     /// Total length of the recording, in seconds — what the scrubber
     /// maps its track to and what the total-time readout displays.
@@ -228,4 +235,10 @@ final class PlaybackController: ObservableObject {
             player?.play()
         }
     }
+}
+
+/// The playhead alone, so only the views that show it re-render at the
+/// periodic observer's rate (see `PlaybackController.currentTime`).
+final class PlaybackClock: ObservableObject {
+    @Published var time: Double = 0
 }

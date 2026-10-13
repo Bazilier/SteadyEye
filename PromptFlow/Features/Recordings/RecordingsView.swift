@@ -187,7 +187,7 @@ struct RecordingsView: View {
                 recording: recording,
                 onDismiss: { playingRecording = nil },
                 // The same file the card shows; read, not regenerated.
-                poster: recording.thumbnailURL.flatMap { UIImage(contentsOfFile: $0.path) }
+                poster: recording.thumbnailURL.flatMap { ThumbnailCache.cached($0) ?? UIImage(contentsOfFile: $0.path) }
             )
             .cardZoomTransition(id: recording.id, in: previewZoom)
             .onPresentationComplete { cardOpener.resetCard() }
@@ -385,6 +385,8 @@ struct RecordingsView: View {
 
 struct RecordingThumbnailCard: View {
     let recording: Recording
+    /// Decoded off the main thread (`ThumbnailCache`); a cached one shows at once.
+    @State private var loadedThumbnail: UIImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -393,6 +395,10 @@ struct RecordingThumbnailCard: View {
                     .aspectRatio(1, contentMode: .fit)
                     .overlay { thumbnailImage }
                     .clipped()
+                    .task(id: recording.thumbnailURL) {
+                        guard let url = recording.thumbnailURL else { return }
+                        loadedThumbnail = await ThumbnailCache.load(url)
+                    }
                 Text(formatDuration(recording.duration))
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
@@ -426,9 +432,7 @@ struct RecordingThumbnailCard: View {
 
     @ViewBuilder
     private var thumbnailImage: some View {
-        if let thumbURL = recording.thumbnailURL,
-           FileManager.default.fileExists(atPath: thumbURL.path),
-           let uiImage = UIImage(contentsOfFile: thumbURL.path) {
+        if let uiImage = loadedThumbnail ?? recording.thumbnailURL.flatMap(ThumbnailCache.cached) {
             // No explicit aspect ratio here — `resizable()` + `aspectRatio(contentMode: .fill)`
             // preserves the source image's natural ratio (portrait 9:16) and scales it to
             // fully cover the surrounding square frame. Overflow on top/bottom is clipped

@@ -12,7 +12,10 @@ final class CameraManager: NSObject, ObservableObject {
 
     // MARK: - Public state
     @Published var isRecording = false
-    @Published var recordingDuration: TimeInterval = 0
+    /// Not published: only the recording timer reads it, on its own
+    /// schedule (`TimelineView`), so its 2 Hz updates do not re-render the
+    /// whole recording screen.
+    var recordingDuration: TimeInterval = 0
     @Published var errorMessage: String?
     @Published var cameraPosition: AVCaptureDevice.Position = .front
     @Published var lastRecordedURL: URL?
@@ -1863,7 +1866,10 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             )
             #endif
         }
-        let processed = watermarkComposer?.process(pixelBuffer) ?? pixelBuffer
+        // Only a frame that will be written gets the watermark: the composer
+        // outlives its take (see `stopWriterPipeline`), and rendering every
+        // preview frame after one cost ~13% of a core on an iPhone 16.
+        let processed = liveTake != nil ? (watermarkComposer?.process(pixelBuffer) ?? pixelBuffer) : pixelBuffer
         // Appended through the SAME object every check above used. When that read
         // yielded no live take the frame belongs to no take that has validated
         // it, and it is not written at all — where previously a second read found

@@ -42,16 +42,14 @@ final class Recording: Identifiable {
         return Recording.thumbnailsDirectory.appendingPathComponent(thumbnailFileName)
     }
 
-    static var recordingsDirectory: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("Recordings", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
+    /// Resolved and created once per process, not on every `fileURL` /
+    /// `thumbnailURL` read (each list cell reads them in its body).
+    static let recordingsDirectory: URL = directory(named: "Recordings")
+    static let thumbnailsDirectory: URL = directory(named: "Thumbnails")
 
-    static var thumbnailsDirectory: URL {
+    private static func directory(named name: String) -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("Thumbnails", isDirectory: true)
+        let dir = docs.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
