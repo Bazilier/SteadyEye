@@ -82,7 +82,7 @@ final class RemoteConfigManager: ObservableObject {
         "paywall_offering_id":       "default",
         "paywall_mode":              "default",
         "paywall_plans":             "[\"monthly\",\"annual\",\"lifetime\"]",
-        "paywall_headline_key":      "paywall.v2.headline.getFullAccess",
+        "paywall_headline_key":      "paywall.v2.headline.lookConfident",
         "paywall_subtitle_with_pct": "paywall.v2.subtitle.specialOfferWithPct",
         "paywall_subtitle_no_pct":   "paywall.v2.subtitle.getFullAccess",
         "paywall_cta_key":           "paywall.v2.cta.continue",

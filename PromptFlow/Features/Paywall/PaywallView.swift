@@ -51,10 +51,21 @@ enum PaywallPlan: String, CaseIterable, Identifiable {
 struct PaywallPresentation: Identifiable {
     let id = UUID()
     let source: String
+    /// See `PaywallView.pillPhrase`.
+    var pillPhrase: String? = nil
+    /// See `PaywallView.eyeContact`.
+    var eyeContact: Double? = nil
 }
 
 struct PaywallView: View {
     let source: String
+    /// Words from the user's own script for the prompter pill at the top.
+    /// Nil: the pill cycles a line about the app instead.
+    var pillPhrase: String? = nil
+    /// Share of the user's last take spent looking at the lens, 0...1. Shown
+    /// as a chip only from `eyeContactChipThreshold` up: a low number would
+    /// argue against buying.
+    var eyeContact: Double? = nil
     /// Optional RC offering identifier. Explicit override — when set,
     /// packages resolve from the named offering directly. When `nil`
     /// (default for all current call sites), the offering is chosen from
@@ -75,8 +86,6 @@ struct PaywallView: View {
     /// Config activates.
     @State private var userDidPickPlan = false
     @State private var errorMessage: String?
-    @State private var bottomSheetHeight: CGFloat = 320
-    @State private var isExpanded: Bool = false
     @State private var isRestoring: Bool = false
     @State private var restoreResultMessage: String? = nil
     @State private var restoreSucceeded: Bool = false
@@ -554,9 +563,18 @@ struct PaywallView: View {
     }
 
     /// Hero headline copy. Trial variant when the selected plan carries a free
-    /// trial; otherwise today's Remote-Config-driven default.
+    /// trial; after a take of the user's own script, a line about that take;
+    /// otherwise today's Remote-Config-driven default.
     private var heroHeadlineText: String {
-        showsTrialCopy ? PaywallConfig.trialHeadline : PaywallConfig.headline
+        if showsTrialCopy { return PaywallConfig.trialHeadline }
+        if pillPhrase != nil {
+            return String(
+                localized: "paywall.v3.headline.keepFilming",
+                defaultValue: "Keep filming like this",
+                comment: "Paywall headline shown right after the user's first take of their own script; the prompter pill above it shows that script."
+            )
+        }
+        return PaywallConfig.headline
     }
 
     /// Hero subtitle copy. When at least one visible package has an
@@ -565,7 +583,11 @@ struct PaywallView: View {
     /// nominally-targeted percent. Falls back to a percent-free
     /// variant when no visible plan has an active intro (e.g. user
     /// already used the intro for this subscription group).
-    private var heroSubtitleText: String {
+    ///
+    /// Nil when there is no offer to state: the plans below already say
+    /// what full access costs, so a generic line would only repeat the
+    /// headline.
+    private var heroSubtitleText: String? {
         // Trial copy substitutes the localized recurring price through the same
         // localized-format-string mechanism the percentage subtitle uses below
         // (`%@` here, `%lld` there). Never a hardcoded currency or amount.
@@ -585,7 +607,7 @@ struct PaywallView: View {
             let template = PaywallConfig.subtitleWithPct
             return String(format: template, pct)
         }
-        return PaywallConfig.subtitleNoPct
+        return nil
     }
 
     /// The plan's price and NOTHING ELSE — no period suffix.
@@ -649,196 +671,438 @@ struct PaywallView: View {
         }
     }
 
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.black.ignoresSafeArea()
-            scrollContent
-            bottomSheet
-        }
-        .overlay(alignment: .topLeading) {
-            closeButton
-                .padding(.leading, 16)
-                .padding(.top, 8)
-        }
-        .preferredColorScheme(.dark)
-        .interactiveDismissDisabled(true)
-        .alert(
-            restoreSucceeded
-                ? String(
-                    localized: "settings.restore.success.title",
-                    defaultValue: "Subscription restored",
-                    comment: "Title of the alert shown when Restore Purchases finds an active subscription on the user's Apple ID."
-                )
-                : String(
-                    localized: "settings.restore.empty.title",
-                    defaultValue: "No purchases found",
-                    comment: "Title of the alert shown when Restore Purchases finds no active subscription on the user's Apple ID."
-                ),
-            isPresented: $showRestoreAlert,
-            presenting: restoreResultMessage
-        ) { _ in
-            Button("common.ok", role: .cancel) {
-                if restoreSucceeded {
-                    // User is now Pro — dismissing the paywall drops them back
-                    // into the app instead of leaving them stranded on a wall
-                    // they no longer need.
-                    //
-                    // A restore onto an active entitlement ends the presentation
-                    // in the same state a purchase does, so it reports
-                    // `purchased=true` too. Set here rather than where
-                    // `restoreSucceeded` is assigned: this alert's only control
-                    // is this button, so a successful restore cannot reach
-                    // dismissal by any other route.
-                    didPurchase = true
-                    dismiss()
-                }
-            }
-        } message: { message in
-            Text(message)
-        }
-        .onPreferenceChange(BottomSheetHeightKey.self) { newHeight in
-            bottomSheetHeight = newHeight
-        }
-        .onAppear {
-            selectedPlan = resolvedDefaultPlan
-            // Offerings normally arrive from the launch-time prewarm. Load here
-            // only if that did not produce them — a `.skipped` prewarm whose
-            // subscriber lapsed mid-session, a failed prewarm, or a paywall
-            // opened before it finished.
-            if manager.offerings == nil {
-                Task { await manager.loadOfferings() }
-            }
-            // Stamp the shared "any paywall shown" timestamp on every appear,
-            // regardless of source or build flavor. ContentView's cold-start
-            // paywall trigger reads this same UserDefaults key to enforce its
-            // 1-hour cross-source cooldown. Writing in DEV too so the cooldown
-            // can be tested without flipping build configs.
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastAnyPaywallShownAt")
-            // Every paywall — automatic or user-initiated — counts toward the
-            // arbiter's gap and suppresses the review prompt for this session.
-            // Automatic ones have already called `didPresent`; repeating the
-            // note here is harmless.
-            PromptArbiter.shared.noteExternalPresentation(isPaywall: true)
-            logPaywallShown()
-        }
-        .onDisappear {
-            PromptArbiter.shared.didDismiss()
-        }
-        // Re-runs whenever the annual product changes identity — including nil →
-        // resolved when offerings finish loading, and on an offering swap after
-        // a Remote Config activation. Fits the existing re-render pattern
-        // (activationCount, selectedPlan) rather than adding new machinery, and
-        // adds no offerings fetch of its own.
-        .task(id: annualPackage?.storeProduct.productIdentifier) {
-            await refreshTrialEligibility()
-        }
-        .onChange(of: remoteConfig.activationCount) { _, _ in
-            // The body re-renders on its own (every PaywallConfig accessor
-            // reads live), but `selectedPlan` is @State and survives the
-            // re-render. If the newly activated `paywall_plans` no longer
-            // contains it, the CTA would stay bound to a plan that is not on
-            // screen — so re-clamp to the configured default.
-            if !userDidPickPlan || !renderablePlans.contains(selectedPlan) {
-                selectedPlan = resolvedDefaultPlan
-            }
-        }
-        // Offerings can land after `onAppear` already picked a selection from
-        // the fallback plan list. Catch up to the configured default unless the
-        // user has already chosen a plan themselves.
-        .onChange(of: manager.offerings) { _, _ in
-            if !userDidPickPlan {
-                selectedPlan = resolvedDefaultPlan
-            }
-        }
-        .onDisappear {
-            // A purchase in flight means this is NOT a dismissal: StoreKit's
-            // payment sheet presenting over this `fullScreenCover` fires
-            // `onDisappear` seconds before the purchase resolves. The flag is
-            // set synchronously on the main actor before the store call, and
-            // cleared the instant it returns — before the success path calls
-            // `dismiss()` — so the real dismissal always logs.
-            guard !isPurchaseInFlight else { return }
-            guard !hasLoggedPaywallDismissed else { return }
-            hasLoggedPaywallDismissed = true
-            AppAnalytics.log("paywall_dismissed", params: [
-                "source": source,
-                "purchased": didPurchase
-            ])
-        }
-    }
+    // MARK: - Layout inputs
 
-    // MARK: - Scrollable hero content
+    /// Lowest `eyeContact` the chip states.
+    static let eyeContactChipThreshold = 0.8
 
-    private var scrollContent: some View {
-        ScrollView {
-            VStack(spacing: 28) {
-                VStack(spacing: 12) {
-                    heroSection
-                    featuresList
-                }
-                restoreRow
-                Spacer().frame(height: bottomSheetHeight + 24)
-            }
-            .padding(.horizontal, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        // Soft warm-orange glow behind the hero. Anchored to the ScrollView's
-        // frame (not the inner content) so the glow stays fixed at the top of
-        // the screen as the user scrolls. `.ignoresSafeArea()` on the gradient
-        // itself pushes it under the status bar; the bottom sheet sits above
-        // this layer in the parent ZStack so its material is unaffected.
-        .background(
-            RadialGradient(
-                colors: [
-                    Theme.accent.opacity(0.18),
-                    Theme.accent.opacity(0.06),
-                    Color.clear
-                ],
-                center: .top,
-                startRadius: 40,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
+    /// The reader the user picked, so the pill looks like their camera.
+    @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
+    private var isClassicMode: Bool { displayMode == "classic" }
+
+    /// Nil on every device but iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
+
+    /// What the pill cycles: the start of the user's own script, else a line
+    /// about the app.
+    private var pillText: String {
+        pillPhrase ?? String(
+            localized: "paywall.v3.pillPhrase",
+            defaultValue: "Read your script, film in one take and shine",
+            comment: "Words cycled through the prompter pill at the top of the paywall, three at a time, one word per line, when the user has no script of their own yet. Keep it short and natural."
         )
     }
 
-    // MARK: - Restore Purchases entry point (top of paywall)
+    private var eyeContactPercent: Int? {
+        guard let eyeContact, eyeContact >= Self.eyeContactChipThreshold else { return nil }
+        return Int((eyeContact * 100).rounded())
+    }
 
-    /// "Already subscribed? Restore" row. Sits inside the padded scrollContent
-    /// VStack alongside the dismiss group, in the secondary-actions zone below
-    /// the feature list. Reuses the same SubscriptionManager.restorePurchases()
-    /// and localized result strings as the Settings → Subscription Restore
-    /// Purchases button — no key duplication. On success, dismisses the
-    /// paywall (user is now Pro).
-    private var restoreRow: some View {
-        HStack(spacing: 6) {
-            Text(String(
-                localized: "paywall.restore.prompt",
-                defaultValue: "Already subscribed?",
-                comment: "Caption preceding the inline Restore link at the bottom of the paywall, above the Dismiss link."
-            ))
-                .foregroundColor(.secondary)
-            if isRestoring {
-                ProgressView()
-                    .controlSize(.small)
+    var body: some View {
+        layout
+            .background(backdrop)
+            .statusBarHidden(true)
+            .preferredColorScheme(.dark)
+            .interactiveDismissDisabled(true)
+            .alert(
+                restoreSucceeded
+                    ? String(
+                        localized: "settings.restore.success.title",
+                        defaultValue: "Subscription restored",
+                        comment: "Title of the alert shown when Restore Purchases finds an active subscription on the user's Apple ID."
+                    )
+                    : String(
+                        localized: "settings.restore.empty.title",
+                        defaultValue: "No purchases found",
+                        comment: "Title of the alert shown when Restore Purchases finds no active subscription on the user's Apple ID."
+                    ),
+                isPresented: $showRestoreAlert,
+                presenting: restoreResultMessage
+            ) { _ in
+                Button("common.ok", role: .cancel) {
+                    if restoreSucceeded {
+                        // User is now Pro — dismissing the paywall drops them back
+                        // into the app instead of leaving them stranded on a wall
+                        // they no longer need.
+                        //
+                        // A restore onto an active entitlement ends the presentation
+                        // in the same state a purchase does, so it reports
+                        // `purchased=true` too. Set here rather than where
+                        // `restoreSucceeded` is assigned: this alert's only control
+                        // is this button, so a successful restore cannot reach
+                        // dismissal by any other route.
+                        didPurchase = true
+                        dismiss()
+                    }
+                }
+            } message: { message in
+                Text(message)
+            }
+            .onAppear {
+                selectedPlan = resolvedDefaultPlan
+                // Offerings normally arrive from the launch-time prewarm. Load here
+                // only if that did not produce them — a `.skipped` prewarm whose
+                // subscriber lapsed mid-session, a failed prewarm, or a paywall
+                // opened before it finished.
+                if manager.offerings == nil {
+                    Task { await manager.loadOfferings() }
+                }
+                // Stamp the shared "any paywall shown" timestamp on every appear,
+                // regardless of source or build flavor. ContentView's cold-start
+                // paywall trigger reads this same UserDefaults key to enforce its
+                // 1-hour cross-source cooldown. Writing in DEV too so the cooldown
+                // can be tested without flipping build configs.
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastAnyPaywallShownAt")
+                // Every paywall — automatic or user-initiated — counts toward the
+                // arbiter's gap and suppresses the review prompt for this session.
+                // Automatic ones have already called `didPresent`; repeating the
+                // note here is harmless.
+                PromptArbiter.shared.noteExternalPresentation(isPaywall: true)
+                logPaywallShown()
+            }
+            .onDisappear {
+                PromptArbiter.shared.didDismiss()
+            }
+            // Re-runs whenever the annual product changes identity — including nil →
+            // resolved when offerings finish loading, and on an offering swap after
+            // a Remote Config activation. Fits the existing re-render pattern
+            // (activationCount, selectedPlan) rather than adding new machinery, and
+            // adds no offerings fetch of its own.
+            .task(id: annualPackage?.storeProduct.productIdentifier) {
+                await refreshTrialEligibility()
+            }
+            .onChange(of: remoteConfig.activationCount) { _, _ in
+                // The body re-renders on its own (every PaywallConfig accessor
+                // reads live), but `selectedPlan` is @State and survives the
+                // re-render. If the newly activated `paywall_plans` no longer
+                // contains it, the CTA would stay bound to a plan that is not on
+                // screen — so re-clamp to the configured default.
+                if !userDidPickPlan || !renderablePlans.contains(selectedPlan) {
+                    selectedPlan = resolvedDefaultPlan
+                }
+            }
+            // Offerings can land after `onAppear` already picked a selection from
+            // the fallback plan list. Catch up to the configured default unless the
+            // user has already chosen a plan themselves.
+            .onChange(of: manager.offerings) { _, _ in
+                if !userDidPickPlan {
+                    selectedPlan = resolvedDefaultPlan
+                }
+            }
+            .onDisappear {
+                // A purchase in flight means this is NOT a dismissal: StoreKit's
+                // payment sheet presenting over this `fullScreenCover` fires
+                // `onDisappear` seconds before the purchase resolves. The flag is
+                // set synchronously on the main actor before the store call, and
+                // cleared the instant it returns — before the success path calls
+                // `dismiss()` — so the real dismissal always logs.
+                guard !isPurchaseInFlight else { return }
+                guard !hasLoggedPaywallDismissed else { return }
+                hasLoggedPaywallDismissed = true
+                AppAnalytics.log("paywall_dismissed", params: [
+                    "source": source,
+                    "purchased": didPurchase
+                ])
+            }
+    }
+
+    // MARK: - Layouts
+
+    /// iPhone: the pill hangs from the camera as it does when recording. Duo:
+    /// it floats beside the close button, and the unfolded screen splits
+    /// along the crease — what you get on one side, the plans on the other.
+    /// Everywhere the plans and the button stay pinned to the bottom; only
+    /// what is above them scrolls on a short screen.
+    @ViewBuilder
+    private var layout: some View {
+        if let duo = duoMonitor?.state {
+            if duo.posture == .unfolded, let crease = duo.creaseFrame {
+                splitLayout(crease: crease)
             } else {
-                Button(action: { restoreTapped() }) {
+                coverScreenLayout(duo)
+            }
+        } else {
+            cameraPillLayout
+        }
+    }
+
+    private var cameraPillLayout: some View {
+        GeometryReader { geo in
+            let g = PrompterPillPreview.Layout(
+                safeTop: geo.safeAreaInsets.top,
+                screenWidth: geo.size.width,
+                isClassicMode: isClassicMode,
+                spacing: 12
+            )
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 0) {
+                    fillingScroll(topInset: g.contentTop) {
+                        headline
+                        featuresList
+                            .padding(.top, 20)
+                    }
+                    purchaseBlock
+                }
+                PrompterPillPreview(
+                    phrase: pillText,
+                    isClassicMode: isClassicMode
+                )
+                .allowsHitTesting(false)
+                closeButton(size: g.closeSize)
+                    .padding(.leading, g.closeLeading)
+                    .offset(y: g.closeTop)
+            }
+        }
+    }
+
+    private func splitLayout(crease: CGRect) -> some View {
+        GeometryReader { geo in
+            let origin = geo.frame(in: .global).origin
+            let local = crease.offsetBy(dx: -origin.x, dy: -origin.y)
+            let isSideBySide = local.height >= local.width
+            let firstLength = max(0, isSideBySide ? local.minX : local.minY)
+            let stack = isSideBySide
+                ? AnyLayout(HStackLayout(spacing: local.width))
+                : AnyLayout(VStackLayout(spacing: local.height))
+            stack {
+                fillingScroll(topInset: 8) {
+                    floatingPillHeader
+                    headline
+                    Spacer(minLength: 20)
+                    featuresList
+                }
+                .frame(
+                    width: isSideBySide ? firstLength : nil,
+                    height: isSideBySide ? nil : firstLength
+                )
+                VStack(alignment: .leading, spacing: 0) {
                     Text(String(
-                        localized: "settings.restore.button",
-                        defaultValue: "Restore Purchases",
-                        comment: "Settings button that triggers RevenueCat restorePurchases against the active Apple ID. Required by App Store review and used by users installing on a new device."
+                        localized: "paywall.v3.choosePlan",
+                        defaultValue: "Choose your plan",
+                        comment: "Title above the plan list on the plans half of the paywall on iPhone Duo's unfolded screen."
                     ))
-                        .underline()
-                        .foregroundColor(.primary)
+                    .font(.title2.bold())
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    Spacer(minLength: 0)
+                    purchaseBlock
                 }
             }
         }
-        .font(.subheadline)
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
     }
+
+    /// Duo folded: the pill sits on the lens in the top corner, as it does
+    /// when recording, and the close button and headline take the space
+    /// beside it. The side insets are dropped: they only keep clear of the
+    /// status bar, which the paywall hides; the lens itself is covered by
+    /// the black pill.
+    private func coverScreenLayout(_ duo: DuoDisplayState) -> some View {
+        GeometryReader { geo in
+            let origin = geo.frame(in: .global).origin
+            let lens = duo.lensFrame.offsetBy(dx: -origin.x, dy: -origin.y)
+            let lensOnRight = lens.midX > geo.size.width / 2
+            let pillWidth = min(210, geo.size.width * 0.48)
+            let pillTop = max(0, lens.minY - 12)
+            let pillEdgeInset = max(8, lensOnRight ? geo.size.width - lens.maxX - 12 : lens.minX - 12)
+            let pill = FloatingPrompterPill(
+                phrase: pillText,
+                isClassicMode: isClassicMode,
+                textTop: lens.maxY - pillTop + 6
+            )
+            .frame(width: pillWidth)
+            let side = VStack(alignment: .leading, spacing: 12) {
+                closeButton(size: 42)
+                    .padding(.leading, -1)
+                headline(fontSize: 26)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 0) {
+                fillingScroll(topInset: 0) {
+                    HStack(alignment: .top, spacing: 12) {
+                        if lensOnRight {
+                            side.padding(.top, 8)
+                            pill.padding(.top, pillTop).padding(.trailing, pillEdgeInset - 20)
+                        } else {
+                            pill.padding(.top, pillTop).padding(.leading, pillEdgeInset - 20)
+                            side.padding(.top, 8)
+                        }
+                    }
+                    featuresList
+                        .padding(.top, 20)
+                }
+                purchaseBlock
+            }
+        }
+        .ignoresSafeArea(.container, edges: .horizontal)
+    }
+
+    /// Duo: the close button and the pill share the top row, so the pill
+    /// costs no extra height on the short cover screen.
+    private var floatingPillHeader: some View {
+        HStack(alignment: .top, spacing: 8) {
+            closeButton(size: 42)
+                .padding(.leading, -8)
+            FloatingPrompterPill(phrase: pillText, isClassicMode: isClassicMode)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.bottom, 20)
+    }
+
+    /// The plans and the button under them: pinned to the bottom, so prices
+    /// and the button stay on screen however short it is; what is above
+    /// them scrolls instead.
+    private var purchaseBlock: some View {
+        VStack(spacing: 12) {
+            plansList
+            checkout
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+    }
+
+    /// Scrolls only when the content is taller than its space; otherwise
+    /// fills it, so a `Spacer` inside pushes what follows to the bottom.
+    private func fillingScroll<Content: View>(
+        topInset: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let content = content()
+        return GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, topInset)
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    /// Lit at the top like onboarding, so the black pill stands out.
+    private var backdrop: some View {
+        ZStack(alignment: .top) {
+            Color.black
+            LinearGradient(
+                colors: [Color(white: 0.16), Color(red: 0.1, green: 0.04, blue: 0), .black],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 360)
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: - What you get
+
+    /// The eye-contact chip when there is one, the headline, and the offer
+    /// line when there is an offer.
+    private var headline: some View { headline(fontSize: 32) }
+
+    private func headline(fontSize: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let percent = eyeContactPercent {
+                eyeContactChip(percent)
+                    .padding(.bottom, 10)
+            }
+            Text(heroHeadlineText)
+                .font(.system(size: fontSize, weight: .heavy))
+                .foregroundStyle(.white)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle = heroSubtitleText {
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    private func eyeContactChip(_ percent: Int) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "eye.fill")
+                .foregroundStyle(.green)
+            Text(String(
+                localized: "paywall.v3.eyeContactChip",
+                defaultValue: "\(percent)% eye contact in your first take",
+                comment: "Chip above the paywall headline after the user's first take of their own script. %lld is the share of the take they spent looking at the lens, as a whole percent."
+            ))
+            .foregroundStyle(.white.opacity(0.9))
+        }
+        .font(.subheadline.weight(.semibold))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.green.opacity(0.14), in: Capsule())
+    }
+
+    private var featuresList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            featureLine(
+                icon: "drop.fill",
+                title: String(
+                    localized: "paywall.v3.feature.noWatermark",
+                    defaultValue: "No watermark.",
+                    comment: "Paywall feature line, bold lead-in. Followed by its detail sentence on the same line."
+                ),
+                detail: String(
+                    localized: "paywall.v3.feature.noWatermark.detail",
+                    defaultValue: "Post takes as they are.",
+                    comment: "Paywall feature line, detail after 'No watermark.'"
+                )
+            )
+            featureLine(
+                icon: "sparkles",
+                title: String(
+                    localized: "paywall.v3.feature.ai",
+                    defaultValue: "AI scripts.",
+                    comment: "Paywall feature line, bold lead-in: AI drafting and optimizing of scripts. Followed by its detail sentence on the same line."
+                ),
+                detail: String(
+                    localized: "paywall.v3.feature.ai.detail",
+                    defaultValue: "Draft and polish every video.",
+                    comment: "Paywall feature line, detail after 'AI scripts.'"
+                )
+            )
+            featureLine(
+                icon: "video.fill",
+                title: String(
+                    localized: "paywall.v3.feature.quality",
+                    defaultValue: "4K, stabilized.",
+                    comment: "Paywall feature line, bold lead-in: 4K recording and video stabilization. Followed by its detail sentence on the same line."
+                ),
+                detail: String(
+                    localized: "paywall.v3.feature.quality.detail",
+                    defaultValue: "Sharp and steady on the move.",
+                    comment: "Paywall feature line, detail after '4K, stabilized.'"
+                )
+            )
+        }
+    }
+
+    private func featureLine(icon: String, title: String, detail: String) -> some View {
+        var lead = AttributedString(title)
+        lead.font = .body.weight(.semibold)
+        lead.foregroundColor = .white
+        var rest = AttributedString(" " + detail)
+        rest.font = .body
+        rest.foregroundColor = Color(.secondaryLabel)
+        return HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 32, height: 32)
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            Text(lead + rest)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Restore Purchases
 
     private func restoreTapped() {
         Task {
@@ -861,205 +1125,20 @@ struct PaywallView: View {
         }
     }
 
-    private var heroSection: some View {
-        VStack(spacing: 12) {
-            Text(heroHeadlineText)
-                .font(.system(size: 40, weight: .bold))
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-
-            Text(heroSubtitleText)
-                .font(.title2)
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-        }
-        // Clears the top-leading close button (44pt + 8pt inset) so a long
-        // first headline line cannot run under it.
-        .padding(.top, 52)
-    }
-
-    // MARK: - Features list
-
-    private var featuresList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            featureRow(
-                icon: "drop.fill",
-                title: String(
-                    localized: "paywall.v2.feature.noWatermark",
-                    defaultValue: "No watermark on recordings",
-                    comment: "Paywall v2 feature row title."
-                ),
-                subtitle: String(
-                    localized: "paywall.v2.feature.noWatermark.subtitle",
-                    defaultValue: "Share videos without the SteadyEye watermark",
-                    comment: "Paywall v2 feature row subtitle for the no-watermark feature."
-                )
-            )
-            featureRow(
-                icon: "sparkles",
-                title: String(
-                    localized: "paywall.v2.feature.unlimitedAI",
-                    defaultValue: "AI optimization for every script",
-                    comment: "Paywall v2 feature row title for the AI optimization feature."
-                ),
-                subtitle: String(
-                    localized: "paywall.v2.feature.unlimitedAI.subtitle",
-                    defaultValue: "Optimize every script you write",
-                    comment: "Paywall v2 feature row subtitle for the AI optimization feature."
-                )
-            )
-            featureRow(
-                icon: "4k.tv",
-                title: String(
-                    localized: "paywall.v2.feature.fourK",
-                    defaultValue: "4K recording",
-                    comment: "Paywall v2 feature row title. '4K' is a technical resolution label."
-                ),
-                subtitle: String(
-                    localized: "paywall.v2.feature.fourK.subtitle",
-                    defaultValue: "Cinematic quality for important shoots",
-                    comment: "Paywall v2 feature row subtitle for the 4K recording feature."
-                )
-            )
-            featureRow(
-                icon: "hand.raised.fill",
-                title: String(
-                    localized: "paywall.v2.feature.stabilization",
-                    defaultValue: "Steadicam stabilization",
-                    comment: "Paywall v2 feature row title for the video stabilization feature."
-                ),
-                subtitle: String(
-                    localized: "paywall.v2.feature.stabilization.subtitle",
-                    defaultValue: "Smooth video while moving or walking",
-                    comment: "Paywall v2 feature row subtitle for the video stabilization feature."
-                )
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-        )
-    }
-
-    private func featureRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(spacing: 18) {
-            ZStack {
-                RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
-                    .fill(Theme.accentTint)
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .foregroundColor(Theme.accent)
-                    .font(.system(size: 18, weight: .semibold))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundColor(.white)
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    // MARK: - Carousel (parked 2026-04-30 — see PaywallFeatureCard.swift)
-    //
-    // Reverted to static featuresList. Re-enable by swapping `featuresList`
-    // → `featuresCarousel` in scrollContent. Card component lives in
-    // PaywallFeatureCard.swift. Keep the watermark icon here in sync with
-    // the row in featuresList (currently `drop.fill`).
-
-    @State private var selectedFeatureIndex: Int? = 0
-
-    private struct Feature {
-        let icon: String
-        let title: String
-        let subtitle: String
-    }
-
-    private var features: [Feature] {
-        [
-            Feature(
-                icon: "drop.fill",
-                title: String(localized: "paywall.v2.feature.noWatermark", defaultValue: "No watermark on recordings", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.noWatermark.subtitle", defaultValue: "Share videos without the SteadyEye watermark", comment: "Paywall v2 feature card subtitle.")
-            ),
-            Feature(
-                icon: "sparkles",
-                title: String(localized: "paywall.v2.feature.unlimitedAI", defaultValue: "AI optimization for every script", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.unlimitedAI.subtitle", defaultValue: "Optimize every script you write", comment: "Paywall v2 feature card subtitle.")
-            ),
-            Feature(
-                icon: "4k.tv",
-                title: String(localized: "paywall.v2.feature.fourK", defaultValue: "4K recording", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.fourK.subtitle", defaultValue: "Cinematic quality for important shoots", comment: "Paywall v2 feature card subtitle.")
-            ),
-            Feature(
-                icon: "hand.raised.fill",
-                title: String(localized: "paywall.v2.feature.stabilization", defaultValue: "Steadicam stabilization", comment: "Paywall v2 feature card title."),
-                subtitle: String(localized: "paywall.v2.feature.stabilization.subtitle", defaultValue: "Smooth video while moving or walking", comment: "Paywall v2 feature card subtitle.")
-            )
-        ]
-    }
-
-    private var featuresCarousel: some View {
-        VStack(spacing: 16) {
-            GeometryReader { geo in
-                let cardWidth = geo.size.width - 80   // 40pt peek per side
-                let sidePadding = (geo.size.width - cardWidth) / 2
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
-                        ForEach(Array(features.enumerated()), id: \.offset) { index, feature in
-                            PaywallFeatureCard(
-                                icon: feature.icon,
-                                title: feature.title,
-                                subtitle: feature.subtitle
-                            )
-                            .frame(width: cardWidth)
-                            .id(index)
-                        }
-                    }
-                    .scrollTargetLayout()
-                    .padding(.horizontal, sidePadding)
-                }
-                .scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $selectedFeatureIndex)
-            }
-            .frame(height: 300)
-
-            // Custom dot indicator (TabView's built-in dots are not used here
-            // because the .page tabViewStyle can't produce the peek effect).
-            HStack(spacing: 8) {
-                ForEach(0..<features.count, id: \.self) { index in
-                    Circle()
-                        .fill(selectedFeatureIndex == index ? Color.white : Color.white.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                }
-            }
-        }
-    }
-
-    /// Low-emphasis top-leading close. Same path as the former inline
-    /// Dismiss link: `dismiss()`, with `paywall_dismissed` logged from
-    /// `onDisappear`.
-    private var closeButton: some View {
+    /// Same path as the former inline Dismiss link: `dismiss()`, with
+    /// `paywall_dismissed` logged from `onDisappear`. Sized and placed like
+    /// the camera's close button, which sits in the same spot.
+    private func closeButton(size: CGFloat) -> some View {
         Button {
             dismiss()
         } label: {
             Image(systemName: "xmark")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.55))
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
+                .font(.system(size: size * 0.36, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: size, height: size)
+                .background(Color.white.opacity(0.14), in: Circle())
+                .frame(width: max(size, 44), height: max(size, 44))
+                .contentShape(Rectangle())
         }
         .accessibilityLabel(String(
             localized: "paywall.v2.dismissA11y",
@@ -1068,40 +1147,7 @@ struct PaywallView: View {
         ))
     }
 
-    private var dismissGroup: some View {
-        VStack(spacing: 4) {
-            Text(String(
-                localized: "paywall.v2.notInterested",
-                defaultValue: "Not interested?",
-                comment: "Caption above the inline Dismiss link on the paywall."
-            ))
-                .font(.body)
-                .foregroundColor(.secondary)
-            Button {
-                dismiss()
-            } label: {
-                Text(String(
-                    localized: "paywall.v2.dismiss",
-                    defaultValue: "Dismiss",
-                    comment: "Inline link that dismisses the paywall and returns the user to the free tier."
-                ))
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(.primary)
-                    .underline()
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel(String(
-                localized: "paywall.v2.dismissA11y",
-                defaultValue: "Dismiss paywall and continue with free tier",
-                comment: "VoiceOver label for the inline Dismiss link on the paywall."
-            ))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-    }
-
-    // MARK: - Sticky bottom sheet
+    // MARK: - Plans and checkout
 
     /// Universal CTA copy sourced from Remote Config. Previously
     /// branched to "Start free trial" for annual; that branch was
@@ -1113,18 +1159,18 @@ struct PaywallView: View {
         showsTrialCopy ? PaywallConfig.trialCtaLabel : PaywallConfig.ctaLabel
     }
 
-    private var bottomSheet: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 10) {
-                if isExpanded {
-                    ForEach(renderablePlans) { plan in
-                        planRow(plan: plan)
-                    }
-                } else {
-                    planRow(plan: resolvedDefaultPlan)
-                }
+    /// Every configured plan, always on screen: nothing cheaper hides behind
+    /// a toggle.
+    private var plansList: some View {
+        VStack(spacing: 8) {
+            ForEach(renderablePlans) { plan in
+                planRow(plan: plan)
             }
+        }
+    }
 
+    private var checkout: some View {
+        VStack(spacing: 10) {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)
@@ -1147,52 +1193,167 @@ struct PaywallView: View {
             .primaryButtonStyle()
             .disabled(isTransactionInFlight)
 
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    if isExpanded {
-                        selectedPlan = resolvedDefaultPlan
-                        userDidPickPlan = false
-                    }
-                    isExpanded.toggle()
-                }
-            } label: {
-                Text(isExpanded
-                    ? String(
-                        localized: "paywall.v2.showLess",
-                        defaultValue: "Show Less",
-                        comment: "Paywall v2 collapse-link below the Continue button when the plan-list is expanded."
-                    )
-                    : String(
-                        localized: "paywall.v2.allPlans",
-                        defaultValue: "All Plans",
-                        comment: "Paywall v2 expand-link below the Continue button when the collapsed annual card is shown."
+            Text(footnoteText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+            legalLinks
+        }
+    }
+
+    private var legalLinks: some View {
+        HStack(spacing: 18) {
+            Button(action: restoreTapped) {
+                ZStack {
+                    Text(String(
+                        localized: "paywall.v3.restore",
+                        defaultValue: "Restore",
+                        comment: "Short link at the bottom of the paywall that restores purchases made on this Apple ID."
                     ))
-                    .font(.body)
-                    .foregroundStyle(.white)
-                    .underline()
-                    .frame(maxWidth: .infinity, minHeight: 32)
-                    .contentShape(Rectangle())
+                    .opacity(isRestoring ? 0 : 1)
+                    ProgressView()
+                        .controlSize(.mini)
+                        .opacity(isRestoring ? 1 : 0)
+                }
             }
             .disabled(isTransactionInFlight)
-        }
-        .padding(20)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: BottomSheetHeightKey.self, value: geo.size.height)
+            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
+                Text("common.termsOfUse", comment: "Terms of use link in Settings")
+            }
+            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+                Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
             }
         }
-        .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: Theme.Radius.card,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: Theme.Radius.card,
-                style: .continuous
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(maxWidth: .infinity, minHeight: 32)
+    }
+
+    /// What the selected plan will charge, under the button.
+    private var footnoteText: String {
+        let product = package(for: selectedPlan)?.storeProduct
+        if product.flatMap({ trialDisplay(for: $0) }) != nil {
+            return String(
+                localized: "paywall.v3.footnote.trial",
+                defaultValue: "Nothing to pay today. Cancel anytime.",
+                comment: "Line under the paywall button when the selected plan starts with a free trial."
             )
-            .fill(.ultraThinMaterial)
-            .ignoresSafeArea(edges: .bottom)
-            .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: -4)
-        )
+        }
+        if product.flatMap({ introDisplay(for: $0) }) != nil {
+            // The plan row states the discounted first period and the price
+            // after it; repeating only the regular price here would misstate
+            // the first charge.
+            return String(
+                localized: "paywall.v3.footnote.cancelAnytime",
+                defaultValue: "Cancel anytime.",
+                comment: "Line under the paywall button when the selected plan starts with a paid introductory price."
+            )
+        }
+        let price = priceText(for: selectedPlan)
+        switch selectedPlan {
+        case .annual:
+            return String(
+                localized: "paywall.v3.footnote.yearly",
+                defaultValue: "Billed \(price) a year. Cancel anytime.",
+                comment: "Line under the paywall button for the annual plan. %@ is the localized yearly price."
+            )
+        case .monthly:
+            return String(
+                localized: "paywall.v3.footnote.monthly",
+                defaultValue: "Billed \(price) a month. Cancel anytime.",
+                comment: "Line under the paywall button for the monthly plan. %@ is the localized monthly price."
+            )
+        case .weekly:
+            return String(
+                localized: "paywall.v3.footnote.weekly",
+                defaultValue: "Billed \(price) a week. Cancel anytime.",
+                comment: "Line under the paywall button for the weekly plan. %@ is the localized weekly price."
+            )
+        case .lifetime:
+            return String(
+                localized: "paywall.v3.footnote.lifetime",
+                defaultValue: "One payment. No subscription.",
+                comment: "Line under the paywall button for the lifetime plan, a single purchase."
+            )
+        }
+    }
+
+    // MARK: - Savings from the store's prices
+
+    /// What a subscription plan costs over a year at its regular price, from
+    /// the store's actual product. Nil for lifetime and before offerings load.
+    private func annualizedPrice(for plan: PaywallPlan) -> Double? {
+        guard plan != .lifetime,
+              let product = package(for: plan)?.storeProduct,
+              let period = product.subscriptionPeriod,
+              period.value > 0
+        else { return nil }
+        let perYear: Double
+        switch period.unit {
+        case .day: perYear = 365
+        case .week: perYear = 52
+        case .month: perYear = 12
+        case .year: perYear = 1
+        @unknown default: return nil
+        }
+        return (product.price as NSDecimalNumber).doubleValue * perYear / Double(period.value)
+    }
+
+    /// The subscription plan on screen that costs least over a year, and how
+    /// much it saves against the dearest one at the same prices. Nil unless
+    /// two subscription plans are on screen and the saving is at least 10%.
+    private var bestValue: (plan: PaywallPlan, percent: Int)? {
+        let priced = renderablePlans.compactMap { plan in
+            annualizedPrice(for: plan).map { (plan: plan, yearly: $0) }
+        }
+        guard priced.count >= 2,
+              let dearest = priced.map(\.yearly).max(), dearest > 0,
+              let cheapest = priced.min(by: { $0.yearly < $1.yearly })
+        else { return nil }
+        let percent = Int(((dearest - cheapest.yearly) / dearest * 100).rounded(.down))
+        return percent >= 10 ? (cheapest.plan, percent) : nil
+    }
+
+    /// The row's line under the plan name: the price per week (when weekly is
+    /// on screen) or per month, for plans billed less often, so they compare
+    /// with the shortest plan; else the billing cadence.
+    private func planDetail(for plan: PaywallPlan) -> String? {
+        let product = package(for: plan)?.storeProduct
+        let comparesWeekly = renderablePlans.contains(.weekly)
+        switch plan {
+        case .annual:
+            if comparesWeekly, let perWeek = product?.localizedPricePerWeek {
+                return String(
+                    localized: "paywall.v3.perWeekBilledYearly",
+                    defaultValue: "\(perWeek) a week, billed yearly",
+                    comment: "Paywall annual plan row, under the plan name. %@ is the localized yearly price divided per week."
+                )
+            }
+            if let perMonth = product?.localizedPricePerMonth {
+                return String(
+                    localized: "paywall.v3.perMonthBilledYearly",
+                    defaultValue: "\(perMonth) a month, billed yearly",
+                    comment: "Paywall annual plan row, under the plan name. %@ is the localized yearly price divided per month."
+                )
+            }
+        case .monthly:
+            if comparesWeekly, let perWeek = product?.localizedPricePerWeek {
+                return String(
+                    localized: "paywall.v3.perWeekBilledMonthly",
+                    defaultValue: "\(perWeek) a week, billed monthly",
+                    comment: "Paywall monthly plan row, under the plan name. %@ is the localized monthly price divided per week."
+                )
+            }
+        case .weekly, .lifetime:
+            break
+        }
+        return billingPeriodText(for: plan).map { text in
+            text.prefix(1).uppercased() + text.dropFirst()
+        }
     }
 
     private func planRow(plan: PaywallPlan) -> some View {
@@ -1202,70 +1363,89 @@ struct PaywallView: View {
         // `savingsPercent` and renders as a "100% OFF" sale badge.
         let trial = pkg.flatMap { trialDisplay(for: $0.storeProduct) }
         let intro = trial == nil ? pkg.flatMap { introDisplay(for: $0.storeProduct) } : nil
-        let basePrice = priceText(for: plan)
-        let displayPrice = trial?.duration ?? intro?.primary ?? basePrice
+        let displayPrice = trial?.duration ?? intro?.primary ?? priceText(for: plan)
         let isSelected = selectedPlan == plan
+        let badge: (text: String, color: Color)? = {
+            if let intro, intro.savingsPercent >= 30 {
+                return (String(
+                    localized: "paywall.intro.savingsBadge",
+                    defaultValue: "\(intro.savingsPercent)% OFF",
+                    comment: "Compact badge displayed next to a paywall plan title when the active intro discount saves the user 30% or more on the first period. %lld is the integer percent saved (e.g. 50)."
+                ), .green)
+            }
+            if let best = bestValue, best.plan == plan {
+                return (String(
+                    localized: "paywall.v3.saveBadge",
+                    defaultValue: "Save \(best.percent)%",
+                    comment: "Badge next to the paywall plan that costs least over a year. %lld is the whole percent it saves against the dearest subscription plan on screen, from store prices. Shown in capitals."
+                ), Theme.accent)
+            }
+            return nil
+        }()
         return Button(action: {
             userDidPickPlan = true
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 selectedPlan = plan
             }
         }) {
-            HStack {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? Theme.accent : Color.secondary)
-                HStack(spacing: 8) {
-                    Text(plan.title)
-                        .font(.title3.weight(.semibold))
-                        .foregroundColor(.white)
-                    // Trial rows carry no badge: the duration text on the
-                    // right already says "Free for 7 days". The HStack stays
-                    // because the DISCOUNT badge below still needs it, and a
-                    // title-only row is not a new layout state — it is what
-                    // already rendered whenever neither badge applied.
-                    if let intro, intro.savingsPercent >= 30 {
-                        Text(String(
-                            localized: "paywall.intro.savingsBadge",
-                            defaultValue: "\(intro.savingsPercent)% OFF",
-                            comment: "Compact badge displayed next to a paywall plan title when the active intro discount saves the user 30% or more on the first period. %lld is the integer percent saved (e.g. 50)."
-                        ))
-                            .font(.caption2).bold()
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.green)
-                            .foregroundColor(.black)
-                            .clipShape(Capsule())
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(isSelected ? Theme.accent : Color(white: 0.39), lineWidth: 2)
+                    Circle()
+                        .fill(Theme.accent)
+                        .padding(6)
+                        .opacity(isSelected ? 1 : 0)
+                }
+                .frame(width: 22, height: 22)
+
+                // A trial or intro row states its terms on the right in two
+                // lines, so its left side has no detail line, and the badge
+                // takes that line instead of squeezing in beside the name.
+                let detail = (trial == nil && intro == nil) ? planDetail(for: plan) : nil
+                let badgeView = badge.map { badge in
+                    Text(badge.text)
+                        .textCase(.uppercase)
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(badge.color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        Text(plan.title)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .fixedSize()
+                        if detail != nil { badgeView }
+                    }
+                    if let detail {
+                        Text(detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        badgeView
                     }
                 }
-                Spacer()
-                // The value and the line qualifying it stack on the RIGHT.
-                // The secondary used to sit under the plan TITLE, on the far
-                // side of the row from the value it refers to, so the left
-                // column read "Annual" / "then $79.99/year" — as though the
-                // yearly price followed the plan name rather than the trial.
-                // Applies to both presentations: the discount case is the same
-                // sentence ("$X first year" / "then $79.99/year"), so the two
-                // layouts must not diverge.
-                //
-                // `spacing: 4` is the rhythm the left column already used for
-                // exactly this pairing — no new constant.
-                VStack(alignment: .trailing, spacing: 4) {
+
+                Spacer(minLength: 8)
+
+                // The value and the line qualifying it ("then $79.99/year")
+                // stack on the RIGHT, next to the value they refer to.
+                VStack(alignment: .trailing, spacing: 2) {
                     Text(displayPrice)
-                        .font(.title3.weight(.semibold))
-                        .foregroundColor(.white)
-                    // Omitted entirely rather than rendered empty, so a row with
-                    // no intro collapses to a single line at exactly its
-                    // previous height.
-                    // Priority: trial "then …" > intro "then …" > billing
-                    // cadence. The third arm is what makes the line present on
-                    // every row, so no row is a line shorter than its neighbours.
-                    if let secondary = trial?.secondary
-                        ?? intro?.secondary
-                        ?? billingPeriodText(for: plan) {
+                        .font(.headline)
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    if let secondary = trial?.secondary ?? intro?.secondary {
                         Text(secondary)
                             .font(.footnote)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 // Trailing alignment for wrapped lines, and ideal-height sizing
@@ -1274,16 +1454,22 @@ struct PaywallView: View {
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                    .fill(isSelected ? Theme.accentTint : Color(.secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isSelected ? Theme.accent.opacity(0.12) : Color(white: 0.11))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.accent : .clear, lineWidth: 2)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isTransactionInFlight)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Purchase action
@@ -1431,14 +1617,5 @@ struct PaywallView: View {
                 )
             }
         }
-    }
-}
-
-// MARK: - Preference key for measuring bottom sheet height
-
-private struct BottomSheetHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 320
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
