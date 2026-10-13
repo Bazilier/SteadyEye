@@ -10,6 +10,9 @@ struct CameraPreviewView: UIViewRepresentable {
     /// The session's video device, once configured. Used only on iPhone Duo,
     /// to keep the preview level as the interface rotates.
     var device: AVCaptureDevice?
+    /// Learned correction for an iPhone Duo camera, added to the level angle
+    /// (`CameraManager.previewAngleCorrection`).
+    var angleCorrection: CGFloat = 0
 
     func makeUIView(context: Context) -> UIView {
         if CameraManager.isChromakeyActive {
@@ -32,7 +35,7 @@ struct CameraPreviewView: UIViewRepresentable {
 
     func updateUIView(_ uiView: UIView, context: Context) {
         #if !targetEnvironment(simulator)
-        (uiView as? PreviewUIView)?.followHorizon(of: device)
+        (uiView as? PreviewUIView)?.followHorizon(of: device, correction: angleCorrection)
         #endif
     }
 }
@@ -43,16 +46,20 @@ final class PreviewUIView: UIView {
 
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var rotationObservation: NSKeyValueObservation?
+    private var correction: CGFloat = 0
 
     /// iPhone Duo only: its interface rotates with the device (portrait lock
     /// does not apply on the inner display), so the preview's rotation must
     /// follow the RotationCoordinator's level-horizon angle for this layer.
     /// Everywhere else the interface is portrait-locked and the preview is
-    /// left exactly as before. Rebuilt when the device changes.
-    func followHorizon(of device: AVCaptureDevice?) {
-        guard DuoDisplayMonitor.deviceHasHinge,
+    /// left exactly as before — except under a learned correction, which only
+    /// a Duo camera (or the DEV calibration test) has. Rebuilt when the device
+    /// or the correction changes.
+    func followHorizon(of device: AVCaptureDevice?, correction: CGFloat) {
+        guard DuoDisplayMonitor.deviceHasHinge || correction != 0 || rotationCoordinator != nil,
               let device,
-              rotationCoordinator?.device !== device else { return }
+              rotationCoordinator?.device !== device || self.correction != correction else { return }
+        self.correction = correction
         let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
         rotationCoordinator = coordinator
         apply(coordinator.videoRotationAngleForHorizonLevelPreview)
@@ -65,7 +72,8 @@ final class PreviewUIView: UIView {
         }
     }
 
-    private func apply(_ angle: CGFloat) {
+    private func apply(_ level: CGFloat) {
+        let angle = CGFloat((Int(level.rounded()) + Int(correction)) % 360)
         guard let connection = previewLayer.connection,
               connection.isVideoRotationAngleSupported(angle) else { return }
         connection.videoRotationAngle = angle

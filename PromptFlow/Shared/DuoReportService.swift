@@ -1,4 +1,5 @@
 import AVFoundation
+import StoreKit
 import UIKit
 
 // iPhone Duo diagnostics, sent to the backend (`/analytics/duo-report/`),
@@ -7,9 +8,10 @@ import UIKit
 // first hardware may be anyone's: a store demo unit or a user's phone, running
 // the App Store build.
 //
-// Only on a device with a hinge. Technical data only: geometry, camera
-// properties, capture events. Never script text or media. Each report key is
-// sent at most once per process; the server also caps reports per install.
+// Only on a device with a hinge (DEV builds: on any device, from a Settings
+// switch). Technical data only: geometry, camera properties, capture events,
+// the face's orientation angle. Never script text or media. Each report key
+// is sent at most once per process; the server also caps reports per install.
 // In the Simulator the JSON is printed instead of sent.
 
 @MainActor
@@ -19,6 +21,34 @@ enum DuoReportService {
     private static var takeCount = 0
     /// Takes reported per process; enough to compare postures, not a stream.
     private static let maxTakesPerProcess = 3
+    /// Where this copy of the app came from: "Production" (App Store),
+    /// "Sandbox" (TestFlight and App Review), "Xcode". Loaded on first use.
+    private static var installEnvironment: String?
+    private static var installEnvironmentRequested = false
+
+    /// Whether reports and the diagnostics feeding them run. On a Duo always;
+    /// in DEV builds also on any device from Settings, to check the pipeline
+    /// end to end before a Duo is in hand.
+    nonisolated static var isEnabled: Bool {
+        if DuoDisplayMonitor.deviceHasHinge { return true }
+        #if DEV
+        return UserDefaults.standard.bool(forKey: "dev_duo_reports_any_device")
+        #else
+        return false
+        #endif
+    }
+
+    /// Whether the camera reads the face's orientation: wherever reports
+    /// run, and in the DEV calibration test, which needs the readings but
+    /// sends nothing.
+    nonisolated static var readsFaceOrientation: Bool {
+        if isEnabled { return true }
+        #if DEV
+        return UserDefaults.standard.bool(forKey: "dev_duo_calibration_test")
+        #else
+        return false
+        #endif
+    }
 
     // MARK: - Reports
 
@@ -26,6 +56,7 @@ enum DuoReportService {
     /// interface orientation, once per pair. Delayed so the regions of a
     /// display switch or rotation have settled.
     static func scheduleDeviceReport(_ monitor: DuoDisplayMonitor) {
+        loadInstallEnvironment()
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.5))
             guard let state = monitor.state else { return }
@@ -46,13 +77,21 @@ enum DuoReportService {
     /// posture and interface orientation, once per pair. Delayed so the
     /// session has delivered its first buffer.
     static func scheduleCameraReport(_ cameraManager: CameraManager, monitor: DuoDisplayMonitor?) {
-        guard DuoDisplayMonitor.deviceHasHinge else { return }
+        guard isEnabled else { return }
+        loadInstallEnvironment()
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2.5))
             let scene = sceneInfo()
             let posture = monitor?.state?.posture.rawValue ?? "unknown"
             let key = "\(posture):\(scene["interface_orientation"] as? String ?? "?")"
             guard claim("camera:\(key)") else { return }
+            // A fresh face reading for exactly this posture and orientation:
+            // which way is up is what this report exists for. The probe gives
+            // up after about three seconds without a face.
+            cameraManager.faceProbe.arm(context: "report_\(key)")
+            for _ in 0..<10 where cameraManager.faceProbe.isPending {
+                try? await Task.sleep(for: .seconds(0.5))
+            }
             var payload: [String: Any] = [
                 "posture": posture,
                 "scene": scene,
@@ -77,8 +116,9 @@ enum DuoReportService {
         cameraManager: CameraManager,
         monitor: DuoDisplayMonitor?
     ) {
-        guard DuoDisplayMonitor.deviceHasHinge, takeCount < maxTakesPerProcess else { return }
+        guard isEnabled, takeCount < maxTakesPerProcess else { return }
         takeCount += 1
+        loadInstallEnvironment()
         let camera = cameraManager.duoDiagnostics()
         let events = recentCameraEvents(limit: 80)
         let scene = sceneInfo()
@@ -101,11 +141,26 @@ enum DuoReportService {
     // MARK: - Sending
 
     private static func claim(_ key: String) -> Bool {
-        guard DuoDisplayMonitor.deviceHasHinge else { return false }
+        guard isEnabled else { return false }
         return sentKeys.insert(key).inserted
     }
 
+    private static func loadInstallEnvironment() {
+        guard !installEnvironmentRequested else { return }
+        installEnvironmentRequested = true
+        Task { @MainActor in
+            do {
+                installEnvironment = try await AppTransaction.shared.unsafePayloadValue.environment.rawValue
+            } catch {
+                installEnvironment = "error"
+            }
+        }
+    }
+
     private static func send(kind: String, payload: [String: Any]) {
+        var payload = payload
+        payload["install_env"] = installEnvironment ?? "unknown"
+        if !DuoDisplayMonitor.deviceHasHinge { payload["dev_any_device"] = true }
         let info = Bundle.main.infoDictionary
         let body: [String: Any] = [
             "install_id": UserIdentity.uuid,

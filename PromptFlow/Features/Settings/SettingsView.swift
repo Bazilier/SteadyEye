@@ -42,6 +42,8 @@ struct SettingsView: View {
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
+    @AppStorage("dev_duo_reports_any_device") private var devDuoReportsAnyDevice: Bool = false
+    @AppStorage("dev_duo_calibration_test") private var devDuoCalibrationTest: Bool = false
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
     @State private var devConfirmFreshInstall = false
     @State private var devShowSatisfactionPrompt = false
@@ -502,7 +504,7 @@ struct SettingsView: View {
                         Text("Crop sideways takes to 9:16")
                     }
                     .tint(Theme.accent)
-                    Text("What iPhone Duo always does: with the phone held sideways, record the level horizon's vertical middle 9:16 instead of a tipped-over portrait frame. Hold this phone sideways to test it. Takes effect on next Recording open.")
+                    Text("Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle(isOn: $devDuoGeometryOverlay) {
@@ -510,6 +512,23 @@ struct SettingsView: View {
                     }
                     .tint(Theme.accent)
                     Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devDuoReportsAnyDevice) {
+                        Text("Send Duo reports from this phone")
+                    }
+                    .tint(Theme.accent)
+                    Text("Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devDuoCalibrationTest) {
+                        Text("Camera self-correction test")
+                    }
+                    .tint(Theme.accent)
+                    .onChange(of: devDuoCalibrationTest) { _, on in
+                        if on { CameraManager.armDuoCalibrationTest() } else { CameraManager.resetDuoCalibration() }
+                    }
+                    Text("Runs the front camera through the iPhone Duo camera path, starting upside down. With your face in the frame, the preview should turn upright within about two seconds and stay upright on the next open. Turning it on again restarts the test. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
