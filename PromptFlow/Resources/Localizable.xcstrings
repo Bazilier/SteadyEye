@@ -1941,62 +1941,32 @@
     "Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only." : {
 
     },
-    "duo.fold_to_record.message" : {
-      "comment" : "Alert message on an unfolded iPhone Duo: recording works folded; the big screen is for writing scripts.",
+    "duo.fold_to_record.toast" : {
+      "comment" : "Toast on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera: recording works folded only.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye records with the outer camera, so the text sits right under the lens. Use the big screen to write and edit your scripts."
+            "value" : "Fold your iPhone to record. The text sits under the outer camera."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye graba con la cámara exterior para que el texto quede justo debajo del lente. Usa la pantalla grande para escribir y editar tus guiones."
+            "value" : "Pliega el iPhone para grabar. El texto va bajo la cámara exterior."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O SteadyEye grava com a câmera externa, para que o texto fique logo abaixo da lente. Use a tela grande para escrever e editar seus roteiros."
+            "value" : "Dobre o iPhone para gravar. O texto fica sob a câmera externa."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SteadyEye снимает на внешнюю камеру, чтобы текст был прямо под объективом. На большом экране удобно писать и редактировать сценарии."
-          }
-        }
-      }
-    },
-    "duo.fold_to_record.title" : {
-      "comment" : "Alert title on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fold iPhone to record"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pliega el iPhone para grabar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dobre o iPhone para gravar"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сложите iPhone для записи"
+            "value" : "Сложите iPhone для записи. Текст будет под внешней камерой."
           }
         }
       }

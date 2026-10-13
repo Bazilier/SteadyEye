@@ -59,7 +59,7 @@ struct ScriptListView: View {
     /// business (`RecordingView.closeForUnfold`): the cover must not vanish
     /// under a take.
     @State private var recordingPresented = false
-    @State private var showFoldToRecordAlert = false
+    @State private var showFoldToRecordToast = false
     /// Opens a card's recording screen after its press shrink (see
     /// `CardPressStyle`).
     @State private var cardOpener = CardOpener()
@@ -158,6 +158,13 @@ struct ScriptListView: View {
 
     private var isDuoUnfolded: Bool { duoMonitor?.state?.posture == .unfolded }
 
+    /// iPhone Duo records folded only: a warning tap and a toast, not a
+    /// modal in the way of the list.
+    private func showFoldToRecord() {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        showFoldToRecordToast = true
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -223,9 +230,9 @@ struct ScriptListView: View {
                 RecordingView(
                     script: script,
                     selectedTab: $selectedTab,
-                    // After the cover is down, or the alert has nothing to sit on.
+                    // After the cover is down, so the toast shows on the list.
                     onClosedByUnfold: {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showFoldToRecordAlert = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showFoldToRecord() }
                     }
                 )
                     .cardZoomTransition(id: script.id, in: recordZoom)
@@ -239,7 +246,7 @@ struct ScriptListView: View {
                         "script_source": script.isDemo ? "demo" : "user"
                     ])
                     scriptToRecord = nil
-                    showFoldToRecordAlert = true
+                    showFoldToRecord()
                     return
                 }
                 // Closed before the presentation completed.
@@ -288,14 +295,12 @@ struct ScriptListView: View {
         .sheet(isPresented: $showFounderChat) {
             ChatView(pinnedMessage: .satisfactionFollowUp)
         }
-        .alert(
-            String(localized: "duo.fold_to_record.title", defaultValue: "Fold iPhone to record", comment: "Alert title on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera."),
-            isPresented: $showFoldToRecordAlert
-        ) {
-            Button(String(localized: "common.ok", defaultValue: "OK", comment: "Generic OK confirmation button used in alerts."), role: .cancel) {}
-        } message: {
-            Text(String(localized: "duo.fold_to_record.message", defaultValue: "SteadyEye records with the outer camera, so the text sits right under the lens. Use the big screen to write and edit your scripts.", comment: "Alert message on an unfolded iPhone Duo: recording works folded; the big screen is for writing scripts."))
-        }
+        .toast(
+            isPresented: $showFoldToRecordToast,
+            message: String(localized: "duo.fold_to_record.toast", defaultValue: "Fold your iPhone to record. The text sits under the outer camera.", comment: "Toast on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera: recording works folded only."),
+            style: .warning,
+            duration: 3.5
+        )
         .alert(
             String(localized: "onboarding_flow.resume.title", defaultValue: "Pick up where you left off?", comment: "Alert on launch when the guided first run was left unfinished."),
             isPresented: $showResumeAlert
