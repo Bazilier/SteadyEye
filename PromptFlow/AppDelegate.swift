@@ -11,4 +11,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         return true
     }
+
+    /// Portrait everywhere, as Info.plist declares — except on iPhone Duo's
+    /// inner display, which rotates whatever an app declares on hardware
+    /// (Apple's iPhone Duo tech talk; confirmed by Duo reports), while the
+    /// simulator holds the declared lock. Declaring every orientation there
+    /// makes both behave the same. Recording never shows there (folded only).
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        guard DuoDisplayMonitor.deviceHasHinge,
+              let window,
+              min(window.bounds.width, window.bounds.height) >= 600 else { return .portrait }
+        return .all
+    }
 }

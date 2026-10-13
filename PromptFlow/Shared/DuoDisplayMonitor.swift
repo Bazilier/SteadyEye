@@ -183,9 +183,22 @@ final class DuoDisplayMonitor {
         if let newState, newState.posture != state?.posture || newState.hingeStatus != state?.hingeStatus {
             CameraDiagnosticsLog.record("event=duo_state posture=\(newState.posture.rawValue) hinge=\(newState.hingeStatus.rawValue) window=\(Self.fmt(newState.windowSize))")
         }
+        // The supported orientations depend on the display (see
+        // `AppDelegate`): ask again when it changes.
+        if newState?.posture != state?.posture {
+            Self.refreshSupportedOrientations()
+        }
         state = newState
         occlusionFrames = newState == nil ? [] : occlusions
         Self.log(newState)
+    }
+
+    private static func refreshSupportedOrientations() {
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for window in scene.windows {
+                window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            }
+        }
     }
 
     // MARK: - Geometry helpers
