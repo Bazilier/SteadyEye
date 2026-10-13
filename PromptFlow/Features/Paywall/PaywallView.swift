@@ -676,9 +676,9 @@ struct PaywallView: View {
     /// Lowest `eyeContact` the chip states.
     static let eyeContactChipThreshold = 0.8
 
-    /// The reader the user picked, so the pill looks like their camera.
-    @AppStorage("teleprompterMode") private var displayMode: String = "wbw"
-    private var isClassicMode: Bool { displayMode == "classic" }
+    /// The pill always shows the three-line reader, whatever the user picked
+    /// for the camera: one word at a time says too little at a glance.
+    private let isClassicMode = true
 
     /// Nil on every device but iPhone Duo.
     @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
@@ -914,22 +914,26 @@ struct PaywallView: View {
                 lensBand: lensBand
             )
             .frame(width: pillWidth)
-            let side = VStack(alignment: .leading, spacing: 12) {
-                closeButton(size: 42)
-                    .padding(.leading, -1)
-                headline(fontSize: 26)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // The headline's last line sits on the pill's bottom edge; the
+            // close button takes the corner above it, clear of the edges.
+            let side = headline(fontSize: 26)
+                .padding(.top, 16 + 44 + 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 0) {
                 fillingScroll(topInset: 0) {
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .bottom, spacing: 12) {
                         if lensOnRight {
-                            side.padding(.top, 8)
+                            side
                             pill.padding(.top, pillTop).padding(.trailing, pillEdgeInset - 20)
                         } else {
                             pill.padding(.top, pillTop).padding(.leading, pillEdgeInset - 20)
-                            side.padding(.top, 8)
+                            side
                         }
+                    }
+                    .overlay(alignment: lensOnRight ? .topLeading : .topTrailing) {
+                        closeButton(size: 42)
+                            .padding(.top, 16)
+                            .padding(lensOnRight ? .leading : .trailing, 4)
                     }
                     featuresList
                         .padding(.top, 20)

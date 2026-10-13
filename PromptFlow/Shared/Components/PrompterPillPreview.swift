@@ -97,8 +97,11 @@ extension PrompterPillPreview {
             let size: CGFloat = cfg.isCameraOffset ? 42 : 32
             let inset = (max(size, 44) - size) / 2
             closeSize = size
-            closeLeading = (cfg.isCameraOffset ? 12 : 8) - inset
-            closeTop = max(8, cfg.topPadding) - safeTop - inset
+            // Clear of the rounded screen corner. Where the pill is centred
+            // (no camera offset) the gutter beside it is narrow, so the
+            // button stays closer to the edge there.
+            closeLeading = (cfg.isCameraOffset ? 20 : 8) - inset
+            closeTop = max(20, cfg.topPadding + 8) - safeTop - inset
             contentTop = pillBottom - safeTop + spacing
         }
     }
