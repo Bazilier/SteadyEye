@@ -42,6 +42,7 @@ struct SettingsView: View {
     @AppStorage("dev_chromakey_enabled") private var devChromakeyEnabled: Bool = false
     @AppStorage("dev_crop_sideways_to_portrait") private var devCropSidewaysToPortrait: Bool = false
     @AppStorage("dev_duo_geometry_overlay") private var devDuoGeometryOverlay: Bool = false
+    @AppStorage("dev_duo_reports_any_device") private var devDuoReportsAnyDevice: Bool = false
     @AppStorage("dev_gaze_probe") private var devGazeProbe: Bool = false
     @State private var devConfirmFreshInstall = false
     @State private var devShowSatisfactionPrompt = false
@@ -510,6 +511,13 @@ struct SettingsView: View {
                     }
                     .tint(Theme.accent)
                     Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(isOn: $devDuoReportsAnyDevice) {
+                        Text("Send Duo reports from this phone")
+                    }
+                    .tint(Theme.accent)
+                    Text("Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

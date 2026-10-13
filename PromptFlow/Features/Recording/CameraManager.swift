@@ -60,6 +60,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// DEV gaze prototype. Fed every video frame; idle (one lock check per
     /// frame) unless a `GazeProbeOverlay` has started it.
     nonisolated let gazeProbe = GazeProbe()
+    /// iPhone Duo diagnostics: which way is up in the delivered buffers.
+    /// Armed for a few frames per session configuration, buffer shape change,
+    /// posture change and take; idle otherwise.
+    nonisolated let faceProbe = FaceOrientationProbe()
     private var assetWriterRecorder: AssetWriterRecorder?
     private var watermarkComposer: RealtimeWatermarkComposer?
     /// Writer geometry frozen at record start by `startWriterPipeline`. Read on
@@ -201,6 +205,9 @@ final class CameraManager: NSObject, ObservableObject {
     private(set) var lastRecordingDuration: TimeInterval = 0
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var routeChangeObserver: NSObjectProtocol?
+    /// Session and device notifications mirrored into the camera diagnostics,
+    /// installed once per process (see `observeSessionEventsOnce`).
+    private var sessionEventObservers: [NSObjectProtocol] = []
 
     // MARK: - Rotation (RotationCoordinator-driven)
     /// Retained for the lifetime of the session so its KVO keeps firing.
@@ -521,6 +528,7 @@ final class CameraManager: NSObject, ObservableObject {
 
     func start(position: AVCaptureDevice.Position = .front) {
         cameraPosition = position
+        observeSessionEventsOnce()
         // On main, before any camera work is dispatched — and so before any
         // buffer, and any pin, can exist for the configuration about to be
         // built. That ordering is what lets the arm treat an already-resolved
@@ -583,6 +591,54 @@ final class CameraManager: NSObject, ObservableObject {
             }
         }
         #endif
+    }
+
+    // MARK: - Session events (diagnostics)
+
+    /// Interruptions, runtime errors, start/stop and camera (dis)connection,
+    /// into the camera diagnostics. On iPhone Duo they show what a fold does to
+    /// a running session — an interruption, a device swap, or nothing — which
+    /// no simulator reproduces. Observation only: nothing here reacts.
+    private func observeSessionEventsOnce() {
+        guard sessionEventObservers.isEmpty else { return }
+        let log = camLog
+        func observe(_ name: Notification.Name, object: Any?, describe: @escaping @Sendable (Notification) -> String) {
+            sessionEventObservers.append(
+                NotificationCenter.default.addObserver(forName: name, object: object, queue: nil) { note in
+                    let line = describe(note)
+                    log.notice("\(line, privacy: .public)")
+                    CameraDiagnosticsLog.record(line)
+                }
+            )
+        }
+        observe(AVCaptureSession.wasInterruptedNotification, object: session) { note in
+            let reason = (note.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber)?.intValue ?? -1
+            return "event=session_interrupted reason=\(reason)"
+        }
+        observe(AVCaptureSession.interruptionEndedNotification, object: session) { _ in
+            "event=session_interruption_ended"
+        }
+        observe(AVCaptureSession.runtimeErrorNotification, object: session) { note in
+            let error = note.userInfo?[AVCaptureSessionErrorKey] as? NSError
+            return "event=session_runtime_error domain=\(error?.domain ?? "?") code=\(error?.code ?? 0)"
+        }
+        observe(AVCaptureSession.didStartRunningNotification, object: session) { _ in
+            "event=session_started"
+        }
+        observe(AVCaptureSession.didStopRunningNotification, object: session) { _ in
+            "event=session_stopped"
+        }
+        observe(AVCaptureDevice.wasConnectedNotification, object: nil) { note in
+            "event=device_connected \(Self.deviceLabel(note.object))"
+        }
+        observe(AVCaptureDevice.wasDisconnectedNotification, object: nil) { note in
+            "event=device_disconnected \(Self.deviceLabel(note.object))"
+        }
+    }
+
+    nonisolated private static func deviceLabel(_ object: Any?) -> String {
+        guard let device = object as? AVCaptureDevice else { return "device=?" }
+        return "type=\(device.deviceType.rawValue) id=\(device.uniqueID.suffix(12)) video=\(device.hasMediaType(.video))"
     }
 
     // MARK: - Phase 1: Video + audio with built-in mic (instant)
@@ -933,6 +989,8 @@ final class CameraManager: NSObject, ObservableObject {
         Self.cameraQueue.async { [weak self] in
             self?.startWriterPipeline(outputURL: outputURL, horizonAngle: horizonAngle)
         }
+        // After the writer is set up, so the face is read off a take's frames.
+        if DuoReportService.isEnabled { faceProbe.arm(context: "take", delay: 0.5) }
 
         recordingStartTime = Date()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -1212,6 +1270,8 @@ final class CameraManager: NSObject, ObservableObject {
         if let device = currentCamera {
             info["device"] = DuoReportService.describe(device, formats: false)
         }
+        if let face = faceProbe.lastResult { info["face"] = face.report }
+        info["face_pending"] = faceProbe.isPending
         return info
     }
 
@@ -1258,14 +1318,14 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         // properties are read only when the dimensions or connection change.
         if output === videoDataOutput {
             let connectionID = ObjectIdentifier(connection)
-            let firstObservation: ObservedBuffer? = observedBuffer.withLock { state in
+            let change: (observation: ObservedBuffer, previous: ObservedBuffer?)? = observedBuffer.withLock { state in
                 if let current = state,
                    current.width == bufferWidth,
                    current.height == bufferHeight,
                    current.connection == connectionID {
                     return nil
                 }
-                let wasEmpty = state == nil
+                let previous = state
                 let observation = ObservedBuffer(
                     width: bufferWidth,
                     height: bufferHeight,
@@ -1274,16 +1334,23 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
                     connection: connectionID
                 )
                 state = observation
-                return wasEmpty ? observation : nil
+                return (observation, previous)
             }
-            if let firstObservation {
-                logFirstBuffer(firstObservation)
+            if let change, change.previous == nil {
+                logFirstBuffer(change.observation)
                 // The residue is now known, so landscape-left is derivable.
                 // Pin it once, on main where the angle state lives.
                 Task { @MainActor [weak self] in
                     self?.pinLandscapeAngleAfterFirstBuffer()
                 }
+                if DuoReportService.isEnabled { faceProbe.arm(context: "preview") }
+            } else if let change, let previous = change.previous {
+                // Same configuration, different shape: an applied rotation, or
+                // on iPhone Duo a fold moving the session to another sensor.
+                logBufferShapeChanged(from: previous, to: change.observation)
+                if DuoReportService.isEnabled { faceProbe.arm(context: "shape_change") }
             }
+            faceProbe.submit(pixelBuffer, connectionAngle: connection.videoRotationAngle, mirrored: connection.isVideoMirrored)
         }
         // Orientation correction. Runs before the watermark composer so it
         // covers both the free path and the pro path (where the composer
@@ -1439,6 +1506,15 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             "event=first_buffer mode=\(self.sessionOrientationMode.rawValue, privacy: .public) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField, privacy: .public)"
         )
         CameraDiagnosticsLog.record("event=first_buffer mode=\(self.sessionOrientationMode.rawValue) buffer_w=\(observation.width) buffer_h=\(observation.height) connection_angle=\(Int(observation.connectionAngle)) mirrored=\(observation.mirrored) portrait_residue=\(residue) landscape_candidates=\(candidatesField)")
+    }
+
+    /// A buffer shape change within one session configuration. With the
+    /// connection angle changed it is an applied rotation; with the angle
+    /// unchanged the device or its sensor changed underneath (iPhone Duo fold).
+    nonisolated private func logBufferShapeChanged(from previous: ObservedBuffer, to current: ObservedBuffer) {
+        let line = "event=buffer_shape_changed from=\(previous.width)x\(previous.height)@\(Int(previous.connectionAngle)) to=\(current.width)x\(current.height)@\(Int(current.connectionAngle)) same_connection=\(previous.connection == current.connection)"
+        camLog.notice("\(line, privacy: .public)")
+        CameraDiagnosticsLog.record(line)
     }
 
     /// Slow path of the orientation correction in `captureOutput`: rotates

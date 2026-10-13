@@ -91,7 +91,11 @@ final class DuoDisplayMonitor {
         if present { Self.hingeLatch.withLock { $0 = true } }
         if present, let status {
             let closed = status == .closed
-            if isHingeClosed != closed { isHingeClosed = closed }
+            if isHingeClosed != closed {
+                isHingeClosed = closed
+                // Lines up the fold with the capture events around it.
+                CameraDiagnosticsLog.record("event=duo_hinge closed=\(closed) angle=\(Int(angleDegrees.rounded()))")
+            }
         }
         hingeStatus = status
         if hingeAngleDegrees != angleDegrees { hingeAngleDegrees = angleDegrees }
@@ -176,6 +180,9 @@ final class DuoDisplayMonitor {
 
     private func commit(_ newState: DuoDisplayState?, occlusions: [CGRect]) {
         guard newState != state else { return }
+        if let newState, newState.posture != state?.posture || newState.hingeStatus != state?.hingeStatus {
+            CameraDiagnosticsLog.record("event=duo_state posture=\(newState.posture.rawValue) hinge=\(newState.hingeStatus.rawValue) window=\(Self.fmt(newState.windowSize))")
+        }
         state = newState
         occlusionFrames = newState == nil ? [] : occlusions
         Self.log(newState)
