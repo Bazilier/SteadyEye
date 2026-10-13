@@ -2184,6 +2184,14 @@ struct RecordingView: View {
                     UserDefaults.standard.set(false, forKey: "ownTakeCoachPending")
                     if !UserDefaults.standard.bool(forKey: "postFirstOwnRecordingPaywallShown") {
                         UserDefaults.standard.set(true, forKey: "ownTakePaywallDue")
+                        // What that paywall shows of this take: the script in
+                        // its pill, and the eye contact when it was measured.
+                        UserDefaults.standard.set(script.id.uuidString, forKey: OwnTakePaywall.scriptIDKey)
+                        if let eyeContact = lastTakeGaze?.lookingFraction {
+                            UserDefaults.standard.set(eyeContact, forKey: OwnTakePaywall.eyeContactKey)
+                        } else {
+                            UserDefaults.standard.removeObject(forKey: OwnTakePaywall.eyeContactKey)
+                        }
                     }
                 }
                 if wasFirst {

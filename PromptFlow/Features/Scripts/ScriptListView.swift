@@ -252,7 +252,11 @@ struct ScriptListView: View {
                 BulkImportView(entryPoint: bulkImportEntryPoint)
             }
             .fullScreenCover(item: $paywallPresentation, onDismiss: { continueOnboardingFlow() }) { presentation in
-                PaywallView(source: presentation.source)
+                PaywallView(
+                    source: presentation.source,
+                    pillPhrase: presentation.pillPhrase,
+                    eyeContact: presentation.eyeContact
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -590,7 +594,7 @@ struct ScriptListView: View {
                     PromptArbiter.shared.didPresent(.onboardingPaywall)
                     // The flow's planned end: ordinary prompts may run again.
                     OnboardingFlow.finish(reason: "paywall")
-                    paywallPresentation = PaywallPresentation(source: "first_own_take")
+                    paywallPresentation = OwnTakePaywall.presentation(scripts: scripts)
                     return
                 } else {
                     // Too soon after another prompt: keep the mark, retry later.
