@@ -219,6 +219,9 @@ final class CameraManager: NSObject, ObservableObject {
     /// main by the rotation handler — the same discipline as the other
     /// rotation state.
     private var sessionDuoCamera: DuoCameraChoice?
+    /// The dynamic aspect ratio the Duo camera outputs now; changes on a turn
+    /// (`switchDuoAspect`). Nil on a fixed format and on the standard path.
+    private var sessionDuoAspect: String?
     /// Bumped per session configuration, so a delayed check knows whether the
     /// configuration it was scheduled for is still the current one.
     private var configurationGeneration = 0
@@ -529,6 +532,7 @@ final class CameraManager: NSObject, ObservableObject {
             } ?? false
             pendingRotationAngle = shapeMatches ? reported : old
             camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true")
+            CameraDiagnosticsLog.record("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=true device_orientation=\(UIDevice.current.orientation.rawValue)")
             return
         }
         if sessionDuoCamera != nil {
@@ -536,6 +540,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
         applyClampedRotation(reported: reported, to: connection)
         camLog.notice("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=false")
+        CameraDiagnosticsLog.record("event=rotation_change old=\(Int(old)) new=\(Int(reported)) suppressed=false device_orientation=\(UIDevice.current.orientation.rawValue)")
     }
 
     private override init() {
@@ -651,6 +656,10 @@ final class CameraManager: NSObject, ObservableObject {
         /// Whether the format's axes are the opposite of what the angle
         /// suggests, learned from a delivered buffer (`validateDuoBufferShape`).
         let axesSwapped: Bool
+        /// On a square format: the dynamic aspect ratio (9:16 or 16:9, raw
+        /// value) set at configuration. A quarter turn then switches it live
+        /// instead of rebuilding the session. Nil on a fixed format.
+        let aspectRatio: String?
     }
 
     /// The recording screen reports the posture; a change rebuilds the session
@@ -738,13 +747,43 @@ final class CameraManager: NSObject, ObservableObject {
             format(long: long, short: short, subtype: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
                 ?? format(long: long, short: short, subtype: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
         }
+        // Preferred: a square format with live 9:16 / 16:9, so a quarter turn
+        // switches the aspect ratio without rebuilding the session (Duo's front
+        // sensors are square; these formats are 30 fps only).
+        if #available(iOS 26.0, *), let square = (want4K ? squareFormat(of: device, side: 3840, targetFPS: targetFPS) : nil)
+            ?? squareFormat(of: device, side: 1920, targetFPS: targetFPS) {
+            let ratio: AVCaptureDevice.AspectRatio = portraitFormat ? .ratio9x16 : .ratio16x9
+            return DuoCameraChoice(
+                device: device, format: square, horizonAngle: horizon,
+                correction: correction, axesSwapped: axesSwapped, aspectRatio: ratio.rawValue
+            )
+        }
         guard let chosen = (want4K ? format(long: 3840, short: 2160) : nil) ?? format(long: 1920, short: 1080) else {
             return nil
         }
         return DuoCameraChoice(
             device: device, format: chosen, horizonAngle: horizon,
-            correction: correction, axesSwapped: axesSwapped
+            correction: correction, axesSwapped: axesSwapped, aspectRatio: nil
         )
+    }
+
+    /// A side x side 8-bit 4:2:0 format offering both 9:16 and 16:9 as
+    /// dynamic aspect ratios at `targetFPS`.
+    @available(iOS 26.0, *)
+    nonisolated private static func squareFormat(of device: AVCaptureDevice, side: Int32, targetFPS: Int) -> AVCaptureDevice.Format? {
+        let subtypes = [kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
+        for subtype in subtypes {
+            let match = device.formats.first { format in
+                let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let ratios = format.supportedDynamicAspectRatios
+                return dims.width == side && dims.height == side
+                    && CMFormatDescriptionGetMediaSubType(format.formatDescription) == subtype
+                    && ratios.contains(.ratio9x16) && ratios.contains(.ratio16x9)
+                    && format.videoSupportedFrameRateRanges.contains { Int($0.maxFrameRate) >= targetFPS }
+            }
+            if let match { return match }
+        }
+        return nil
     }
 
     nonisolated private static func correctionKey(_ type: String) -> String { "duo_angle_correction.\(type)" }
@@ -817,10 +856,40 @@ final class CameraManager: NSObject, ObservableObject {
                   let residue = self.observedPortraitResidue else { return }
             let angle = self.duoCorrected(coordinator.videoRotationAngleForHorizonLevelCapture)
             guard !CaptureRotationGeometry.producesPortrait(angle: angle, portraitResidue: residue) else { return }
+            if self.sessionDuoAspect != nil, self.switchDuoAspect(to: angle, on: choice) { return }
             self.reconfigureDuoCamera(reason: "turned_\(Int(angle))", force: true)
         }
         duoTurnRebuild = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    /// The live alternative to a rebuild on a square format: the other
+    /// dynamic aspect ratio and the new level angle together give a portrait
+    /// buffer again, with no session reconfiguration and so no blank preview.
+    /// Returns false when the switch could not be made (the caller rebuilds).
+    private func switchDuoAspect(to angle: CGFloat, on choice: DuoCameraChoice) -> Bool {
+        guard #available(iOS 26.0, *), let current = sessionDuoAspect,
+              let connection = videoDataOutput?.connection(with: .video) else { return false }
+        let next: AVCaptureDevice.AspectRatio = current == AVCaptureDevice.AspectRatio.ratio9x16.rawValue
+            ? .ratio16x9 : .ratio9x16
+        do {
+            try choice.device.lockForConfiguration()
+            choice.device.setDynamicAspectRatio(next, completionHandler: nil)
+            choice.device.unlockForConfiguration()
+        } catch {
+            return false
+        }
+        sessionDuoAspect = next.rawValue
+        // What was observed belonged to the other aspect ratio: the next
+        // buffer is this shape's first, and the angle is applied unclamped.
+        observedBuffer.withLock { $0 = nil }
+        applyClampedRotation(reported: angle, to: connection)
+        CameraDiagnosticsLog.record("event=duo_aspect_switched to=\(next.rawValue) angle=\(Int(angle))")
+        let generation = configurationGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.validateDuoBufferShape(generation: generation)
+        }
+        return true
     }
 
     /// Self-correction for a Duo camera whose RotationCoordinator angle turns
@@ -948,6 +1017,7 @@ final class CameraManager: NSObject, ObservableObject {
             ? Self.duoCamera(for: duoPosture, want4K: want4K && allow4K, targetFPS: targetFPS)
             : nil
         sessionDuoCamera = duoChoice
+        sessionDuoAspect = duoChoice?.aspectRatio
 
         // Video input
         guard let videoDevice = duoChoice?.device ?? AVCaptureDevice.default(
@@ -985,7 +1055,12 @@ final class CameraManager: NSObject, ObservableObject {
             // Duo format first: setting a format resets the frame durations
             // set below. It also turns the preset into `.inputPriority`, which
             // nothing later in this configuration overrides.
-            if let duoChoice { videoDevice.activeFormat = duoChoice.format }
+            if let duoChoice {
+                videoDevice.activeFormat = duoChoice.format
+                if #available(iOS 26.0, *), let raw = duoChoice.aspectRatio {
+                    videoDevice.setDynamicAspectRatio(AVCaptureDevice.AspectRatio(rawValue: raw), completionHandler: nil)
+                }
+            }
             let desiredFPS = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
             let supported = videoDevice.activeFormat.videoSupportedFrameRateRanges.contains {
                 Int($0.maxFrameRate) >= targetFPS
@@ -1087,7 +1162,7 @@ final class CameraManager: NSObject, ObservableObject {
         }
         if let duoChoice {
             let dims = CMVideoFormatDescriptionGetDimensions(videoDevice.activeFormat.formatDescription)
-            let line = "event=duo_camera type=\(videoDevice.deviceType.rawValue) position=\(videoDevice.position.rawValue) format=\(dims.width)x\(dims.height) horizon_angle=\(duoChoice.horizonAngle) correction=\(duoChoice.correction) axes_swapped=\(duoChoice.axesSwapped) posture=\(duoPosture?.rawValue ?? "none") preset=\(session.sessionPreset.rawValue)"
+            let line = "event=duo_camera type=\(videoDevice.deviceType.rawValue) position=\(videoDevice.position.rawValue) format=\(dims.width)x\(dims.height) horizon_angle=\(duoChoice.horizonAngle) correction=\(duoChoice.correction) axes_swapped=\(duoChoice.axesSwapped) aspect=\(duoChoice.aspectRatio ?? "fixed") posture=\(duoPosture?.rawValue ?? "none") preset=\(session.sessionPreset.rawValue)"
             camLog.notice("\(line, privacy: .public)")
             CameraDiagnosticsLog.record(line)
         } else if duoPosture != nil, position == .front {
@@ -1582,6 +1657,7 @@ final class CameraManager: NSObject, ObservableObject {
                 "horizon_angle": duo.horizonAngle,
                 "correction": duo.correction,
                 "axes_swapped": duo.axesSwapped,
+                "aspect": sessionDuoAspect ?? "fixed",
             ]
         } else {
             info["duo_camera"] = "standard"
