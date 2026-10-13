@@ -101,6 +101,9 @@ struct ToastView: View {
             RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
+        // A phone's width; on a wide screen (iPhone Duo unfolded) the toast
+        // stays this size, centred, rather than spanning the display.
+        .frame(maxWidth: 520)
         .padding(.horizontal, 24)
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .contentShape(Rectangle())
