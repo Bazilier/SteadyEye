@@ -897,6 +897,10 @@ struct RecordingView: View {
         let closeCentreY: CGFloat
         /// The recording timer goes above the pill rather than below it.
         let badgeAbove: Bool
+        /// With the lens at one end of the pill (folded): the eye-contact
+        /// indicator's centre in the pill, under the lens. Nil when the lens
+        /// is centred on the pill and the eye takes a corner.
+        let indicatorCenter: CGPoint?
     }
 
     /// Pill size on Duo, the same in every posture and orientation. The
@@ -1104,6 +1108,16 @@ struct RecordingView: View {
         let top = clamp(lens.midY - height / 2, half.minY + inset, half.maxY - inset - height)
         let textInset = (height - block) / 2
 
+        // Lens at one end: the eye goes in line with it, in the larger of the
+        // gaps above and below it, so it never crowds the rounded corner.
+        var indicatorCenter: CGPoint?
+        if toggleAlignment != .bottomTrailing {
+            let lensTop = lens.minY - top
+            let lensBottom = lens.maxY - top
+            let y = height - lensBottom >= lensTop ? (lensBottom + height) / 2 : lensTop / 2
+            indicatorCenter = CGPoint(x: lens.midX - (centreX - width / 2), y: y)
+        }
+
         let lensAtTop = Self.duoLensIsAtTop(duo)
         // Off the top the pill can reach the leading edge or the bottom, so
         // the close button takes the window's top-leading corner (42 pt
@@ -1141,7 +1155,8 @@ struct RecordingView: View {
                 textOffsetX: textOffsetX,
                 toggleAlignment: toggleAlignment,
                 closeCentreY: closeCentreY,
-                badgeAbove: badgeAbove
+                badgeAbove: badgeAbove,
+                indicatorCenter: indicatorCenter
             )
         )
     }
@@ -1215,10 +1230,10 @@ struct RecordingView: View {
                 overlayAlignment: .top,
                 // On Duo the top-trailing corner can hold the lens.
                 toggleAlignment: g.duo?.toggleAlignment ?? .topTrailing,
-                // The corner opposite the toggle. On Duo only when the toggle
-                // sits in a bottom corner; its side positions leave the
-                // opposite side to the lens.
-                indicatorAlignment: g.duo.map { $0.toggleAlignment == .bottomTrailing ? .bottomLeading : nil } ?? .topLeading
+                // The corner opposite the toggle; on Duo with the lens at one
+                // end, under the lens instead (`indicatorCenter`).
+                indicatorAlignment: g.duo.map { $0.toggleAlignment == .bottomTrailing ? .bottomLeading : nil } ?? .topLeading,
+                indicatorCenter: g.duo?.indicatorCenter
             ) {
                 if showTextContent {
                     wordDisplay
@@ -1367,6 +1382,7 @@ struct RecordingView: View {
         overlayAlignment: Alignment,
         toggleAlignment: Alignment = .topTrailing,
         indicatorAlignment: Alignment? = .topLeading,
+        indicatorCenter: CGPoint? = nil,
         @ViewBuilder textOverlay: () -> Overlay
     ) -> some View {
         UnevenRoundedRectangle(
@@ -1385,6 +1401,11 @@ struct RecordingView: View {
         .overlay(alignment: indicatorAlignment ?? .topLeading) {
             if showsGazeIndicator, isExpanded, indicatorAlignment != nil {
                 gazeIndicator
+            }
+        }
+        .overlay {
+            if showsGazeIndicator, isExpanded, let indicatorCenter {
+                gazeIndicator.position(indicatorCenter)
             }
         }
         .scaleEffect(isDragging || isTextEditMode ? 1.02 : 1.0)
