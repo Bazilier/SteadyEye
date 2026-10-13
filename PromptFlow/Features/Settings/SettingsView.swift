@@ -488,6 +488,14 @@ struct SettingsView: View {
                 }
                 .listRowSeparator(.hidden)
 
+                Section("Recordings (DEV)") {
+                    DevImportRecordingButton()
+                    Text("Adds a video from Photos to Recordings as a take, to see the library and the preview without a camera. Simulator: xcrun simctl addmedia booted <file> first.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowSeparator(.hidden)
+
                 Section("Chromakey (DEV)") {
                     Toggle(isOn: $devChromakeyEnabled) {
                         Text("Chromakey background (replace camera)")
