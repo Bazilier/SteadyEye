@@ -39,6 +39,10 @@ struct VideoPreviewView: View {
     var onRecordOwnScript: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Set by a pinch: in shows the whole frame, out fills the width. Nil
+    /// keeps the default for the screen (`showsWholeFrame`).
+    @State private var pinchedWholeFrame: Bool?
     @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
     @State private var isResultSheetHidden = false
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -66,6 +70,12 @@ struct VideoPreviewView: View {
         return videoSize
     }
     private var isLandscapeVideo: Bool { frameSize.width > frameSize.height }
+    /// The whole frame, centred, instead of full width from the top. Default
+    /// on a wide screen (iPhone Duo unfolded), where a full-width portrait
+    /// video would leave little more than its top on screen.
+    private var showsWholeFrame: Bool { pinchedWholeFrame ?? (horizontalSizeClass == .regular) }
+    /// Keeps the bottom controls a comfortable width on a wide screen.
+    private var controlsMaxWidth: CGFloat { horizontalSizeClass == .regular ? 520 : .infinity }
     @State private var showPostSavePaywall = false
     @State private var showSatisfactionPrompt = false
     @State private var satisfactionTrigger: ReviewPromptManager.Trigger = .greatTake
@@ -95,7 +105,11 @@ struct VideoPreviewView: View {
                 // top edge and may extend behind the controls below; a
                 // landscape one is fitted to the width and centred here.
                 Color.clear
-                    .overlay(alignment: isLandscapeVideo ? .center : .top) {
+                    // Top-aligned full width only on a phone, where a portrait
+                    // video is about the screen's shape; on a wide screen the
+                    // zoomed video is centred on the screen's middle, not cut to
+                    // its top.
+                    .overlay(alignment: isLandscapeVideo || showsWholeFrame || horizontalSizeClass == .regular ? .center : .top) {
                         videoLayer
                     }
                     // Top scrim — keeps Back / Delete legible over the video.
@@ -124,6 +138,16 @@ struct VideoPreviewView: View {
                         .allowsHitTesting(false)
                     }
                     .ignoresSafeArea(edges: .top)
+                    // Pinch in for the whole frame, out to fill the width.
+                    .simultaneousGesture(
+                        MagnifyGesture().onEnded { value in
+                            let scale = value.magnification
+                            guard scale < 0.92 || scale > 1.08 else { return }
+                            withAnimation(.smooth(duration: 0.3)) {
+                                pinchedWholeFrame = scale < 1
+                            }
+                        }
+                    )
 
                 // Bottom block, pinned to the bottom safe area. The scrubber's
                 // DragGesture lives here, not over the video, so it doesn't
@@ -132,8 +156,10 @@ struct VideoPreviewView: View {
                     scrubberRow
                     saveButton
                 }
+                .frame(maxWidth: controlsMaxWidth)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
+                .frame(maxWidth: .infinity)
                 .background(Color.black.ignoresSafeArea(edges: .bottom))
             }
 
@@ -363,8 +389,10 @@ struct VideoPreviewView: View {
                 }
             }
             .aspectRatio(frameSize.width / frameSize.height, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .fixedSize(horizontal: false, vertical: true)
+            // Full width from the top, possibly past the stage's bottom; or the
+            // whole frame fitted inside the stage.
+            .frame(maxWidth: .infinity, maxHeight: showsWholeFrame ? .infinity : nil)
+            .fixedSize(horizontal: false, vertical: !showsWholeFrame)
             .overlay {
                 if playback.player != nil && !playback.isPlaying && !playback.isScrubbing {
                     Image(systemName: "play.fill")
@@ -773,6 +801,9 @@ private final class PlayerUIView: UIView {
         // Clear until the first frame can be drawn, so the poster behind the
         // layer shows through instead of a black rectangle.
         playerLayer.backgroundColor = UIColor.clear.cgColor
+        // Touches go to the SwiftUI gestures above (tap to play, pinch to
+        // fit): a UIView takes only the first finger of a pinch.
+        isUserInteractionEnabled = false
         readyObservation = playerLayer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
             let ready = layer.isReadyForDisplay
             DispatchQueue.main.async { self?.readyForDisplayChanged(ready) }
