@@ -431,14 +431,18 @@ struct RecordingView: View {
             guard let old, let new, old != new else { return }
             stopTakeForFoldChange()
         }
-        .onChange(of: duoMonitor?.state?.posture) { old, new in
-            guard let old, let new, old != new else { return }
-            stopTakeForFoldChange()
-            // Which way is up on the other display's camera. After a delay,
-            // so the buffers still in flight from before the switch are skipped.
-            if DuoReportService.isEnabled {
-                cameraManager.faceProbe.arm(context: "posture_\(new.rawValue)", delay: 0.6)
+        .onChange(of: duoMonitor?.state?.posture, initial: true) { old, new in
+            if let old, let new, old != new {
+                stopTakeForFoldChange()
+                // Which way is up on the other display's camera. After a delay,
+                // so the buffers still in flight from before the switch are skipped.
+                if DuoReportService.isEnabled {
+                    cameraManager.faceProbe.arm(context: "posture_\(new.rawValue)", delay: 0.6)
+                }
             }
+            // After the stop: the camera for this posture is picked once no
+            // take is running.
+            cameraManager.setDuoPosture(new)
         }
         // Duo report of the live camera, once per posture and orientation.
         .onChange(of: duoMonitor?.state) { _, _ in
@@ -604,7 +608,11 @@ struct RecordingView: View {
             // landscape pin are unaffected. Portrait reveals immediately;
             // landscape waits for the angle to be pinned so the first thing the
             // user sees is already landscape.
-            CameraPreviewView(session: cameraManager.session, device: cameraManager.activeVideoDevice)
+            CameraPreviewView(
+                session: cameraManager.session,
+                device: cameraManager.activeVideoDevice,
+                angleCorrection: cameraManager.previewAngleCorrection
+            )
                 #if DEBUG
                 // 1a. Duo geometry overlay — chromakey mockups only, never
                 // interactive. An overlay of the full-window preview layer:

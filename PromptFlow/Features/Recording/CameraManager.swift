@@ -209,6 +209,32 @@ final class CameraManager: NSObject, ObservableObject {
     /// installed once per process (see `observeSessionEventsOnce`).
     private var sessionEventObservers: [NSObjectProtocol] = []
 
+    // MARK: iPhone Duo camera state
+
+    /// Posture the recording screen last reported. Main. Nil until known, and
+    /// always nil on other iPhones.
+    private var duoPosture: DuoDisplayState.Posture?
+    /// Posture the current session configuration was built for. Camera queue.
+    private var sessionDuoPosture: DuoDisplayState.Posture?
+    /// The iPhone Duo camera the current configuration runs on; nil on the
+    /// standard path. Written in `setupSession` on the camera queue, read on
+    /// main by the rotation handler — the same discipline as the other
+    /// rotation state.
+    private var sessionDuoCamera: DuoCameraChoice?
+    /// Bumped per session configuration, so a delayed check knows whether the
+    /// configuration it was scheduled for is still the current one.
+    private var configurationGeneration = 0
+    /// Face readings in a row asking for the same correction. Main.
+    private var duoCalibrationStreak: (rotation: Int, count: Int)?
+    /// Readings in a row needed before a Duo camera's angle is corrected.
+    private static let duoCalibrationReadings = 3
+    /// Duo cameras whose format axes were already flipped in this process —
+    /// one try each, so a camera that never delivers portrait cannot loop.
+    private var duoAxesFlippedThisProcess: Set<String> = []
+    /// Added to the preview's level angle on a Duo camera: the same learned
+    /// correction the capture connection gets.
+    @Published private(set) var previewAngleCorrection: CGFloat = 0
+
     // MARK: - Rotation (RotationCoordinator-driven)
     /// Retained for the lifetime of the session so its KVO keeps firing.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
@@ -474,7 +500,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// recording is active (logs suppressed=true, stashes a pending portrait
     /// angle); otherwise applies the clamped angle immediately.
     private func handleRotationChange(_ coordinator: AVCaptureDevice.RotationCoordinator) {
-        let reported = coordinator.videoRotationAngleForHorizonLevelCapture
+        let reported = duoCorrected(coordinator.videoRotationAngleForHorizonLevelCapture)
         guard let connection = videoDataOutput?.connection(with: .video) else { return }
         let old = appliedRotationAngle
         if isRecordingActive {
@@ -503,6 +529,9 @@ final class CameraManager: NSObject, ObservableObject {
 
     private override init() {
         super.init()
+        faceProbe.setResultHandler { [weak self] reading in
+            Task { @MainActor [weak self] in self?.handleFaceReading(reading) }
+        }
     }
 
     // MARK: - Chromakey background mode (DEV)
@@ -544,13 +573,17 @@ final class CameraManager: NSObject, ObservableObject {
             return
         }
         #if !targetEnvironment(simulator)
+        let duoPosture = self.duoPosture
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
-            if self.session.isRunning {
+            // A running session built for another Duo posture (or before the
+            // posture was known, e.g. pre-warmed by onboarding) is rebuilt;
+            // everywhere else both are nil and this is the early return as before.
+            if self.session.isRunning, self.sessionDuoPosture == duoPosture {
                 DispatchQueue.main.async { self.isSessionReady = true }
                 return
             }
-            self.setupSession(position: position)
+            self.setupSession(position: position, duoPosture: duoPosture)
         }
         #endif
     }
@@ -591,6 +624,194 @@ final class CameraManager: NSObject, ObservableObject {
             }
         }
         #endif
+    }
+
+    // MARK: - iPhone Duo camera
+
+    /// The camera an iPhone Duo session runs on, chosen by posture.
+    private struct DuoCameraChoice {
+        let device: AVCaptureDevice
+        let format: AVCaptureDevice.Format
+        /// The RotationCoordinator's level angle when chosen, before correction.
+        let horizonAngle: Int
+        /// Degrees added to every RotationCoordinator angle for this camera:
+        /// 0 unless a face showed the coordinator wrong (`handleFaceReading`).
+        let correction: Int
+        /// Whether the format's axes are the opposite of what the angle
+        /// suggests, learned from a delivered buffer (`validateDuoBufferShape`).
+        let axesSwapped: Bool
+    }
+
+    /// The recording screen reports the posture; a change rebuilds the session
+    /// on the other display's camera while no take is running (a fold during a
+    /// take has already stopped it, and the rebuild queues behind the writer).
+    func setDuoPosture(_ posture: DuoDisplayState.Posture?) {
+        guard let posture, posture != duoPosture else { return }
+        duoPosture = posture
+        reconfigureDuoCamera(reason: "posture_\(posture.rawValue)", force: false)
+    }
+
+    /// Rebuilds a running session for the current posture. `force` rebuilds
+    /// even when the posture is unchanged, after learning a correction.
+    private func reconfigureDuoCamera(reason: String, force: Bool) {
+        #if !targetEnvironment(simulator)
+        guard !Self.isChromakeyActive, !isRecording, !isRecordingActive, cameraPosition == .front else { return }
+        let posture = duoPosture
+        resetLandscapeWarmup()
+        Self.cameraQueue.async { [weak self] in
+            guard let self, self.session.isRunning,
+                  force || self.sessionDuoPosture != posture else { return }
+            CameraDiagnosticsLog.record("event=duo_reconfigure reason=\(reason)")
+            self.setupSession(position: .front, duoPosture: posture)
+        }
+        #endif
+    }
+
+    /// The RotationCoordinator's angle with this Duo camera's learned
+    /// correction. Unchanged on the standard path.
+    private func duoCorrected(_ angle: CGFloat) -> CGFloat {
+        guard let correction = sessionDuoCamera?.correction, correction != 0 else { return angle }
+        return CGFloat((Int(angle.rounded()) + correction) % 360)
+    }
+
+    /// Outer ultra wide when folded, inner when unfolded, with an 8-bit 4:2:0
+    /// format whose delivered buffer will be portrait at full resolution —
+    /// no crop. Nil when there is no posture, no such camera or no such format:
+    /// the standard front camera then runs exactly as before.
+    nonisolated private static func duoCamera(
+        for posture: DuoDisplayState.Posture?,
+        want4K: Bool,
+        targetFPS: Int
+    ) -> DuoCameraChoice? {
+        var device: AVCaptureDevice?
+        if let posture, #available(iOS 27.1, *) {
+            let type: AVCaptureDevice.DeviceType = posture == .folded
+                ? .builtInOuterUltraWideCamera
+                : .builtInInnerUltraWideCamera
+            device = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [type], mediaType: .video, position: .unspecified
+            ).devices.first
+        }
+        #if DEV
+        // Calibration test on any iPhone: the standard front camera through
+        // this path, starting from the deliberately wrong correction the
+        // Settings switch stored.
+        if device == nil, posture == nil, UserDefaults.standard.bool(forKey: "dev_duo_calibration_test") {
+            device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+        }
+        #endif
+        guard let device else { return nil }
+        let typeKey = device.deviceType.rawValue
+        let correction = UserDefaults.standard.integer(forKey: correctionKey(typeKey))
+        let axesSwapped = UserDefaults.standard.bool(forKey: axesKey(typeKey))
+        let horizon = Int(AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
+            .videoRotationAngleForHorizonLevelCapture.rounded())
+        // A quarter turn swaps the axes, so at 0/180 the format itself must be
+        // portrait and at 90/270 landscape — as standard front cameras record
+        // portrait from landscape formats at 90. Some sensors do not follow
+        // their format's axes (iPhone 17 front cameras), hence `axesSwapped`.
+        let quarterTurn = ((horizon + correction) % 180) != 0
+        let portraitFormat = quarterTurn == axesSwapped
+        func format(long: Int32, short: Int32, subtype: OSType) -> AVCaptureDevice.Format? {
+            device.formats.first { format in
+                let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let sizeMatches = portraitFormat
+                    ? dims.width == short && dims.height == long
+                    : dims.width == long && dims.height == short
+                return sizeMatches
+                    && CMFormatDescriptionGetMediaSubType(format.formatDescription) == subtype
+                    && format.videoSupportedFrameRateRanges.contains { Int($0.maxFrameRate) >= targetFPS }
+            }
+        }
+        func format(long: Int32, short: Int32) -> AVCaptureDevice.Format? {
+            format(long: long, short: short, subtype: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+                ?? format(long: long, short: short, subtype: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+        }
+        guard let chosen = (want4K ? format(long: 3840, short: 2160) : nil) ?? format(long: 1920, short: 1080) else {
+            return nil
+        }
+        return DuoCameraChoice(
+            device: device, format: chosen, horizonAngle: horizon,
+            correction: correction, axesSwapped: axesSwapped
+        )
+    }
+
+    nonisolated private static func correctionKey(_ type: String) -> String { "duo_angle_correction.\(type)" }
+    nonisolated private static func axesKey(_ type: String) -> String { "duo_format_axes_swapped.\(type)" }
+
+    /// Forgets every learned Duo camera correction.
+    nonisolated static func resetDuoCalibration() {
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys
+        where key.hasPrefix("duo_angle_correction.") || key.hasPrefix("duo_format_axes_swapped.") {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    #if DEV
+    /// Starts the DEV calibration test: the standard front camera through the
+    /// Duo path with a half-turn error the face reading has to find and undo.
+    nonisolated static func armDuoCalibrationTest() {
+        resetDuoCalibration()
+        UserDefaults.standard.set(180, forKey: correctionKey(AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue))
+    }
+    #endif
+
+    /// The Duo camera should deliver portrait. A landscape buffer means its
+    /// format axes run the other way: one rebuild with them swapped. Takes are
+    /// safe either way — a landscape buffer goes down the sideways crop.
+    private func validateDuoBufferShape(generation: Int) {
+        guard generation == configurationGeneration,
+              let choice = sessionDuoCamera,
+              let observed = observedBuffer.withLock({ $0 }),
+              observed.width > observed.height else { return }
+        let type = choice.device.deviceType.rawValue
+        guard !duoAxesFlippedThisProcess.contains(type) else {
+            CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(type) buffer=\(observed.width)x\(observed.height) action=crop")
+            return
+        }
+        duoAxesFlippedThisProcess.insert(type)
+        UserDefaults.standard.set(!choice.axesSwapped, forKey: Self.axesKey(type))
+        CameraDiagnosticsLog.record("event=duo_landscape_buffer type=\(type) buffer=\(observed.width)x\(observed.height) action=swap_axes")
+        reconfigureDuoCamera(reason: "axes_swapped", force: true)
+    }
+
+    /// Self-correction for a Duo camera whose RotationCoordinator angle turns
+    /// out wrong for its native format: when several face readings in a row
+    /// agree the buffer needs turning, that turn is added to the camera's
+    /// angle for good. Only on a Duo camera, never mid-take, only with a
+    /// clearly upright head (|roll| < 30) and a reading taken at the angle the
+    /// connection holds now, on a buffer of the shape it delivers now; a
+    /// reading with no face changes nothing.
+    private func handleFaceReading(_ reading: FaceOrientationProbe.Result) {
+        guard let choice = sessionDuoCamera,
+              !isRecording, !isRecordingActive,
+              !reading.mirrored,
+              reading.connectionAngle == Int(appliedRotationAngle),
+              // A buffer of another shape than the connection now delivers was
+              // captured before its angle was applied.
+              let observed = observedBuffer.withLock({ $0 }),
+              reading.bufferWidth == observed.width, reading.bufferHeight == observed.height,
+              let rotation = reading.uprightRotation,
+              let roll = reading.roll, abs(roll) < 30 else { return }
+        guard rotation != 0 else {
+            duoCalibrationStreak = nil
+            return
+        }
+        let count = duoCalibrationStreak?.rotation == rotation ? (duoCalibrationStreak?.count ?? 0) + 1 : 1
+        guard count >= Self.duoCalibrationReadings else {
+            duoCalibrationStreak = (rotation, count)
+            faceProbe.arm(context: "calibration", delay: 0.3)
+            return
+        }
+        duoCalibrationStreak = nil
+        let type = choice.device.deviceType.rawValue
+        let corrected = (choice.correction + rotation) % 360
+        UserDefaults.standard.set(corrected, forKey: Self.correctionKey(type))
+        let line = "event=duo_angle_corrected type=\(type) upright_cw=\(rotation) roll=\(Int(roll.rounded())) correction_before=\(choice.correction) correction_after=\(corrected)"
+        camLog.notice("\(line, privacy: .public)")
+        CameraDiagnosticsLog.record(line)
+        reconfigureDuoCamera(reason: "angle_corrected", force: true)
     }
 
     // MARK: - Session events (diagnostics)
@@ -644,8 +865,10 @@ final class CameraManager: NSObject, ObservableObject {
     // MARK: - Phase 1: Video + audio with built-in mic (instant)
 
     #if !targetEnvironment(simulator)
-    private func setupSession(position: AVCaptureDevice.Position) {
+    private func setupSession(position: AVCaptureDevice.Position, duoPosture: DuoDisplayState.Posture?) {
         session.automaticallyConfiguresApplicationAudioSession = false
+        configurationGeneration += 1
+        let generation = configurationGeneration
 
         // Audio session with built-in mic only (no Bluetooth yet — instant)
         let audioSession = AVAudioSession.sharedInstance()
@@ -662,15 +885,23 @@ final class CameraManager: NSObject, ObservableObject {
         let allow4K = SubscriptionManager.shared.canRecord4K
         if want4K && allow4K && session.canSetSessionPreset(.hd4K3840x2160) {
             session.sessionPreset = .hd4K3840x2160
-        } else {
+        } else if session.canSetSessionPreset(.hd1920x1080) {
             session.sessionPreset = .hd1920x1080
         }
 
         session.inputs.forEach { session.removeInput($0) }
         session.outputs.forEach { session.removeOutput($0) }
 
+        // iPhone Duo: the camera for this posture with a native format, or nil
+        // for the standard front camera (always nil on other iPhones).
+        sessionDuoPosture = duoPosture
+        let duoChoice = position == .front
+            ? Self.duoCamera(for: duoPosture, want4K: want4K && allow4K, targetFPS: targetFPS)
+            : nil
+        sessionDuoCamera = duoChoice
+
         // Video input
-        guard let videoDevice = AVCaptureDevice.default(
+        guard let videoDevice = duoChoice?.device ?? AVCaptureDevice.default(
             .builtInWideAngleCamera, for: .video, position: position
         ) else {
             session.commitConfiguration()
@@ -702,6 +933,10 @@ final class CameraManager: NSObject, ObservableObject {
         // Frame rate
         do {
             try videoDevice.lockForConfiguration()
+            // Duo format first: setting a format resets the frame durations
+            // set below. It also turns the preset into `.inputPriority`, which
+            // nothing later in this configuration overrides.
+            if let duoChoice { videoDevice.activeFormat = duoChoice.format }
             let desiredFPS = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
             let supported = videoDevice.activeFormat.videoSupportedFrameRateRanges.contains {
                 Int($0.maxFrameRate) >= targetFPS
@@ -783,7 +1018,7 @@ final class CameraManager: NSObject, ObservableObject {
             // which angles are portrait on this sensor.
             let coordinator = AVCaptureDevice.RotationCoordinator(device: videoDevice, previewLayer: nil)
             rotationCoordinator = coordinator
-            applyClampedRotation(reported: coordinator.videoRotationAngleForHorizonLevelCapture, to: connection)
+            applyClampedRotation(reported: duoCorrected(coordinator.videoRotationAngleForHorizonLevelCapture), to: connection)
             rotationObservation = coordinator.observe(
                 \.videoRotationAngleForHorizonLevelCapture,
                 options: [.new]
@@ -800,6 +1035,14 @@ final class CameraManager: NSObject, ObservableObject {
                 "event=session_config_complete device_model=\(Self.deviceModelIdentifier, privacy: .public) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue, privacy: .public) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))"
             )
             CameraDiagnosticsLog.record("event=session_config_complete device_model=\(Self.deviceModelIdentifier) active_format=\(dims.width)x\(dims.height) preset=\(self.session.sessionPreset.rawValue) rotation_angle=\(Int(connection.videoRotationAngle)) angle_supported=\(connection.isVideoRotationAngleSupported(connection.videoRotationAngle))")
+        }
+        if let duoChoice {
+            let dims = CMVideoFormatDescriptionGetDimensions(videoDevice.activeFormat.formatDescription)
+            let line = "event=duo_camera type=\(videoDevice.deviceType.rawValue) position=\(videoDevice.position.rawValue) format=\(dims.width)x\(dims.height) horizon_angle=\(duoChoice.horizonAngle) correction=\(duoChoice.correction) axes_swapped=\(duoChoice.axesSwapped) posture=\(duoPosture?.rawValue ?? "none") preset=\(session.sessionPreset.rawValue)"
+            camLog.notice("\(line, privacy: .public)")
+            CameraDiagnosticsLog.record(line)
+        } else if duoPosture != nil, position == .front {
+            CameraDiagnosticsLog.record("event=duo_camera_unavailable posture=\(duoPosture?.rawValue ?? "none")")
         }
 
         // Arm the landscape gate BEFORE the session runs. Two reasons: the wait
@@ -822,8 +1065,16 @@ final class CameraManager: NSObject, ObservableObject {
 
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.previewAngleCorrection = CGFloat(duoChoice?.correction ?? 0)
             self.activeVideoDevice = videoDevice
             self.isSessionReady = true
+            // A few frames in, past any buffer still in flight from the
+            // previous configuration: is the Duo camera delivering portrait?
+            if duoChoice != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                    self?.validateDuoBufferShape(generation: generation)
+                }
+            }
             // Portrait reveals exactly as it always has: its angle is right from
             // the first frame, so gating would cost startup time for nothing.
             // Landscape is already gated by the warmup armed above.
@@ -949,9 +1200,10 @@ final class CameraManager: NSObject, ObservableObject {
         // Same reset as `start`: this reconfigures the session, so warmup state
         // from the previous configuration must not carry into the new one.
         resetLandscapeWarmup()
+        let duoPosture = self.duoPosture
         Self.cameraQueue.async { [weak self] in
             guard let self else { return }
-            self.setupSession(position: newPosition)
+            self.setupSession(position: newPosition, duoPosture: duoPosture)
         }
         #endif
     }
@@ -1271,6 +1523,16 @@ final class CameraManager: NSObject, ObservableObject {
             info["device"] = DuoReportService.describe(device, formats: false)
         }
         if let face = faceProbe.lastResult { info["face"] = face.report }
+        if let duo = sessionDuoCamera {
+            info["duo_camera"] = [
+                "type": duo.device.deviceType.rawValue,
+                "horizon_angle": duo.horizonAngle,
+                "correction": duo.correction,
+                "axes_swapped": duo.axesSwapped,
+            ]
+        } else {
+            info["duo_camera"] = "standard"
+        }
         info["face_pending"] = faceProbe.isPending
         return info
     }
@@ -1343,7 +1605,9 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
                 Task { @MainActor [weak self] in
                     self?.pinLandscapeAngleAfterFirstBuffer()
                 }
-                if DuoReportService.isEnabled { faceProbe.arm(context: "preview") }
+                // After a pause: right after a reconfiguration the first buffer
+                // can still carry the previous connection angle.
+                if DuoReportService.isEnabled { faceProbe.arm(context: "preview", delay: 0.3) }
             } else if let change, let previous = change.previous {
                 // Same configuration, different shape: an applied rotation, or
                 // on iPhone Duo a fold moving the session to another sensor.

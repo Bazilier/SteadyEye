@@ -67,6 +67,7 @@ nonisolated final class FaceOrientationProbe: @unchecked Sendable {
         var busy = false
         var lastSubmit: CFAbsoluteTime = 0
         var lastResult: Result?
+        var onResult: (@Sendable (Result) -> Void)?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -93,6 +94,12 @@ nonisolated final class FaceOrientationProbe: @unchecked Sendable {
     var isPending: Bool { state.withLock { $0.arming != nil } }
 
     var lastResult: Result? { state.withLock { $0.lastResult } }
+
+    /// Receives every finished reading, on the probe's queue. Set once by the
+    /// camera, which corrects an iPhone Duo camera's angle from it.
+    func setResultHandler(_ handler: @escaping @Sendable (Result) -> Void) {
+        state.withLock { $0.onResult = handler }
+    }
 
     /// Called for every video frame. Cheap unless armed.
     func submit(_ pixelBuffer: CVPixelBuffer, connectionAngle: CGFloat, mirrored: Bool) {
@@ -125,19 +132,20 @@ nonisolated final class FaceOrientationProbe: @unchecked Sendable {
                 roll: upright?.roll,
                 rollsByRotation: found
             )
-            let report = state.withLock { s -> Bool in
+            let handler = state.withLock { s -> (@Sendable (Result) -> Void)?? in
                 s.busy = false
                 // A newer arming replaced this one while Vision ran: its own
                 // frames will report.
                 guard finished, s.arming?.context == taken.context,
-                      s.arming?.notBefore == taken.notBefore else { return false }
+                      s.arming?.notBefore == taken.notBefore else { return nil }
                 s.arming = nil
                 s.lastResult = result
-                return true
+                return .some(s.onResult)
             }
-            guard report else { return }
+            guard let handler else { return }
             log.notice("\(result.logLine, privacy: .public)")
             CameraDiagnosticsLog.record(result.logLine)
+            handler?(result)
         }
     }
 
