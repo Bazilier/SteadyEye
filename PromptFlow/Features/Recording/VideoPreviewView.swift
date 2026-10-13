@@ -540,11 +540,9 @@ struct VideoPreviewView: View {
     /// doesn't conflict with the video's onTapGesture.
     private var scrubberRow: some View {
         HStack(spacing: 12) {
-            Text(Self.formatTime(playback.currentTime))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(.white)
+            PlaybackTimeLabel(clock: playback.clock)
                 .frame(width: 44, alignment: .leading)
-            ScrubberView(playback: playback)
+            ScrubberView(playback: playback, clock: playback.clock)
             Text(Self.formatTime(playback.duration))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.white)
@@ -556,7 +554,7 @@ struct VideoPreviewView: View {
     /// Formats `seconds` as `M:SS` (or `MM:SS` when total length is
     /// ≥ 10 minutes). Negative values clamp to 0; fractional seconds
     /// are floored.
-    private static func formatTime(_ seconds: Double) -> String {
+    static func formatTime(_ seconds: Double) -> String {
         let safe = max(0, seconds)
         let total = Int(safe)
         let m = total / 60
@@ -722,8 +720,21 @@ struct VideoPreviewView: View {
 /// `DragGesture(minimumDistance: 0)` doubles as tap-to-seek: a single
 /// tap fires `.onChanged` once at the touch point (jumping the thumb)
 /// and immediately `.onEnded`.
+/// The elapsed-time readout, re-rendered alone at the playhead's rate.
+private struct PlaybackTimeLabel: View {
+    @ObservedObject var clock: PlaybackClock
+
+    var body: some View {
+        Text(VideoPreviewView.formatTime(clock.time))
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundColor(.white)
+    }
+}
+
 private struct ScrubberView: View {
     @ObservedObject var playback: PlaybackController
+    /// The playhead, observed here rather than in the preview screen.
+    @ObservedObject var clock: PlaybackClock
     @State private var scrubTime: Double = 0
 
     var body: some View {
@@ -734,7 +745,7 @@ private struct ScrubberView: View {
             // `initialDuration` before the View binds, so this is a
             // belt-and-suspenders default.
             let denom = max(playback.duration, 0.001)
-            let displayTime = playback.isScrubbing ? scrubTime : playback.currentTime
+            let displayTime = playback.isScrubbing ? scrubTime : clock.time
             let progress = min(1, max(0, displayTime / denom))
             let filledWidth = width * progress
 

@@ -1325,9 +1325,12 @@ struct RecordingView: View {
             Circle()
                 .fill(.red)
                 .frame(width: 10, height: 10)
-            Text(durationString(cameraManager.recordingDuration))
-                .font(.caption.monospacedDigit().bold())
-                .foregroundStyle(.white)
+            // Its own schedule: `recordingDuration` is not published.
+            TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+                Text(durationString(cameraManager.recordingDuration))
+                    .font(.caption.monospacedDigit().bold())
+                    .foregroundStyle(.white)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
