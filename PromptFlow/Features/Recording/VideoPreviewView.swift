@@ -75,6 +75,10 @@ struct VideoPreviewView: View {
     /// Set once the user went through the first-use sheet, which is also
     /// their consent to the audio going to Auphonic.
     @AppStorage("studioIntroAccepted") private var studioIntroAccepted = false
+    @State private var showStudioConfirm = false
+    /// "Don't ask again" on the confirmation sheet. Subscribers only: the
+    /// free try always asks.
+    @AppStorage("studioSkipConfirm") private var studioSkipConfirm = false
     @ObservedObject private var studioSound = StudioSoundManager.shared
     @State private var showSaveSuccess = false
     @State private var showPhotosDeniedToast = false
@@ -387,6 +391,20 @@ struct VideoPreviewView: View {
                 },
                 onCancel: { showStudioIntro = false }
             )
+        }
+        .sheet(isPresented: $showStudioConfirm) {
+            if let quota = studioSound.quota {
+                StudioConfirmSheet(
+                    quota: quota,
+                    units: studioUnits,
+                    dontAskAgain: $studioSkipConfirm,
+                    onConfirm: {
+                        showStudioConfirm = false
+                        startStudio()
+                    },
+                    onCancel: { showStudioConfirm = false }
+                )
+            }
         }
         .sheet(isPresented: $showStudioLimit) {
             if let quota = studioSound.quota {
@@ -921,6 +939,11 @@ struct VideoPreviewView: View {
                 showStudioIntro = true
                 return
             }
+            if let quota = studioSound.quota,
+               quota.tier == .free || !studioSkipConfirm || studioUnits > quota.remaining {
+                showStudioConfirm = true
+                return
+            }
             startStudio()
         case .ready:
             let enabled = !recording.studioEnabled
@@ -936,6 +959,12 @@ struct VideoPreviewView: View {
         default:
             break
         }
+    }
+
+    /// What this recording costs: one enhancement per started 3 minutes,
+    /// as the server counts it.
+    private var studioUnits: Int {
+        max(1, Int((recording.duration / 180).rounded(.up)))
     }
 
     private func startStudio() {

@@ -432,6 +432,132 @@ struct StudioLimitSheet: View {
     }
 }
 
+/// Asked before each enhancement that spends the allowance (after the
+/// first, which the intro sheet confirms): how much it costs and what is
+/// left. Subscribers can turn it off; the one free try always asks.
+struct StudioConfirmSheet: View {
+    let quota: StudioSoundService.Quota
+    /// What this recording costs: one per started 3 minutes.
+    let units: Int
+    @Binding var dontAskAgain: Bool
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    private var affordable: Bool { units <= quota.remaining }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StudioSheetIcon(name: "sparkles")
+            Text(String(
+                localized: "studio.confirm.title",
+                defaultValue: "Enhance this video's sound?",
+                comment: "Title of the confirmation sheet before Studio Sound spends an enhancement."
+            ))
+            .font(.title2.bold())
+            .padding(.bottom, 12)
+
+            Text(remainingLine)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Theme.accentTint, in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
+                .padding(.bottom, units > 1 ? 8 : 16)
+
+            if units > 1 {
+                Text(costLine)
+                    .font(.footnote)
+                    .foregroundStyle(affordable ? Color.secondary : Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 16)
+            }
+
+            if quota.tier != .free && affordable {
+                Toggle(isOn: $dontAskAgain) {
+                    Text(String(
+                        localized: "studio.confirm.dontAsk",
+                        defaultValue: "Don't ask again",
+                        comment: "Toggle on the Studio Sound confirmation sheet: skip this confirmation from now on."
+                    ))
+                    .font(.subheadline)
+                }
+                .tint(Theme.accent)
+                .padding(.bottom, 16)
+            }
+
+            if affordable {
+                Button(action: onConfirm) {
+                    Text(String(
+                        localized: "studio.button.enhance",
+                        defaultValue: "Enhance sound",
+                        comment: "VoiceOver label of the Studio Sound button before the audio has been enhanced."
+                    ))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Theme.accent, in: Capsule())
+                }
+            }
+            Button(action: onCancel) {
+                Text("common.cancel", comment: "Generic Cancel button used in alerts and toolbars.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+        }
+        .studioSheetStyle(height: sheetHeight)
+    }
+
+    private var sheetHeight: CGFloat {
+        var height: CGFloat = 330
+        if units > 1 { height += 50 }
+        if quota.tier != .free && affordable { height += 50 }
+        if !affordable { height -= 56 }
+        return height
+    }
+
+    private var remainingLine: String {
+        switch quota.tier {
+        case .free:
+            return String(
+                localized: "studio.confirm.free",
+                defaultValue: "This uses your one free enhancement.",
+                comment: "Studio Sound confirmation for a user without a subscription: this spends their single free try."
+            )
+        case .trial:
+            return String(
+                localized: "studio.intro.quota.trial",
+                defaultValue: "Enhancements left in your trial: \(quota.remaining) of \(quota.limit)",
+                comment: "First-use sheet of Studio Sound, during the free trial. First number: left; second: the trial's total."
+            )
+        case .paid:
+            return String(
+                localized: "studio.intro.quota.paid",
+                defaultValue: "Enhancements left this month: \(quota.remaining) of \(quota.limit)",
+                comment: "First-use sheet of Studio Sound, for a subscriber. First number: left; second: the monthly total."
+            )
+        }
+    }
+
+    private var costLine: String {
+        if affordable {
+            return String(
+                localized: "studio.confirm.cost",
+                defaultValue: "This video is longer than 3 minutes and uses \(units) enhancements.",
+                comment: "Studio Sound confirmation: a video over 3 minutes costs one enhancement per started 3 minutes. The number is that cost (always 2 or more)."
+            )
+        }
+        return String(
+            localized: "studio.confirm.notEnough",
+            defaultValue: "This video is longer than 3 minutes and needs \(units) enhancements, more than you have left.",
+            comment: "Studio Sound confirmation: the video costs more enhancements than are left. The number is the cost (always 2 or more)."
+        )
+    }
+}
+
 private struct StudioSheetIcon: View {
     let name: String
 

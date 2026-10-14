@@ -258,6 +258,156 @@
         }
       }
     },
+    "studio.confirm.cost" : {
+      "comment" : "Studio Sound confirmation: a video over 3 minutes costs one enhancement per started 3 minutes. The number is that cost (always 2 or more).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This video is longer than 3 minutes and uses %lld enhancements."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este video dura más de 3 minutos y usa %lld mejoras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este vídeo tem mais de 3 minutos e usa %lld melhorias."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ролик длиннее 3 минут, улучшений будет списано: %lld."
+          }
+        }
+      }
+    },
+    "studio.confirm.dontAsk" : {
+      "comment" : "Toggle on the Studio Sound confirmation sheet: skip this confirmation from now on.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't ask again"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No volver a preguntar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não perguntar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше не спрашивать"
+          }
+        }
+      }
+    },
+    "studio.confirm.free" : {
+      "comment" : "Studio Sound confirmation for a user without a subscription: this spends their single free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This uses your one free enhancement."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se usará tu única mejora gratis."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso usa sua única melhoria grátis."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Будет использовано ваше единственное бесплатное улучшение."
+          }
+        }
+      }
+    },
+    "studio.confirm.notEnough" : {
+      "comment" : "Studio Sound confirmation: the video costs more enhancements than are left. The number is the cost (always 2 or more).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This video is longer than 3 minutes and needs %lld enhancements, more than you have left."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este video dura más de 3 minutos y necesita %lld mejoras, más de las que te quedan."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este vídeo tem mais de 3 minutos e precisa de %lld melhorias, mais do que você tem."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ролик длиннее 3 минут, нужно улучшений: %lld — больше, чем осталось."
+          }
+        }
+      }
+    },
+    "studio.confirm.title" : {
+      "comment" : "Title of the confirmation sheet before Studio Sound spends an enhancement.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhance this video's sound?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Mejorar el sonido de este video?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorar o som deste vídeo?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшить звук этого ролика?"
+          }
+        }
+      }
+    },
     "studio.error.freeLimit" : {
       "comment" : "Studio Sound failed because the user without a subscription already used the one free enhancement.",
       "extractionState" : "extracted_with_value",
