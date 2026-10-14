@@ -271,7 +271,7 @@ struct StudioIntroSheet: View {
             .padding(.bottom, 10)
             Text(String(
                 localized: "studio.intro.privacy",
-                defaultValue: "Only the audio of this video is sent to our partner Auphonic for processing and deleted there right after. The video stays on your phone.",
+                defaultValue: "Only the audio of this video is sent to our partner Auphonic for processing, and we have it deleted there right after. The video stays on your phone.",
                 comment: "First-use sheet of Studio Sound: discloses that the audio goes to the third-party service Auphonic. Keep the name Auphonic."
             ))
             .font(.footnote)

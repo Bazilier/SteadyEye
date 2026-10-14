@@ -235,25 +235,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Only the audio of this video is sent to our partner Auphonic for processing and deleted there right after. The video stays on your phone."
+            "value" : "Only the audio of this video is sent to our partner Auphonic for processing, and we have it deleted there right after. The video stays on your phone."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Solo el audio de este video se envía a nuestro socio Auphonic para procesarlo y se borra allí de inmediato. El video se queda en tu teléfono."
+            "value" : "Solo el audio de este video se envía a nuestro socio Auphonic para procesarlo, y pedimos que se borre allí de inmediato. El video se queda en tu teléfono."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro Auphonic para processamento e apagado lá logo em seguida. O vídeo fica no seu celular."
+            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro Auphonic para processamento, e pedimos que seja apagado lá logo em seguida. O vídeo fica no seu celular."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На обработку нашему партнёру Auphonic уходит только звук этого ролика, и сразу после обработки он там удаляется. Видео остаётся на телефоне."
+            "value" : "На обработку нашему партнёру Auphonic уходит только звук этого ролика, и сразу после обработки мы удаляем его там. Видео остаётся на телефоне."
           }
         }
       }
