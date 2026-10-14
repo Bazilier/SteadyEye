@@ -468,6 +468,36 @@
         }
       }
     },
+    "studio.error.busy" : {
+      "comment" : "Studio Sound failed because of a server-wide limit; trying later works.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Studio Sound is busy right now. Try again later."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Studio Sound está ocupado ahora. Inténtalo más tarde."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Studio Sound está ocupado agora. Tente mais tarde."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Studio Sound сейчас перегружен. Попробуйте позже."
+          }
+        }
+      }
+    },
     "studio.error.generic" : {
       "comment" : "Studio Sound failed for an unspecified reason; tapping the sparkles button retries.",
       "extractionState" : "extracted_with_value",
@@ -498,32 +528,32 @@
         }
       }
     },
-    "studio.error.limit" : {
-      "comment" : "Studio Sound failed because the user's daily processing limit is used up.",
+    "studio.error.monthlyLimit" : {
+      "comment" : "Studio Sound failed because the subscriber's monthly allowance is used up; it renews on the 1st of the month.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Daily limit reached. Try again tomorrow."
+            "value" : "This month's enhancements are used up. New ones arrive on the 1st."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alcanzaste el límite diario. Inténtalo mañana."
+            "value" : "Ya usaste las mejoras de este mes. Habrá nuevas el día 1."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Limite diário atingido. Tente novamente amanhã."
+            "value" : "As melhorias deste mês acabaram. Novas chegam no dia 1."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дневной лимит исчерпан. Попробуйте завтра."
+            "value" : "Улучшения на этот месяц закончились. Новые появятся 1-го числа."
           }
         }
       }
@@ -614,6 +644,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Улучшить можно видео до 15 минут."
+          }
+        }
+      }
+    },
+    "studio.error.trialLimit" : {
+      "comment" : "Studio Sound failed because the free trial's small allowance is used up.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "You've used the enhancements included in the trial."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste las mejoras incluidas en la prueba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já usou as melhorias incluídas no teste."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшения, включённые в пробный период, закончились."
           }
         }
       }

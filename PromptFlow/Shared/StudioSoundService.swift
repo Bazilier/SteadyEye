@@ -16,7 +16,11 @@ enum StudioSoundService {
     enum ServiceError: Error, Equatable {
         case network
         case subscriptionRequired
-        case dailyLimit
+        /// This month's allowance is used up.
+        case monthlyLimit
+        /// The trial's allowance is used up.
+        case trialLimit
+        /// A server-wide or per-network ceiling; later is fine.
         case rateLimited
         case disabled
         case tooLong
@@ -28,7 +32,7 @@ enum StudioSoundService {
         /// Worth retrying as-is: the request may well succeed a moment later.
         var isTransient: Bool {
             switch self {
-            case .network, .rateLimited: return true
+            case .network: return true
             case .http(let code): return code >= 500
             default: return false
             }
@@ -39,7 +43,8 @@ enum StudioSoundService {
             switch self {
             case .network: return "network"
             case .subscriptionRequired: return "subscription_required"
-            case .dailyLimit: return "daily_limit"
+            case .monthlyLimit: return "monthly_limit"
+            case .trialLimit: return "trial_limit"
             case .rateLimited: return "rate_limited"
             case .disabled: return "disabled"
             case .tooLong: return "too_long"
@@ -158,7 +163,8 @@ enum StudioSoundService {
         let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
         switch code {
         case "subscription_required": return .subscriptionRequired
-        case "daily_limit": return .dailyLimit
+        case "monthly_limit": return .monthlyLimit
+        case "trial_limit": return .trialLimit
         case "rate_limited": return .rateLimited
         case "audio_disabled": return .disabled
         case "input_too_long", "input_too_large": return .tooLong

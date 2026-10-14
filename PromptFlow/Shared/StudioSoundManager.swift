@@ -428,11 +428,23 @@ final class StudioSoundManager: ObservableObject {
     /// What to tell the user about a failure, by `studioErrorCode`.
     static func failureMessage(for code: String?) -> String {
         switch code {
-        case "daily_limit", "rate_limited":
+        case "monthly_limit":
             return String(
-                localized: "studio.error.limit",
-                defaultValue: "Daily limit reached. Try again tomorrow.",
-                comment: "Studio Sound failed because the user's daily processing limit is used up."
+                localized: "studio.error.monthlyLimit",
+                defaultValue: "This month's enhancements are used up. New ones arrive on the 1st.",
+                comment: "Studio Sound failed because the subscriber's monthly allowance is used up; it renews on the 1st of the month."
+            )
+        case "trial_limit":
+            return String(
+                localized: "studio.error.trialLimit",
+                defaultValue: "You've used the enhancements included in the trial.",
+                comment: "Studio Sound failed because the free trial's small allowance is used up."
+            )
+        case "rate_limited":
+            return String(
+                localized: "studio.error.busy",
+                defaultValue: "Studio Sound is busy right now. Try again later.",
+                comment: "Studio Sound failed because of a server-wide limit; trying later works."
             )
         case "too_long":
             return String(
