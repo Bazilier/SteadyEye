@@ -686,10 +686,10 @@ struct SettingsView: View {
                     } label: {
                         Text("settings.support.feedback", comment: "Button: send feedback via mail")
                     }
-                    Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+                    Link(destination: URL(string: "https://steadyeye.bazilier.com/privacy")!) {
                         Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
                     }
-                    Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
+                    Link(destination: URL(string: "https://steadyeye.bazilier.com/terms")!) {
                         Text("common.termsOfUse", comment: "Terms of use link in Settings")
                     }
                 } header: {
