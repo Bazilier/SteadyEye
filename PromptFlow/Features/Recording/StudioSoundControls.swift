@@ -318,7 +318,7 @@ struct StudioIntroSheet: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.bottom, 4)
-            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+            Link(destination: URL(string: "https://steadyeye.bazilier.com/privacy")!) {
                 Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.accent)

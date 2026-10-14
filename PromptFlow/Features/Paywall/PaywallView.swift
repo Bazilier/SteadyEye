@@ -1254,11 +1254,11 @@ struct PaywallView: View {
             }
             .disabled(isTransactionInFlight)
             Text(verbatim: "·")
-            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/terms.html")!) {
+            Link(destination: URL(string: "https://steadyeye.bazilier.com/terms")!) {
                 Text("common.termsOfUse", comment: "Terms of use link in Settings")
             }
             Text(verbatim: "·")
-            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+            Link(destination: URL(string: "https://steadyeye.bazilier.com/privacy")!) {
                 Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
             }
         }
