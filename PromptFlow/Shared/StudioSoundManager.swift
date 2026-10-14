@@ -40,6 +40,9 @@ final class StudioSoundManager: ObservableObject {
     /// The recording that just finished, for the Recordings banner. Cleared
     /// a few seconds later.
     @Published private(set) var lastFinished: Finished?
+    /// The caller's allowance, for the counter on the button. Nil until the
+    /// first successful `refreshQuota()`.
+    @Published private(set) var quota: StudioSoundService.Quota?
 
     struct Finished: Equatable {
         let recordingID: UUID
@@ -121,6 +124,16 @@ final class StudioSoundManager: ObservableObject {
         let recordings = (try? context.fetch(descriptor)) ?? []
         for recording in recordings where inFlight.contains(recording.studioStatusRaw ?? "") {
             run(recording.id)
+        }
+    }
+
+    // MARK: - Quota
+
+    /// Fetches the allowance. Failures keep the last known value: the
+    /// button then shows no counter rather than a wrong one.
+    func refreshQuota() async {
+        if let fresh = try? await StudioSoundService.quota() {
+            quota = fresh
         }
     }
 
@@ -215,12 +228,16 @@ final class StudioSoundManager: ObservableObject {
         guard isAlive(recording) else { return }
         switch result {
         case .success(let job):
+            if let fresh = job.quota { quota = fresh }
             recording.studioJobID = job.id
             recording.studioStartedAt = Date()
             recording.studioStatus = .processing
             save()
         case .failure(let error):
             fail(recording, code: error.code)
+            if [.freeLimit, .trialLimit, .monthlyLimit].contains(error) {
+                Task { await refreshQuota() }
+            }
         }
     }
 
@@ -433,6 +450,12 @@ final class StudioSoundManager: ObservableObject {
                 localized: "studio.error.monthlyLimit",
                 defaultValue: "This month's enhancements are used up. New ones arrive on the 1st.",
                 comment: "Studio Sound failed because the subscriber's monthly allowance is used up; it renews on the 1st of the month."
+            )
+        case "free_limit":
+            return String(
+                localized: "studio.error.freeLimit",
+                defaultValue: "Your free enhancement is used. Subscribe to enhance more videos.",
+                comment: "Studio Sound failed because the user without a subscription already used the one free enhancement."
             )
         case "trial_limit":
             return String(

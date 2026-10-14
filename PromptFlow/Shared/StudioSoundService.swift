@@ -9,6 +9,7 @@ import Foundation
 enum StudioSoundService {
 
     private static let baseURL = "https://web-production-49244.up.railway.app/api/v1/audio/enhance/"
+    private static let quotaURL = "https://web-production-49244.up.railway.app/api/v1/audio/quota/"
 
     /// Overridable so tests can install a `URLProtocol` stub.
     static var session: URLSession = .shared
@@ -16,6 +17,8 @@ enum StudioSoundService {
     enum ServiceError: Error, Equatable {
         case network
         case subscriptionRequired
+        /// The one free try is used.
+        case freeLimit
         /// This month's allowance is used up.
         case monthlyLimit
         /// The trial's allowance is used up.
@@ -43,6 +46,7 @@ enum StudioSoundService {
             switch self {
             case .network: return "network"
             case .subscriptionRequired: return "subscription_required"
+            case .freeLimit: return "free_limit"
             case .monthlyLimit: return "monthly_limit"
             case .trialLimit: return "trial_limit"
             case .rateLimited: return "rate_limited"
@@ -63,6 +67,48 @@ enum StudioSoundService {
     struct Job: Decodable {
         let id: String
         let status: JobStatus
+        /// Sent with a newly started job.
+        let quota: Quota?
+    }
+
+    /// The caller's allowance, from `GET /audio/quota/` and with each start.
+    struct Quota: Decodable, Equatable {
+        enum Tier: String, Decodable {
+            case free, trial, paid
+        }
+        let tier: Tier
+        let limit: Int
+        let used: Int
+        let remaining: Int
+        /// "yyyy-MM-dd" of the next month, paid only.
+        let resetsAt: String?
+        /// For "with a subscription: N a month".
+        let paidMonthlyLimit: Int
+
+        enum CodingKeys: String, CodingKey {
+            case tier, limit, used, remaining
+            case resetsAt = "resets_at"
+            case paidMonthlyLimit = "paid_monthly_limit"
+        }
+
+        var resetDate: Date? {
+            guard let resetsAt else { return nil }
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(identifier: "UTC")
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.date(from: resetsAt)
+        }
+    }
+
+    static func quota() async throws -> Quota {
+        var request = URLRequest(url: URL(string: quotaURL)!)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        addIdentity(to: &request)
+        let data = try await send(request)
+        return try decode(Quota.self, from: data)
     }
 
     /// Uploads an `.m4a` and starts processing. `requestID` makes a retry
@@ -128,8 +174,13 @@ enum StudioSoundService {
         var request = URLRequest(url: URL(string: baseURL + path)!)
         request.httpMethod = method
         request.timeoutInterval = 30
-        request.setValue(AnthropicService.appUserId(), forHTTPHeaderField: "X-App-User-Id")
+        addIdentity(to: &request)
         return request
+    }
+
+    private static func addIdentity(to request: inout URLRequest) {
+        request.setValue(AnthropicService.appUserId(), forHTTPHeaderField: "X-App-User-Id")
+        request.setValue(DeviceIdentity.id, forHTTPHeaderField: "X-Device-Id")
     }
 
     private static func send(_ request: URLRequest, uploading body: Data? = nil) async throws -> Data {
@@ -163,6 +214,7 @@ enum StudioSoundService {
         let code = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
         switch code {
         case "subscription_required": return .subscriptionRequired
+        case "free_limit": return .freeLimit
         case "monthly_limit": return .monthlyLimit
         case "trial_limit": return .trialLimit
         case "rate_limited": return .rateLimited

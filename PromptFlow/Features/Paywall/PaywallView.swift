@@ -1064,6 +1064,19 @@ struct PaywallView: View {
                 )
             )
             featureLine(
+                icon: "waveform",
+                title: String(
+                    localized: "paywall.v3.feature.studioSound",
+                    defaultValue: "Studio sound.",
+                    comment: "Paywall feature line, bold lead-in: Studio Sound, enhancement that removes noise and echo from the recording's audio. Followed by its detail sentence on the same line."
+                ),
+                detail: String(
+                    localized: "paywall.v3.feature.studioSound.detail",
+                    defaultValue: "Your voice without noise or echo.",
+                    comment: "Paywall feature line, detail after 'Studio sound.'"
+                )
+            )
+            featureLine(
                 icon: "sparkles",
                 title: String(
                     localized: "paywall.v3.feature.ai",

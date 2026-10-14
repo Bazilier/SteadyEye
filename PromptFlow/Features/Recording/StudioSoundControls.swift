@@ -6,11 +6,14 @@ import SwiftUI
 
 // MARK: - Toggle button
 
-/// 56 pt circle left of the save button. Idle and failed: tap to enhance.
+/// 56 pt circle left of the save button. Idle and failed: tap to enhance,
+/// with a counter of what is left (a lock once a free user's try is used).
 /// In flight: a progress ring. Ready: a toggle, filled when Studio Sound
 /// plays, glass with a dot when the original does.
 struct StudioSoundButton: View {
     let recording: Recording
+    /// Nil until loaded (or offline): no counter then.
+    let quota: StudioSoundService.Quota?
     let action: () -> Void
 
     var body: some View {
@@ -71,10 +74,40 @@ struct StudioSoundButton: View {
                 .frame(width: 12, height: 12)
                 .overlay(Circle().stroke(Color.black, lineWidth: 2))
                 .padding(2)
+        } else if status == nil, let quota {
+            counter(quota)
         }
     }
 
+    /// What is left to spend: a number, or a lock for a used free try.
+    private func counter(_ quota: StudioSoundService.Quota) -> some View {
+        let empty = quota.remaining == 0
+        return Group {
+            if empty && quota.tier == .free {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9, weight: .bold))
+            } else {
+                Text(verbatim: "\(quota.remaining)")
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 5)
+        .frame(minWidth: 20, minHeight: 20)
+        .background(empty ? Color(white: 0.35) : Theme.accent, in: Capsule())
+        .overlay(Capsule().stroke(Color.black, lineWidth: 2))
+        .offset(x: 4, y: -4)
+        .accessibilityHidden(true)
+    }
+
     private var accessibilityLabel: String {
+        if status == nil, let quota {
+            return String(
+                localized: "studio.button.enhanceRemaining",
+                defaultValue: "Enhance sound, \(quota.remaining) of \(quota.limit) left",
+                comment: "VoiceOver label of the Studio Sound button before enhancing: how many enhancements are left out of the allowance."
+            )
+        }
         if isOn {
             return String(
                 localized: "studio.button.on",
@@ -208,6 +241,186 @@ struct StudioChip: View {
         .padding(.horizontal, 14)
         .frame(height: 32)
         .background(Color.black.opacity(0.55), in: Capsule())
+    }
+}
+
+// MARK: - First use
+
+/// Shown on the first tap of the button: what Studio Sound does, that the
+/// audio goes to Auphonic (the consent App Review asks for before sending
+/// user content to a third party), and what the user's allowance is.
+struct StudioIntroSheet: View {
+    let quota: StudioSoundService.Quota?
+    let onContinue: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StudioSheetIcon(name: "sparkles")
+            Text(verbatim: "Studio Sound")
+                .font(.title2.bold())
+                .padding(.bottom, 6)
+            Text(String(
+                localized: "studio.intro.body",
+                defaultValue: "Removes background noise and echo and evens out your voice.",
+                comment: "First-use sheet of Studio Sound: what the feature does."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 10)
+            Text(String(
+                localized: "studio.intro.privacy",
+                defaultValue: "Only the audio of this video is sent to our partner Auphonic for processing and deleted there right after. The video stays on your phone.",
+                comment: "First-use sheet of Studio Sound: discloses that the audio goes to the third-party service Auphonic. Keep the name Auphonic."
+            ))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 16)
+
+            if let quota {
+                Text(allowance(quota))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Theme.accentTint, in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
+                    .padding(.bottom, 20)
+            }
+
+            Button(action: onContinue) {
+                Text(continueTitle)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Theme.accent, in: Capsule())
+            }
+            Button(action: onCancel) {
+                Text("common.cancel", comment: "Generic Cancel button used in alerts and toolbars.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+        }
+        .studioSheetStyle(height: quota == nil ? 400 : 470)
+    }
+
+    private func allowance(_ quota: StudioSoundService.Quota) -> String {
+        switch quota.tier {
+        case .free:
+            return String(
+                localized: "studio.intro.quota.free",
+                defaultValue: "One free enhancement. Use it on a video where the sound matters.",
+                comment: "First-use sheet of Studio Sound, for a user without a subscription: they have a single free try."
+            )
+        case .trial:
+            return String(
+                localized: "studio.intro.quota.trial",
+                defaultValue: "Enhancements left in your trial: \(quota.remaining) of \(quota.limit)",
+                comment: "First-use sheet of Studio Sound, during the free trial. First number: left; second: the trial's total."
+            )
+        case .paid:
+            return String(
+                localized: "studio.intro.quota.paid",
+                defaultValue: "Enhancements left this month: \(quota.remaining) of \(quota.limit)",
+                comment: "First-use sheet of Studio Sound, for a subscriber. First number: left; second: the monthly total."
+            )
+        }
+    }
+
+    private var continueTitle: String {
+        if quota?.tier == .free {
+            return String(
+                localized: "studio.intro.continueFree",
+                defaultValue: "Enhance for free",
+                comment: "First-use sheet of Studio Sound: main button for a user without a subscription, who spends their one free try."
+            )
+        }
+        return String(
+            localized: "studio.button.enhance",
+            defaultValue: "Enhance sound",
+            comment: "VoiceOver label of the Studio Sound button before the audio has been enhanced."
+        )
+    }
+}
+
+/// A subscriber (or trial user) with nothing left to spend.
+struct StudioLimitSheet: View {
+    let quota: StudioSoundService.Quota
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StudioSheetIcon(name: "hourglass")
+            Text(String(
+                localized: "studio.limit.title",
+                defaultValue: "Enhancements used up",
+                comment: "Title of the sheet shown when the Studio Sound allowance is used up."
+            ))
+            .font(.title2.bold())
+            .padding(.bottom, 6)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 24)
+            Button(action: onClose) {
+                Text("common.ok", comment: "Generic OK confirmation button used in alerts.")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(Color.white.opacity(0.1), in: Capsule())
+            }
+        }
+        .studioSheetStyle(height: 340)
+    }
+
+    private var message: String {
+        if quota.tier == .trial {
+            return String(
+                localized: "studio.limit.trial",
+                defaultValue: "You've used the enhancements included in your trial. With the subscription: \(quota.paidMonthlyLimit) a month.",
+                comment: "Studio Sound allowance used up during the free trial. The number is the monthly allowance of the paid subscription."
+            )
+        }
+        let date = quota.resetDate?.formatted(.dateTime.day().month(.wide)) ?? ""
+        return String(
+            localized: "studio.limit.paid",
+            defaultValue: "This month's enhancements are used up. New ones arrive on \(date). Soon you'll be able to buy more.",
+            comment: "Studio Sound monthly allowance used up. The placeholder is the day the allowance renews, like 'November 1'. Buying extra enhancements is coming soon."
+        )
+    }
+}
+
+private struct StudioSheetIcon: View {
+    let name: String
+
+    var body: some View {
+        Image(systemName: name)
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(Theme.accent)
+            .frame(width: 48, height: 48)
+            .background(Theme.accentTint, in: Circle())
+            .padding(.bottom, 14)
+    }
+}
+
+private extension View {
+    func studioSheetStyle(height: CGFloat) -> some View {
+        self
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 8)
+            .presentationDetents([.height(height)])
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(Color(white: 0.11))
+            .preferredColorScheme(.dark)
     }
 }
 

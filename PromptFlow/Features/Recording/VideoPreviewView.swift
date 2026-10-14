@@ -68,6 +68,12 @@ struct VideoPreviewView: View {
     /// The one-time tip above the Studio Sound button, decided on appear.
     @State private var showStudioCoach = false
     @AppStorage("studioCoachShown") private var studioCoachShown = false
+    @State private var showStudioIntro = false
+    @State private var showStudioLimit = false
+    /// Set once the user went through the first-use sheet, which is also
+    /// their consent to the audio going to Auphonic.
+    @AppStorage("studioIntroAccepted") private var studioIntroAccepted = false
+    @ObservedObject private var studioSound = StudioSoundManager.shared
     @State private var showSaveSuccess = false
     @State private var showPhotosDeniedToast = false
     @State private var isSavingToCameraRoll = false
@@ -174,7 +180,11 @@ struct VideoPreviewView: View {
                     scrubberRow
                     HStack(spacing: 10) {
                         if showsStudioButton {
-                            StudioSoundButton(recording: recording, action: handleStudioTap)
+                            StudioSoundButton(
+                                recording: recording,
+                                quota: studioSound.quota,
+                                action: handleStudioTap
+                            )
                         }
                         saveButton
                     }
@@ -362,6 +372,25 @@ struct VideoPreviewView: View {
         .fullScreenCover(isPresented: $showStudioPaywall) {
             PaywallView(source: "studio_sound")
         }
+        .sheet(isPresented: $showStudioIntro) {
+            StudioIntroSheet(
+                quota: studioSound.quota,
+                onContinue: {
+                    studioIntroAccepted = true
+                    showStudioIntro = false
+                    AppAnalytics.log("studio_sound_intro_accepted", params: [
+                        "tier": studioSound.quota?.tier.rawValue ?? "unknown"
+                    ])
+                    startStudio()
+                },
+                onCancel: { showStudioIntro = false }
+            )
+        }
+        .sheet(isPresented: $showStudioLimit) {
+            if let quota = studioSound.quota {
+                StudioLimitSheet(quota: quota, onClose: { showStudioLimit = false })
+            }
+        }
         .toast(
             isPresented: $showStudioWillSaveToast,
             message: String(
@@ -379,6 +408,11 @@ struct VideoPreviewView: View {
                 showStudioCoach = true
                 studioCoachShown = true
             }
+            Task { await studioSound.refreshQuota() }
+        }
+        // A purchase from the paywall changes the allowance.
+        .onChange(of: subscriptionManager.isSubscribed) { _, _ in
+            Task { await studioSound.refreshQuota() }
         }
         .onChange(of: recording.studioStatusRaw) { _, _ in
             guard isVisible, recording.studioStatus == .ready, studioItem == nil else { return }
@@ -823,11 +857,9 @@ struct VideoPreviewView: View {
 
     // MARK: - Studio Sound
 
-    /// Subscribers get the button; anyone who already has a result keeps
-    /// the toggle for it.
-    private var showsStudioButton: Bool {
-        subscriptionManager.isSubscribed || recording.studioStatus != nil
-    }
+    /// Everyone gets the button: subscribers spend their allowance, free
+    /// users have one try and then see the paywall from it.
+    private var showsStudioButton: Bool { true }
 
     @ViewBuilder
     private var studioHint: some View {
@@ -857,12 +889,20 @@ struct VideoPreviewView: View {
         withAnimation { showStudioCoach = false }
         switch recording.studioStatus {
         case nil, .failed:
-            guard subscriptionManager.isSubscribed else {
-                showStudioPaywall = true
+            if let quota = studioSound.quota, quota.remaining == 0 {
+                AppAnalytics.log("studio_sound_limit_tapped", params: ["tier": quota.tier.rawValue])
+                if quota.tier == .free {
+                    showStudioPaywall = true
+                } else {
+                    showStudioLimit = true
+                }
                 return
             }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation { StudioSoundManager.shared.start(recording) }
+            guard studioIntroAccepted else {
+                showStudioIntro = true
+                return
+            }
+            startStudio()
         case .ready:
             let enabled = !recording.studioEnabled
             StudioSoundManager.shared.setEnabled(enabled, for: recording)
@@ -877,6 +917,11 @@ struct VideoPreviewView: View {
         default:
             break
         }
+    }
+
+    private func startStudio() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation { StudioSoundManager.shared.start(recording) }
     }
 
     private func flashStudioChip(isStudio: Bool) {
