@@ -65,9 +65,11 @@ struct VideoPreviewView: View {
     @State private var showStudioSaveSheet = false
     @State private var showStudioPaywall = false
     @State private var showStudioWillSaveToast = false
-    /// The one-time tip above the Studio Sound button, decided on appear.
+    /// The tip above the Studio Sound button that explains its counter.
     @State private var showStudioCoach = false
-    @AppStorage("studioCoachShown") private var studioCoachShown = false
+    /// The tier the tip was last shown for: it shows once per tier, so a
+    /// free user who subscribes learns what the new number means.
+    @AppStorage("studioCoachTier") private var studioCoachTier = ""
     @State private var showStudioIntro = false
     @State private var showStudioLimit = false
     /// Set once the user went through the first-use sheet, which is also
@@ -404,15 +406,17 @@ struct VideoPreviewView: View {
         .onAppear {
             isVisible = true
             setupPlayer()
-            if !studioCoachShown, showsStudioButton, recording.studioStatus == nil, firstTakeResult == nil {
-                showStudioCoach = true
-                studioCoachShown = true
+            Task {
+                await studioSound.refreshQuota()
+                showStudioCoachIfDue()
             }
-            Task { await studioSound.refreshQuota() }
         }
         // A purchase from the paywall changes the allowance.
         .onChange(of: subscriptionManager.isSubscribed) { _, _ in
-            Task { await studioSound.refreshQuota() }
+            Task {
+                await studioSound.refreshQuota()
+                showStudioCoachIfDue()
+            }
         }
         .onChange(of: recording.studioStatusRaw) { _, _ in
             guard isVisible, recording.studioStatus == .ready, studioItem == nil else { return }
@@ -857,9 +861,24 @@ struct VideoPreviewView: View {
 
     // MARK: - Studio Sound
 
-    /// Everyone gets the button: subscribers spend their allowance, free
-    /// users have one try and then see the paywall from it.
-    private var showsStudioButton: Bool { true }
+    /// Everyone gets the button — subscribers spend their allowance, free
+    /// users have one try and then see the paywall from it — except on the
+    /// onboarding's demo take, where a free user would spend the one try on
+    /// a sample they never meant to keep.
+    private var showsStudioButton: Bool { firstTakeResult == nil }
+
+    /// Once per tier, with the counter loaded: what the number means.
+    private func showStudioCoachIfDue() {
+        guard isVisible,
+              showsStudioButton,
+              recording.studioStatus == nil,
+              let quota = studioSound.quota,
+              quota.remaining > 0,
+              studioCoachTier != quota.tier.rawValue
+        else { return }
+        studioCoachTier = quota.tier.rawValue
+        withAnimation { showStudioCoach = true }
+    }
 
     @ViewBuilder
     private var studioHint: some View {
@@ -875,7 +894,7 @@ struct VideoPreviewView: View {
                 )
                 .transition(.opacity)
             case nil where showStudioCoach:
-                StudioCoachBubble()
+                StudioCoachBubble(tier: studioSound.quota?.tier ?? .paid)
                     .onTapGesture { withAnimation { showStudioCoach = false } }
                     .transition(.opacity)
             default:

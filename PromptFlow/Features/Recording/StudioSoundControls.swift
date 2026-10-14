@@ -185,28 +185,24 @@ struct StudioHintCard: View {
     }
 }
 
-/// One-time explainer pointing at the Studio Sound button.
+/// Explainer pointing at the Studio Sound button and its counter, once per
+/// tier.
 struct StudioCoachBubble: View {
+    let tier: StudioSoundService.Quota.Tier
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(String(
-                localized: "studio.coach.title",
-                defaultValue: "Studio sound",
-                comment: "Title of the one-time tip above the Studio Sound button."
-            ))
-            .font(.subheadline.weight(.semibold))
-            Text(String(
-                localized: "studio.coach.body",
-                defaultValue: "Removes noise and echo, evens out the volume",
-                comment: "Body of the one-time tip above the Studio Sound button."
-            ))
-            .font(.footnote)
-            .foregroundStyle(Color(white: 0.24))
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Color(white: 0.24))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(.black)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .frame(maxWidth: 260, alignment: .leading)
+        .frame(maxWidth: 270, alignment: .leading)
         .background(Color.white, in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
         .overlay(alignment: .bottomLeading) {
             Rectangle()
@@ -214,6 +210,44 @@ struct StudioCoachBubble: View {
                 .frame(width: 14, height: 14)
                 .rotationEffect(.degrees(45))
                 .offset(x: 21, y: 6)
+        }
+    }
+
+    private var title: String {
+        if tier == .free {
+            return String(
+                localized: "studio.coach.free.title",
+                defaultValue: "Studio sound: one free try",
+                comment: "Title of the tip above the Studio Sound button for a user without a subscription."
+            )
+        }
+        return String(
+            localized: "studio.coach.title",
+            defaultValue: "Studio sound",
+            comment: "Title of the one-time tip above the Studio Sound button."
+        )
+    }
+
+    private var message: String {
+        switch tier {
+        case .free:
+            return String(
+                localized: "studio.coach.free",
+                defaultValue: "Removes noise and echo. Try it on a video where the sound matters.",
+                comment: "Tip above the Studio Sound button for a user without a subscription, who has one free try."
+            )
+        case .trial:
+            return String(
+                localized: "studio.coach.trial",
+                defaultValue: "Removes noise and echo. The number is how many enhancements are left in your trial.",
+                comment: "Tip above the Studio Sound button during the free trial; explains the counter badge on the button."
+            )
+        case .paid:
+            return String(
+                localized: "studio.coach.paid",
+                defaultValue: "Removes noise and echo. The number is how many enhancements are left until the end of the month.",
+                comment: "Tip above the Studio Sound button for a subscriber; explains the counter badge, which renews on the 1st."
+            )
         }
     }
 }

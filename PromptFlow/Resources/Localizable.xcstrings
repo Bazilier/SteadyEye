@@ -138,6 +138,126 @@
         }
       }
     },
+    "studio.coach.free" : {
+      "comment" : "Tip above the Studio Sound button for a user without a subscription, who has one free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. Try it on a video where the sound matters."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. Pruébalo en un video donde el sonido importe."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. Teste em um vídeo em que o som importa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Попробуйте на ролике, где звук важен."
+          }
+        }
+      }
+    },
+    "studio.coach.free.title" : {
+      "comment" : "Title of the tip above the Studio Sound button for a user without a subscription.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Studio sound: one free try"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonido de estudio: una prueba gratis"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Som de estúdio: um teste grátis"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Студийный звук — 1 раз бесплатно"
+          }
+        }
+      }
+    },
+    "studio.coach.paid" : {
+      "comment" : "Tip above the Studio Sound button for a subscriber; explains the counter badge, which renews on the 1st.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. The number is how many enhancements are left until the end of the month."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan hasta fin de mes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam até o fim do mês."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось до конца месяца."
+          }
+        }
+      }
+    },
+    "studio.coach.trial" : {
+      "comment" : "Tip above the Studio Sound button during the free trial; explains the counter badge on the button.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. The number is how many enhancements are left in your trial."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan en la prueba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam no seu teste."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось в пробном периоде."
+          }
+        }
+      }
+    },
     "studio.error.freeLimit" : {
       "comment" : "Studio Sound failed because the user without a subscription already used the one free enhancement.",
       "extractionState" : "extracted_with_value",
@@ -11627,36 +11747,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Оригинальный звук"
-          }
-        }
-      }
-    },
-    "studio.coach.body" : {
-      "comment" : "Body of the one-time tip above the Studio Sound button.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Removes noise and echo, evens out the volume"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quita el ruido y el eco, nivela el volumen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove ruído e eco, equilibra o volume"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Уберём шум и эхо, выровняем громкость"
           }
         }
       }
