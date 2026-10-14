@@ -303,14 +303,23 @@ struct StudioIntroSheet: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.bottom, 10)
+            // The disclosure App Review asks for before user content goes to a
+            // third party. The partner (Auphonic) is named in the privacy
+            // policy linked below, not in the app.
             Text(String(
                 localized: "studio.intro.privacy",
-                defaultValue: "Only the audio of this video is sent to our partner Auphonic for processing, and we have it deleted there right after. The video stays on your phone.",
-                comment: "First-use sheet of Studio Sound: discloses that the audio goes to the third-party service Auphonic. Keep the name Auphonic."
+                defaultValue: "Only the audio of this video is sent to our audio partner for processing, and we have it deleted there right after. The video stays on your phone.",
+                comment: "First-use sheet of Studio Sound: discloses that the audio goes to a third-party processing partner, unnamed here (the privacy policy names it)."
             ))
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.bottom, 4)
+            Link(destination: URL(string: "https://bazilier.github.io/steadyeye-legal/privacy.html")!) {
+                Text("common.privacyPolicy", comment: "Privacy policy link in Settings")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+            }
             .padding(.bottom, 16)
 
             if let quota {
@@ -341,7 +350,7 @@ struct StudioIntroSheet: View {
                     .frame(height: 44)
             }
         }
-        .studioSheetStyle(height: quota == nil ? 400 : 470)
+        .studioSheetStyle(height: quota == nil ? 420 : 490)
     }
 
     private func allowance(_ quota: StudioSoundService.Quota) -> String {

@@ -499,31 +499,31 @@
       }
     },
     "studio.intro.privacy" : {
-      "comment" : "First-use sheet of Studio Sound: discloses that the audio goes to the third-party service Auphonic. Keep the name Auphonic.",
+      "comment" : "First-use sheet of Studio Sound: discloses that the audio goes to a third-party processing partner, unnamed here (the privacy policy names it).",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Only the audio of this video is sent to our partner Auphonic for processing, and we have it deleted there right after. The video stays on your phone."
+            "value" : "Only the audio of this video is sent to our audio partner for processing, and we have it deleted there right after. The video stays on your phone."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Solo el audio de este video se envía a nuestro socio Auphonic para procesarlo, y pedimos que se borre allí de inmediato. El video se queda en tu teléfono."
+            "value" : "Solo el audio de este video se envía a nuestro socio de audio para procesarlo, y pedimos que se borre allí de inmediato. El video se queda en tu teléfono."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro Auphonic para processamento, e pedimos que seja apagado lá logo em seguida. O vídeo fica no seu celular."
+            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro de áudio para processamento, e pedimos que seja apagado lá logo em seguida. O vídeo fica no seu celular."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "На обработку нашему партнёру Auphonic уходит только звук этого ролика, и сразу после обработки мы удаляем его там. Видео остаётся на телефоне."
+            "value" : "На обработку нашему партнёру по звуку уходит только звук этого ролика, и сразу после обработки мы удаляем его там. Видео остаётся на телефоне."
           }
         }
       }
