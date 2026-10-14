@@ -13,6 +13,7 @@ struct RecordingsView: View {
     @ObservedObject private var chatBadgeState = ChatBadgeState.shared
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var studioSound = StudioSoundManager.shared
     @Query(sort: \Recording.createdAt, order: .reverse) private var allRecordings: [Recording]
 
     @State private var searchText: String = ""
@@ -267,9 +268,40 @@ struct RecordingsView: View {
 
     // MARK: - Grid
 
+    /// What the Studio Sound banner shows, if anything: work in progress
+    /// first, then a result that just came in, then a failure.
+    private var studioBannerContent: StudioBanner.Content? {
+        if let active = allRecordings.first(where: { $0.studioStatus?.isInFlight == true }) {
+            return .processing(active)
+        }
+        if let finished = studioSound.lastFinished {
+            return .finished(finished)
+        }
+        if let failed = allRecordings.first(where: { $0.studioStatus == .failed }) {
+            return .failed(failed)
+        }
+        return nil
+    }
+
     private var grid: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                if let content = studioBannerContent {
+                    StudioBanner(
+                        content: content,
+                        onOpen: { id in
+                            playingRecording = allRecordings.first { $0.id == id }
+                        },
+                        onRetry: { recording in
+                            withAnimation { StudioSoundManager.shared.start(recording) }
+                        },
+                        onDismiss: { recording in
+                            withAnimation { StudioSoundManager.shared.dismissFailure(recording) }
+                        }
+                    )
+                    .padding(.bottom, 18)
+                    .transition(.opacity)
+                }
                 ForEach(Array(recordingsByDay.enumerated()), id: \.element.day) { index, group in
                     // Same header as the script list; lines up with the
                     // cards' text, scrolls with the content.
@@ -354,15 +386,29 @@ struct RecordingsView: View {
 
     private func saveToCameraRoll(_ recording: Recording) {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else { return }
+        Task {
+            // The soundtrack the preview toggle selects; the original if
+            // the Studio Sound export fails.
+            let file = (try? await StudioSoundManager.shared.fileForSaving(recording))
+                ?? StudioSoundManager.SaveFile(url: recording.fileURL, isTemporary: false)
+            saveToCameraRoll(recording, file: file)
+        }
+    }
+
+    private func saveToCameraRoll(_ recording: Recording, file: StudioSoundManager.SaveFile) {
         PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: recording.fileURL)
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file.url)
         } completionHandler: { success, error in
+            if file.isTemporary {
+                try? FileManager.default.removeItem(at: file.url)
+            }
             DispatchQueue.main.async {
                 if success {
                     AppAnalytics.log("recording_exported_to_camera_roll", params: [
                         "duration_sec": Int(recording.duration.rounded()),
                         "had_watermark": recording.hasWatermark,
-                        "via": "context_menu"
+                        "via": "context_menu",
+                        "studio_sound": file.isTemporary
                     ])
                     withAnimation { showSavedToast = true }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
@@ -394,6 +440,7 @@ struct RecordingThumbnailCard: View {
                 Color.black
                     .aspectRatio(1, contentMode: .fit)
                     .overlay { thumbnailImage }
+                    .overlay { StudioCardOverlay(recording: recording) }
                     .clipped()
                     .task(id: recording.thumbnailURL) {
                         guard let url = recording.thumbnailURL else { return }

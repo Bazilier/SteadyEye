@@ -182,7 +182,7 @@ enum AnthropicService {
     /// appUserID; DEV builds never call `Purchases.configure`, and touching
     /// `Purchases.shared` there is a fatal error, so they fall back to a
     /// persistent local UUID.
-    private static func appUserId() -> String {
+    static func appUserId() -> String {
         if Purchases.isConfigured {
             return Purchases.shared.appUserID
         }
