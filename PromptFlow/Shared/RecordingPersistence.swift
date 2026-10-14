@@ -71,6 +71,7 @@ enum RecordingPersistence {
     /// removed so the UI cleans up.
     @MainActor
     static func delete(_ recording: Recording, modelContext: ModelContext) {
+        StudioSoundManager.shared.forget(recording)
         try? FileManager.default.removeItem(at: recording.fileURL)
         if let thumbURL = recording.thumbnailURL {
             try? FileManager.default.removeItem(at: thumbURL)

@@ -17,6 +17,26 @@ final class Recording: Identifiable {
     var createdAt: Date
     var hasWatermark: Bool
 
+    // Studio Sound (StudioSoundManager). All optional or defaulted, so
+    // SwiftData migrates existing stores without a schema version.
+    /// `StudioStatus` raw value; nil until the user first taps the button.
+    var studioStatusRaw: String?
+    /// The backend job, once the upload went through.
+    var studioJobID: String?
+    /// One enhance attempt; a retried upload reuses it so the server never
+    /// starts (and bills) the same attempt twice.
+    var studioRequestID: String?
+    var studioStartedAt: Date?
+    /// Why the last attempt failed (`StudioSoundService.ServiceError.code`
+    /// or an audio step's code).
+    var studioErrorCode: String?
+    /// The processed audio, AAC, next to the video in `recordingsDirectory`.
+    var studioAudioFileName: String?
+    /// The toggle: play and save the processed audio (true) or the original.
+    var studioEnabled: Bool = true
+    /// Save to Camera Roll as soon as processing finishes.
+    var studioSaveWhenReady: Bool = false
+
     init(
         fileName: String,
         thumbnailFileName: String? = nil,
@@ -35,6 +55,21 @@ final class Recording: Identifiable {
 
     var fileURL: URL {
         Recording.recordingsDirectory.appendingPathComponent(fileName)
+    }
+
+    var studioStatus: StudioStatus? {
+        get { studioStatusRaw.flatMap(StudioStatus.init(rawValue:)) }
+        set { studioStatusRaw = newValue?.rawValue }
+    }
+
+    var studioAudioURL: URL? {
+        guard let studioAudioFileName else { return nil }
+        return Recording.recordingsDirectory.appendingPathComponent(studioAudioFileName)
+    }
+
+    /// Processed audio exists and the toggle is on.
+    var usesStudioAudio: Bool {
+        studioStatus == .ready && studioEnabled && studioAudioURL != nil
     }
 
     var thumbnailURL: URL? {

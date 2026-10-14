@@ -163,6 +163,7 @@ struct SteadyEyeApp: App {
                 Task { await SubscriptionManager.shared.rescheduleInactiveReminder() }
                 Task { await RemoteConfigManager.shared.fetchAndActivate() }
                 Task { await ChatBackgroundFetcher.fetchInBackground() }
+                StudioSoundManager.shared.resumeAll()
                 consumePendingDeepLink()
             } else if newPhase == .background {
                 Task { await SubscriptionManager.shared.rescheduleInactiveReminder() }
@@ -212,6 +213,7 @@ struct SteadyEyeApp: App {
         if let newContainer {
             await migrateRecordingsIfNeeded(container: newContainer)
             container = newContainer
+            StudioSoundManager.shared.attach(newContainer.mainContext)
         } else {
             fatalError("Could not create ModelContainer")
         }

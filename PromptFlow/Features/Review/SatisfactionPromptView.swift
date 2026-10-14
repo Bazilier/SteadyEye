@@ -121,6 +121,8 @@ struct SatisfactionPromptView: View {
             return String(localized: "review.satisfaction.title.take", defaultValue: "Happy with this take?", comment: "Satisfaction question right after the user watched a take that held eye contact.")
         case .afterExport:
             return String(localized: "review.satisfaction.title.export", defaultValue: "How did your video turn out?", comment: "Satisfaction question when the user comes back to the app after exporting a take to share.")
+        case .studioSound:
+            return String(localized: "review.satisfaction.title.studio", defaultValue: "How does it sound?", comment: "Satisfaction question after the user compared the original and the Studio Sound (enhanced) audio of a take and watched it to the end.")
         }
     }
 

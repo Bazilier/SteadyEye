@@ -83,12 +83,18 @@ final class PlaybackController: ObservableObject {
     /// Idempotent only insofar as the caller pairs each `setup` with
     /// a `teardown` — calling twice without teardown leaks observers.
     func setup(url: URL, initialDuration: TimeInterval) {
+        setup(item: AVPlayerItem(url: url), initialDuration: initialDuration)
+    }
+
+    /// Same as `setup(url:initialDuration:)` for a prepared item — the
+    /// Studio Sound composition, which carries both soundtracks.
+    func setup(item: AVPlayerItem, initialDuration: TimeInterval) {
         didPlayToEnd = false
         duration = initialDuration
         currentTime = 0
         isPlaying = false
 
-        let avPlayer = AVPlayer(url: url)
+        let avPlayer = AVPlayer(playerItem: item)
         player = avPlayer
 
         // Periodic time observer drives `currentTime` for the
@@ -102,25 +108,7 @@ final class PlaybackController: ObservableObject {
             self.currentTime = CMTimeGetSeconds(time)
         }
 
-        // Pause at the last frame on end-of-item. Does NOT seek to
-        // zero and does NOT resume playback — the user explicitly
-        // chose this over the previous auto-loop behavior. Tapping
-        // play after end will seek to zero (handled in
-        // togglePlayPause).
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: avPlayer.currentItem,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            self.player?.pause()
-            self.didPlayToEnd = true
-            // The periodic observer above ticks at 1/30s, so its last
-            // tick before the end can land just short of `duration` and
-            // leave the thumb inside the track on a finished video.
-            // Snap it so "played to the end" reads as played to the end.
-            self.currentTime = self.duration
-        }
+        observeEnd(of: item)
 
         // KVO on `timeControlStatus`: single source of truth for
         // `isPlaying`. Catches every transition path (manual toggle,
@@ -160,6 +148,48 @@ final class PlaybackController: ObservableObject {
         }
 
         avPlayer.play()
+    }
+
+    /// Pause at the last frame on end-of-item. Does NOT seek to
+    /// zero and does NOT resume playback — the user explicitly
+    /// chose this over the previous auto-loop behavior. Tapping
+    /// play after end will seek to zero (handled in
+    /// togglePlayPause).
+    private func observeEnd(of item: AVPlayerItem) {
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.player?.pause()
+            self.didPlayToEnd = true
+            // The periodic observer above ticks at 1/30s, so its last
+            // tick before the end can land just short of `duration` and
+            // leave the thumb inside the track on a finished video.
+            // Snap it so "played to the end" reads as played to the end.
+            self.currentTime = self.duration
+        }
+    }
+
+    /// Swaps in a new item for the same video — Studio Sound becoming ready
+    /// while the preview is open — keeping the playhead and play state.
+    func replaceItem(with item: AVPlayerItem) {
+        guard let player else { return }
+        let time = player.currentTime()
+        let wasPlaying = player.timeControlStatus == .playing
+        player.replaceCurrentItem(with: item)
+        observeEnd(of: item)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        if wasPlaying { player.play() }
+    }
+
+    /// Switches the soundtrack of the current item without a pause.
+    func setAudioMix(_ mix: AVAudioMix?) {
+        player?.currentItem?.audioMix = mix
     }
 
     /// Removes observers and pauses the player. Safe to call when

@@ -986,6 +986,16 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // On a short screen the list can end exactly between two lines
+            // above the plans, with nothing saying there is more: fade the
+            // bottom edge so a cut-off line reads as "scroll for more".
+            .mask {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 28)
+                }
+            }
         }
     }
 
@@ -1061,6 +1071,19 @@ struct PaywallView: View {
                     localized: "paywall.v3.feature.noWatermark.detail",
                     defaultValue: "Post takes as they are.",
                     comment: "Paywall feature line, detail after 'No watermark.'"
+                )
+            )
+            featureLine(
+                icon: "waveform",
+                title: String(
+                    localized: "paywall.v3.feature.studioSound",
+                    defaultValue: "Studio sound.",
+                    comment: "Paywall feature line, bold lead-in: Studio Sound, enhancement that removes noise and echo from the recording's audio. Followed by its detail sentence on the same line."
+                ),
+                detail: String(
+                    localized: "paywall.v3.feature.studioSound.detail",
+                    defaultValue: "Your voice without noise or echo.",
+                    comment: "Paywall feature line, detail after 'Studio sound.'"
                 )
             )
             featureLine(

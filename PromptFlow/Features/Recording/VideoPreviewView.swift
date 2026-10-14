@@ -57,6 +57,32 @@ struct VideoPreviewView: View {
     @StateObject private var playback = PlaybackController()
     @State private var showDeleteConfirmation = false
     @State private var showSaveError = false
+    /// The composition with both soundtracks, once Studio Sound is ready.
+    @State private var studioItem: StudioSoundAudio.PlayerItem?
+    /// Which soundtrack the top chip names while it is up; nil when hidden.
+    @State private var studioChip: Bool?
+    @State private var studioChipHideToken = UUID()
+    @State private var showStudioSaveSheet = false
+    @State private var showStudioPaywall = false
+    @State private var showStudioWillSaveToast = false
+    /// The tip above the Studio Sound button that explains its counter.
+    @State private var showStudioCoach = false
+    /// The tier the tip was last shown for: it shows once per tier, so a
+    /// free user who subscribes learns what the new number means.
+    @AppStorage("studioCoachTier") private var studioCoachTier = ""
+    @State private var showStudioIntro = false
+    @State private var showStudioLimit = false
+    /// Set once the user went through the first-use sheet, which is also
+    /// their consent to the audio going to Auphonic.
+    @AppStorage("studioIntroAccepted") private var studioIntroAccepted = false
+    @State private var showStudioConfirm = false
+    /// "Don't show again" on the Studio Sound sheets. Subscribers only: the
+    /// free try always asks.
+    @AppStorage("studioSkipConfirm") private var studioSkipConfirm = false
+    /// Flipped between the two soundtracks during this visit: heard the
+    /// difference, which makes the end of the video a happy moment.
+    @State private var comparedStudioSound = false
+    @ObservedObject private var studioSound = StudioSoundManager.shared
     @State private var showSaveSuccess = false
     @State private var showPhotosDeniedToast = false
     @State private var isSavingToCameraRoll = false
@@ -161,7 +187,21 @@ struct VideoPreviewView: View {
                 // conflict with the video's tap gesture.
                 VStack(spacing: 8) {
                     scrubberRow
-                    saveButton
+                    HStack(spacing: 10) {
+                        if showsStudioButton {
+                            StudioSoundButton(
+                                recording: recording,
+                                quota: studioSound.quota,
+                                action: handleStudioTap
+                            )
+                        }
+                        saveButton
+                    }
+                }
+                // Floats above the controls without pushing the video up.
+                .overlay(alignment: .topLeading) {
+                    studioHint
+                        .alignmentGuide(.top) { $0[.bottom] + 12 }
                 }
                 .frame(maxWidth: controlsMaxWidth)
                 .padding(.horizontal, 20)
@@ -328,23 +368,104 @@ struct VideoPreviewView: View {
         .sheet(isPresented: $showFounderChat) {
             ChatView(pinnedMessage: .satisfactionFollowUp)
         }
+        .sheet(isPresented: $showStudioSaveSheet) {
+            StudioSaveSheet(
+                onSaveWhenReady: saveWhenStudioReady,
+                onSaveOriginal: {
+                    showStudioSaveSheet = false
+                    proceedWithSave(forceOriginal: true)
+                },
+                onCancel: { showStudioSaveSheet = false }
+            )
+        }
+        .fullScreenCover(isPresented: $showStudioPaywall) {
+            PaywallView(source: "studio_sound")
+        }
+        .sheet(isPresented: $showStudioIntro) {
+            StudioIntroSheet(
+                quota: studioSound.quota,
+                dontAskAgain: $studioSkipConfirm,
+                onContinue: {
+                    studioIntroAccepted = true
+                    showStudioIntro = false
+                    AppAnalytics.log("studio_sound_intro_accepted", params: [
+                        "tier": studioSound.quota?.tier.rawValue ?? "unknown"
+                    ])
+                    startStudio()
+                },
+                onCancel: { showStudioIntro = false }
+            )
+        }
+        .sheet(isPresented: $showStudioConfirm) {
+            if let quota = studioSound.quota {
+                StudioConfirmSheet(
+                    quota: quota,
+                    units: studioUnits,
+                    dontAskAgain: $studioSkipConfirm,
+                    onConfirm: {
+                        showStudioConfirm = false
+                        startStudio()
+                    },
+                    onCancel: { showStudioConfirm = false }
+                )
+            }
+        }
+        .sheet(isPresented: $showStudioLimit) {
+            if let quota = studioSound.quota {
+                StudioLimitSheet(quota: quota, onClose: { showStudioLimit = false })
+            }
+        }
+        .toast(
+            isPresented: $showStudioWillSaveToast,
+            message: String(
+                localized: "studio.toast.willSave",
+                defaultValue: "We'll save it as soon as the sound is ready",
+                comment: "Toast after the user chose to save the recording to Camera Roll once Studio Sound finishes."
+            ),
+            style: .info,
+            duration: 3.0
+        )
         .onAppear {
             isVisible = true
             setupPlayer()
+            Task {
+                await studioSound.refreshQuota()
+                showStudioCoachIfDue()
+            }
         }
-        // The happy moment: the user just watched a take of their own script
-        // that held eye contact. Ask then, not while they are on the way out.
+        // A purchase from the paywall changes the allowance.
+        .onChange(of: subscriptionManager.isSubscribed) { _, _ in
+            Task {
+                await studioSound.refreshQuota()
+                showStudioCoachIfDue()
+            }
+        }
+        .onChange(of: recording.studioStatusRaw) { _, _ in
+            guard isVisible, recording.studioStatus == .ready, studioItem == nil else { return }
+            Task { await attachStudioAudio(replacingCurrentItem: true) }
+        }
+        // The happy moments: the user just watched a take of their own script
+        // that held eye contact, or watched one with Studio Sound on after
+        // comparing it with the original. Ask then, not on the way out.
         .onChange(of: playback.didPlayToEnd) { _, finished in
             guard finished,
                   firstTakeResult == nil,
-                  let eyeContact = takeEyeContact,
-                  eyeContact >= ReviewPromptManager.greatTakeThreshold,
                   !showPostSavePaywall, !showSatisfactionPrompt,
-                  scenePhase == .active,
-                  ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: isUserWrittenScript)
+                  scenePhase == .active
             else { return }
-            satisfactionTrigger = .greatTake
-            showSatisfactionPrompt = true
+            if let eyeContact = takeEyeContact,
+               eyeContact >= ReviewPromptManager.greatTakeThreshold,
+               ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: isUserWrittenScript) {
+                satisfactionTrigger = .greatTake
+                showSatisfactionPrompt = true
+            } else if comparedStudioSound,
+                      recording.usesStudioAudio,
+                      // The user's own voice, enhanced: a happy moment whatever
+                      // script it was read from, so the origin gate is passed.
+                      ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: true) {
+                satisfactionTrigger = .studioSound
+                showSatisfactionPrompt = true
+            }
         }
         .onDisappear {
             isVisible = false
@@ -448,6 +569,12 @@ struct VideoPreviewView: View {
                 comment: "VoiceOver label for the trash button in the recording preview."
             ))
         }
+        .overlay {
+            if let isStudio = studioChip {
+                StudioChip(isStudio: isStudio)
+                    .transition(.opacity)
+            }
+        }
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
@@ -480,8 +607,49 @@ struct VideoPreviewView: View {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else {
             return
         }
-        playback.setup(url: recording.fileURL, initialDuration: recording.duration)
+        if recording.studioStatus == .ready, recording.studioAudioURL != nil {
+            Task {
+                await attachStudioAudio(replacingCurrentItem: false)
+                if playback.player == nil, isVisible {
+                    playback.setup(url: recording.fileURL, initialDuration: recording.duration)
+                }
+                loadVideoSize()
+            }
+        } else {
+            playback.setup(url: recording.fileURL, initialDuration: recording.duration)
+            loadVideoSize()
+        }
+    }
 
+    /// Builds the two-soundtrack item and starts playback with it, or swaps
+    /// it in when Studio Sound finished while the preview was open. On any
+    /// failure the plain file keeps playing.
+    private func attachStudioAudio(replacingCurrentItem: Bool) async {
+        guard let studioURL = recording.studioAudioURL else { return }
+        let prepared: StudioSoundAudio.PlayerItem
+        do {
+            prepared = try await StudioSoundAudio.makePlayerItem(
+                videoURL: recording.fileURL,
+                studioAudioURL: studioURL,
+                useStudio: recording.studioEnabled
+            )
+        } catch {
+            AppAnalytics.log("studio_sound_playback_failed", params: [
+                "error_reason": (error as NSError).code
+            ])
+            return
+        }
+        guard isVisible else { return }
+        studioItem = prepared
+        if replacingCurrentItem {
+            playback.replaceItem(with: prepared.item)
+            flashStudioChip(isStudio: recording.studioEnabled)
+        } else {
+            playback.setup(item: prepared.item, initialDuration: recording.duration)
+        }
+    }
+
+    private func loadVideoSize() {
         // Load the video track's natural size + preferred transform so the
         // container can size to the actual aspect ratio. Falls back silently
         // to the 9:16 default if any step fails. The MainActor write checks
@@ -587,7 +755,11 @@ struct VideoPreviewView: View {
         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         switch status {
         case .authorized, .limited:
-            proceedWithSave()
+            if recording.studioStatus?.isInFlight == true {
+                showStudioSaveSheet = true
+            } else {
+                proceedWithSave()
+            }
         case .denied, .notDetermined, .restricted:
             showPhotosDeniedToast = true
         @unknown default:
@@ -596,13 +768,33 @@ struct VideoPreviewView: View {
     }
 
     /// The file on disk already has the watermark burned in (free) or no
-    /// watermark (Pro), so Save is just a direct PhotoKit hand-off.
-    private func proceedWithSave() {
+    /// watermark (Pro), so Save is just a direct PhotoKit hand-off — of the
+    /// file itself, or of a copy carrying the processed audio when the
+    /// Studio Sound toggle is on.
+    private func proceedWithSave(forceOriginal: Bool = false) {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else {
             showSaveError = true
             return
         }
         isSavingToCameraRoll = true
+        Task {
+            var file = StudioSoundManager.SaveFile(url: recording.fileURL, isTemporary: false)
+            if !forceOriginal, recording.usesStudioAudio {
+                // A failed export falls back to the original rather than
+                // failing the save.
+                do {
+                    file = try await StudioSoundManager.shared.fileForSaving(recording)
+                } catch {
+                    AppAnalytics.log("studio_sound_export_failed", params: [
+                        "error_reason": (error as NSError).code
+                    ])
+                }
+            }
+            save(file)
+        }
+    }
+
+    private func save(_ file: StudioSoundManager.SaveFile) {
         // Capture the new asset's localIdentifier inside the change
         // block so the success toast can deep-link straight into
         // Photos.app at the saved video. PhotoKit serializes the
@@ -611,16 +803,20 @@ struct VideoPreviewView: View {
         // it on main.
         var capturedAssetID: String?
         PHPhotoLibrary.shared().performChanges {
-            let request = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: recording.fileURL)
+            let request = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: file.url)
             capturedAssetID = request?.placeholderForCreatedAsset?.localIdentifier
         } completionHandler: { success, error in
+            if file.isTemporary {
+                try? FileManager.default.removeItem(at: file.url)
+            }
             DispatchQueue.main.async {
                 isSavingToCameraRoll = false
                 if success {
                     AppAnalytics.log("recording_exported_to_camera_roll", params: [
                         "duration_sec": Int(recording.duration.rounded()),
                         "had_watermark": recording.hasWatermark,
-                        "via": "preview"
+                        "via": "preview",
+                        "studio_sound": file.isTemporary
                     ])
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     savedAssetLocalIdentifier = capturedAssetID
@@ -692,6 +888,126 @@ struct VideoPreviewView: View {
                 UIApplication.shared.open(fallback)
             }
         }
+    }
+
+    // MARK: - Studio Sound
+
+    /// Everyone gets the button — subscribers spend their allowance, free
+    /// users have one try and then see the paywall from it — except on the
+    /// onboarding's demo take, where a free user would spend the one try on
+    /// a sample they never meant to keep.
+    private var showsStudioButton: Bool { firstTakeResult == nil }
+
+    /// Once per tier, with the counter loaded: what the number means.
+    private func showStudioCoachIfDue() {
+        guard isVisible,
+              showsStudioButton,
+              recording.studioStatus == nil,
+              let quota = studioSound.quota,
+              quota.remaining > 0,
+              studioCoachTier != quota.tier.rawValue
+        else { return }
+        studioCoachTier = quota.tier.rawValue
+        withAnimation { showStudioCoach = true }
+    }
+
+    @ViewBuilder
+    private var studioHint: some View {
+        if showsStudioButton && (firstTakeResult == nil || isResultSheetHidden) {
+            switch recording.studioStatus {
+            case .preparing, .uploading, .processing, .downloading:
+                StudioHintCard(kind: .processing)
+                    .transition(.opacity)
+            case .failed:
+                StudioHintCard(
+                    kind: .failed,
+                    message: StudioSoundManager.failureMessage(for: recording.studioErrorCode)
+                )
+                .transition(.opacity)
+            case nil where showStudioCoach:
+                StudioCoachBubble(tier: studioSound.quota?.tier ?? .paid)
+                    .onTapGesture { withAnimation { showStudioCoach = false } }
+                    .transition(.opacity)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    /// Idle or failed: start. Ready: flip between the two soundtracks.
+    private func handleStudioTap() {
+        withAnimation { showStudioCoach = false }
+        switch recording.studioStatus {
+        case nil, .failed:
+            if let quota = studioSound.quota, quota.remaining == 0 {
+                AppAnalytics.log("studio_sound_limit_tapped", params: ["tier": quota.tier.rawValue])
+                if quota.tier == .free {
+                    showStudioPaywall = true
+                } else {
+                    showStudioLimit = true
+                }
+                return
+            }
+            guard studioIntroAccepted else {
+                showStudioIntro = true
+                return
+            }
+            if let quota = studioSound.quota,
+               quota.tier == .free || !studioSkipConfirm || studioUnits > quota.remaining {
+                showStudioConfirm = true
+                return
+            }
+            startStudio()
+        case .ready:
+            let enabled = !recording.studioEnabled
+            StudioSoundManager.shared.setEnabled(enabled, for: recording)
+            if let studioItem {
+                playback.setAudioMix(enabled ? studioItem.studioMix : studioItem.originalMix)
+            } else {
+                // The two-soundtrack item never got built; try again now.
+                Task { await attachStudioAudio(replacingCurrentItem: true) }
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+            flashStudioChip(isStudio: enabled)
+            comparedStudioSound = true
+        default:
+            break
+        }
+    }
+
+    /// What this recording costs: one enhancement per started 3 minutes,
+    /// as the server counts it.
+    private var studioUnits: Int {
+        max(1, Int((recording.duration / 180).rounded(.up)))
+    }
+
+    private func startStudio() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation { StudioSoundManager.shared.start(recording) }
+    }
+
+    private func flashStudioChip(isStudio: Bool) {
+        withAnimation(.easeOut(duration: 0.2)) { studioChip = isStudio }
+        let token = UUID()
+        studioChipHideToken = token
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            guard token == studioChipHideToken else { return }
+            withAnimation(.easeIn(duration: 0.3)) { studioChip = nil }
+        }
+    }
+
+    /// "Save when ready" from the save sheet. If processing finished or
+    /// failed while the sheet was up, save right away instead.
+    private func saveWhenStudioReady() {
+        showStudioSaveSheet = false
+        guard recording.studioStatus?.isInFlight == true else {
+            proceedWithSave()
+            return
+        }
+        recording.studioSaveWhenReady = true
+        try? modelContext.save()
+        AppAnalytics.log("studio_sound_save_when_ready")
+        showStudioWillSaveToast = true
     }
 
     // MARK: - Delete
