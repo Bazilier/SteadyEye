@@ -986,6 +986,16 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .topLeading)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // On a short screen the list can end exactly between two lines
+            // above the plans, with nothing saying there is more: fade the
+            // bottom edge so a cut-off line reads as "scroll for more".
+            .mask {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 28)
+                }
+            }
         }
     }
 
