@@ -556,14 +556,21 @@ struct VideoPreviewView: View {
     /// it in when Studio Sound finished while the preview was open. On any
     /// failure the plain file keeps playing.
     private func attachStudioAudio(replacingCurrentItem: Bool) async {
-        guard let studioURL = recording.studioAudioURL,
-              let prepared = try? await StudioSoundAudio.makePlayerItem(
+        guard let studioURL = recording.studioAudioURL else { return }
+        let prepared: StudioSoundAudio.PlayerItem
+        do {
+            prepared = try await StudioSoundAudio.makePlayerItem(
                 videoURL: recording.fileURL,
                 studioAudioURL: studioURL,
                 useStudio: recording.studioEnabled
-              ),
-              isVisible
-        else { return }
+            )
+        } catch {
+            AppAnalytics.log("studio_sound_playback_failed", params: [
+                "error_reason": (error as NSError).code
+            ])
+            return
+        }
+        guard isVisible else { return }
         studioItem = prepared
         if replacingCurrentItem {
             playback.replaceItem(with: prepared.item)
@@ -706,8 +713,12 @@ struct VideoPreviewView: View {
             if !forceOriginal, recording.usesStudioAudio {
                 // A failed export falls back to the original rather than
                 // failing the save.
-                if let studioFile = try? await StudioSoundManager.shared.fileForSaving(recording) {
-                    file = studioFile
+                do {
+                    file = try await StudioSoundManager.shared.fileForSaving(recording)
+                } catch {
+                    AppAnalytics.log("studio_sound_export_failed", params: [
+                        "error_reason": (error as NSError).code
+                    ])
                 }
             }
             save(file)
@@ -857,6 +868,9 @@ struct VideoPreviewView: View {
             StudioSoundManager.shared.setEnabled(enabled, for: recording)
             if let studioItem {
                 playback.setAudioMix(enabled ? studioItem.studioMix : studioItem.originalMix)
+            } else {
+                // The two-soundtrack item never got built; try again now.
+                Task { await attachStudioAudio(replacingCurrentItem: true) }
             }
             UISelectionFeedbackGenerator().selectionChanged()
             flashStudioChip(isStudio: enabled)

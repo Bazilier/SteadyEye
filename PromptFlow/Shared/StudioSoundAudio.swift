@@ -106,7 +106,10 @@ enum StudioSoundAudio {
     // MARK: - Helpers
 
     static func audioDuration(ofVideoAt url: URL) async throws -> Double {
-        guard let track = try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).first else {
+        // Held in a local: a track does not keep its asset alive, and a
+        // track whose asset is gone fails every later call (-12780).
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
             throw AudioError.noAudioTrack
         }
         return try await track.load(.timeRange).duration.seconds
@@ -150,7 +153,8 @@ enum StudioSoundAudio {
         into composition: AVMutableComposition,
         at start: CMTime
     ) async throws -> AVMutableCompositionTrack {
-        guard let source = try await AVURLAsset(url: url).loadTracks(withMediaType: .audio).first,
+        let asset = AVURLAsset(url: url)  // kept alive for the insert below
+        guard let source = try await asset.loadTracks(withMediaType: .audio).first,
               let track = composition.addMutableTrack(
                 withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
               )
