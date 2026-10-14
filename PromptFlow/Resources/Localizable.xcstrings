@@ -289,31 +289,31 @@
       }
     },
     "studio.confirm.dontAsk" : {
-      "comment" : "Toggle on the Studio Sound sheets: skip the confirmation before each enhancement from now on.",
+      "comment" : "Toggle on the Studio Sound sheets: don't show the confirmation before each enhancement from now on.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Don't ask again"
+            "value" : "Don't show again"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No volver a preguntar"
+            "value" : "No volver a mostrar"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não perguntar de novo"
+            "value" : "Não mostrar de novo"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Больше не спрашивать"
+            "value" : "Больше не показывать"
           }
         }
       }

@@ -76,7 +76,7 @@ struct VideoPreviewView: View {
     /// their consent to the audio going to Auphonic.
     @AppStorage("studioIntroAccepted") private var studioIntroAccepted = false
     @State private var showStudioConfirm = false
-    /// "Don't ask again" on the confirmation sheet. Subscribers only: the
+    /// "Don't show again" on the Studio Sound sheets. Subscribers only: the
     /// free try always asks.
     @AppStorage("studioSkipConfirm") private var studioSkipConfirm = false
     @ObservedObject private var studioSound = StudioSoundManager.shared

@@ -285,7 +285,7 @@ struct StudioChip: View {
 /// user content to a third party), and what the user's allowance is.
 struct StudioIntroSheet: View {
     let quota: StudioSoundService.Quota?
-    /// "Don't ask again" for later enhancements; offered to subscribers and
+    /// "Don't show again" for later enhancements; offered to subscribers and
     /// trial users here already, so they never meet the confirmation sheet.
     @Binding var dontAskAgain: Bool
     let onContinue: () -> Void
@@ -564,8 +564,8 @@ private struct StudioDontAskToggle: View {
         Toggle(isOn: $isOn) {
             Text(String(
                 localized: "studio.confirm.dontAsk",
-                defaultValue: "Don't ask again",
-                comment: "Toggle on the Studio Sound sheets: skip the confirmation before each enhancement from now on."
+                defaultValue: "Don't show again",
+                comment: "Toggle on the Studio Sound sheets: don't show the confirmation before each enhancement from now on."
             ))
             .font(.subheadline)
         }
