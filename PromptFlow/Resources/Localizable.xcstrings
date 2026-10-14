@@ -48,662 +48,32 @@
         }
       }
     },
-    "paywall.v3.feature.studioSound" : {
-      "comment" : "Paywall feature line, bold lead-in: Studio Sound, enhancement that removes noise and echo from the recording's audio. Followed by its detail sentence on the same line.",
+    "review.satisfaction.title.studio" : {
+      "comment" : "Satisfaction question after the user compared the original and the Studio Sound (enhanced) audio of a take and watched it to the end.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Studio sound."
+            "value" : "How does it sound?"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sonido de estudio."
+            "value" : "¿Qué te parece el sonido?"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Som de estúdio."
+            "value" : "O que achou do som?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Студийный звук."
-          }
-        }
-      }
-    },
-    "paywall.v3.feature.studioSound.detail" : {
-      "comment" : "Paywall feature line, detail after 'Studio sound.'",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Your voice without noise or echo."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu voz sin ruido ni eco."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sua voz sem ruído nem eco."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Голос без шума и эха."
-          }
-        }
-      }
-    },
-    "studio.button.enhanceRemaining" : {
-      "comment" : "VoiceOver label of the Studio Sound button before enhancing: how many enhancements are left out of the allowance.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhance sound, %1$lld of %2$lld left"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mejorar el sonido, quedan %1$lld de %2$lld"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melhorar o som, restam %1$lld de %2$lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшить звук, осталось %1$lld из %2$lld"
-          }
-        }
-      }
-    },
-    "studio.coach.free" : {
-      "comment" : "Tip above the Studio Sound button for a user without a subscription, who has one free try.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Removes noise and echo. Try it on a video where the sound matters."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quita el ruido y el eco. Pruébalo en un video donde el sonido importe."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove ruído e eco. Teste em um vídeo em que o som importa."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убирает шум и эхо. Попробуйте на ролике, где звук важен."
-          }
-        }
-      }
-    },
-    "studio.coach.free.title" : {
-      "comment" : "Title of the tip above the Studio Sound button for a user without a subscription.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Studio sound: one free try"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sonido de estudio: una prueba gratis"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Som de estúdio: um teste grátis"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Студийный звук — 1 раз бесплатно"
-          }
-        }
-      }
-    },
-    "studio.coach.paid" : {
-      "comment" : "Tip above the Studio Sound button for a subscriber; explains the counter badge, which renews on the 1st.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Removes noise and echo. The number is how many enhancements are left until the end of the month."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan hasta fin de mes."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam até o fim do mês."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось до конца месяца."
-          }
-        }
-      }
-    },
-    "studio.coach.trial" : {
-      "comment" : "Tip above the Studio Sound button during the free trial; explains the counter badge on the button.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Removes noise and echo. The number is how many enhancements are left in your trial."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan en la prueba."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam no seu teste."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось в пробном периоде."
-          }
-        }
-      }
-    },
-    "studio.confirm.cost" : {
-      "comment" : "Studio Sound confirmation: a video over 3 minutes costs one enhancement per started 3 minutes. The number is that cost (always 2 or more).",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This video is longer than 3 minutes and uses %lld enhancements."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este video dura más de 3 minutos y usa %lld mejoras."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este vídeo tem mais de 3 minutos e usa %lld melhorias."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ролик длиннее 3 минут, улучшений будет списано: %lld."
-          }
-        }
-      }
-    },
-    "studio.confirm.dontAsk" : {
-      "comment" : "Toggle on the Studio Sound sheets: don't show the confirmation before each enhancement from now on.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Don't show again"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No volver a mostrar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Não mostrar de novo"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Больше не показывать"
-          }
-        }
-      }
-    },
-    "studio.confirm.free" : {
-      "comment" : "Studio Sound confirmation for a user without a subscription: this spends their single free try.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This uses your one free enhancement."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se usará tu única mejora gratis."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Isso usa sua única melhoria grátis."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Будет использовано ваше единственное бесплатное улучшение."
-          }
-        }
-      }
-    },
-    "studio.confirm.notEnough" : {
-      "comment" : "Studio Sound confirmation: the video costs more enhancements than are left. The number is the cost (always 2 or more).",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This video is longer than 3 minutes and needs %lld enhancements, more than you have left."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este video dura más de 3 minutos y necesita %lld mejoras, más de las que te quedan."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este vídeo tem mais de 3 minutos e precisa de %lld melhorias, mais do que você tem."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ролик длиннее 3 минут, нужно улучшений: %lld — больше, чем осталось."
-          }
-        }
-      }
-    },
-    "studio.confirm.title" : {
-      "comment" : "Title of the confirmation sheet before Studio Sound spends an enhancement.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhance this video's sound?"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Mejorar el sonido de este video?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melhorar o som deste vídeo?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшить звук этого ролика?"
-          }
-        }
-      }
-    },
-    "studio.error.freeLimit" : {
-      "comment" : "Studio Sound failed because the user without a subscription already used the one free enhancement.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Your free enhancement is used. Subscribe to enhance more videos."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ya usaste tu mejora gratis. Suscríbete para mejorar más videos."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você já usou sua melhoria grátis. Assine para melhorar mais vídeos."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бесплатное улучшение уже использовано. Оформите подписку, чтобы улучшать больше роликов."
-          }
-        }
-      }
-    },
-    "studio.intro.body" : {
-      "comment" : "First-use sheet of Studio Sound: what the feature does.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Removes background noise and echo and evens out your voice."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elimina el ruido de fondo y el eco y equilibra tu voz."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove ruído de fundo e eco e equilibra sua voz."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Убирает фоновый шум и эхо и выравнивает голос."
-          }
-        }
-      }
-    },
-    "studio.intro.continueFree" : {
-      "comment" : "First-use sheet of Studio Sound: main button for a user without a subscription, who spends their one free try.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhance for free"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mejorar gratis"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melhorar grátis"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшить бесплатно"
-          }
-        }
-      }
-    },
-    "studio.intro.privacy" : {
-      "comment" : "First-use sheet of Studio Sound: discloses that the audio goes to a third-party processing partner, unnamed here (the privacy policy names it).",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Only the audio of this video is sent to our audio partner for processing, and we have it deleted there right after. The video stays on your phone."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo el audio de este video se envía a nuestro socio de audio para procesarlo, y pedimos que se borre allí de inmediato. El video se queda en tu teléfono."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro de áudio para processamento, e pedimos que seja apagado lá logo em seguida. O vídeo fica no seu celular."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "На обработку нашему партнёру по звуку уходит только звук этого ролика, и сразу после обработки мы удаляем его там. Видео остаётся на телефоне."
-          }
-        }
-      }
-    },
-    "studio.intro.quota.free" : {
-      "comment" : "First-use sheet of Studio Sound, for a user without a subscription: they have a single free try.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "One free enhancement. Use it on a video where the sound matters."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Una mejora gratis. Úsala en un video donde el sonido importe."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uma melhoria grátis. Use em um vídeo em que o som importa."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Одно бесплатное улучшение. Выберите ролик, где звук важен."
-          }
-        }
-      }
-    },
-    "studio.intro.quota.paid" : {
-      "comment" : "First-use sheet of Studio Sound, for a subscriber. First number: left; second: the monthly total.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhancements left this month: %1$lld of %2$lld"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mejoras restantes este mes: %1$lld de %2$lld"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melhorias restantes este mês: %1$lld de %2$lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осталось улучшений в этом месяце: %1$lld из %2$lld"
-          }
-        }
-      }
-    },
-    "studio.intro.quota.trial" : {
-      "comment" : "First-use sheet of Studio Sound, during the free trial. First number: left; second: the trial's total.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhancements left in your trial: %1$lld of %2$lld"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mejoras restantes en tu prueba: %1$lld de %2$lld"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melhorias restantes no seu teste: %1$lld de %2$lld"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Осталось улучшений в пробном периоде: %1$lld из %2$lld"
-          }
-        }
-      }
-    },
-    "studio.limit.paid" : {
-      "comment" : "Studio Sound monthly allowance used up. The placeholder is the day the allowance renews, like 'November 1'. Buying extra enhancements is coming soon.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This month's enhancements are used up. New ones arrive on %@. Soon you'll be able to buy more."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ya usaste las mejoras de este mes. Habrá nuevas el %@. Pronto podrás comprar más."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As melhorias deste mês acabaram. Novas chegam em %@. Em breve você poderá comprar mais."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшения на этот месяц закончились. Новые появятся %@. Скоро можно будет докупить ещё."
-          }
-        }
-      }
-    },
-    "studio.limit.title" : {
-      "comment" : "Title of the sheet shown when the Studio Sound allowance is used up.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Enhancements used up"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se acabaron las mejoras"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As melhorias acabaram"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшения закончились"
-          }
-        }
-      }
-    },
-    "studio.limit.trial" : {
-      "comment" : "Studio Sound allowance used up during the free trial. The number is the monthly allowance of the paid subscription.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "You've used the enhancements included in your trial. With the subscription: %lld a month."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ya usaste las mejoras incluidas en tu prueba. Con la suscripción: %lld al mes."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você já usou as melhorias incluídas no seu teste. Com a assinatura: %lld por mês."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Улучшения пробного периода закончились. С подпиской — %lld в месяц."
+            "value" : "Как вам звук?"
           }
         }
       }
@@ -817,6 +187,19 @@
         }
       }
     },
+    "%lld / 20" : {
+
+    },
+    "%lld events copied. Paste them into the chat." : {
+      "comment" : "A message in the alert that appears when the user copies the camera diagnostics.",
+      "isCommentAutoGenerated" : true
+    },
+    "Adds a video from Photos to Recordings as a take, to see the library and the preview without a camera. Simulator: xcrun simctl addmedia booted <file> first." : {
+
+    },
+    "AI optimize used today" : {
+
+    },
     "ai.proDailyLimit.body" : {
       "comment" : "Body of the Pro AI daily-limit alert.",
       "extractionState" : "extracted_with_value",
@@ -877,6 +260,15 @@
         }
       }
     },
+    "API calls today" : {
+
+    },
+    "auto: %@" : {
+
+    },
+    "Build: DEV" : {
+
+    },
     "Camera & microphone access needed" : {
       "comment" : "Heading on the onboarding permission-explainer screen, shown when the user denied either camera or microphone (or both) during the permission flow. Recording requires both, so the explainer asks the user to enable them in Settings.",
       "extractionState" : "manual",
@@ -906,6 +298,13 @@
           }
         }
       }
+    },
+    "Camera Diagnostics" : {
+      "comment" : "A screen that shows a list of camera diagnostics events.",
+      "isCommentAutoGenerated" : true
+    },
+    "Camera self-correction test" : {
+
     },
     "camera.audio.iPhoneMic" : {
       "comment" : "Default audio source name displayed in the recording HUD when no external mic is connected.",
@@ -1116,6 +515,12 @@
           }
         }
       }
+    },
+    "Cancel" : {
+
+    },
+    "Cancel all pending notifications" : {
+
     },
     "chat.empty" : {
       "comment" : "Empty-state hint shown in the chat when there are no messages yet.",
@@ -1446,6 +851,16 @@
           }
         }
       }
+    },
+    "Chromakey (DEV)" : {
+
+    },
+    "Chromakey background (replace camera)" : {
+
+    },
+    "Clear" : {
+      "comment" : "A button that clears all camera diagnostics.",
+      "isCommentAutoGenerated" : true
     },
     "Clears the frozen paywall_mode so the next resolution re-reads Remote Config. Non-production Firebase projects only." : {
 
@@ -1840,6 +1255,23 @@
         }
       }
     },
+    "Copied" : {
+      "comment" : "A confirmation alert that appears when the user copies the camera diagnostics.",
+      "isCommentAutoGenerated" : true
+    },
+    "Copy" : {
+      "comment" : "A button that copies the contents of the screen to the clipboard.",
+      "isCommentAutoGenerated" : true
+    },
+    "Crop sideways takes to 9:16" : {
+
+    },
+    "Debug" : {
+
+    },
+    "Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay." : {
+
+    },
     "demo.script.content" : {
       "comment" : "Body text of the seeded demo script created on first launch. Plays through the WBW prompter to demonstrate the eye-contact mechanic. Translate naturally; the second-person closing invites the user to create their own script.",
       "extractionState" : "manual",
@@ -1899,6 +1331,12 @@
           }
         }
       }
+    },
+    "DEV" : {
+
+    },
+    "DEV only. Forces isSubscribed state for testing." : {
+
     },
     "draft.drafting" : {
       "comment" : "Shown on the draft button while the AI writes the script.",
@@ -2530,6 +1968,9 @@
         }
       }
     },
+    "Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only." : {
+
+    },
     "duo.fold_to_record.toast" : {
       "comment" : "Toast on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera: recording works folded only.",
       "extractionState" : "manual",
@@ -2679,6 +2120,21 @@
           }
         }
       }
+    },
+    "Erase everything and quit" : {
+
+    },
+    "Fire inactive_3_days in 5s" : {
+
+    },
+    "Fire trial_day_5 in 5s" : {
+
+    },
+    "Fire trial_ending_24h in 5s" : {
+
+    },
+    "Fire trial_started in 5s" : {
+
     },
     "first_take.after.body" : {
       "comment" : "Body of the first-take coach card after a rehearsal. 'The eye' is the eye-contact indicator on the prompter pill.",
@@ -3040,6 +2496,21 @@
         }
       }
     },
+    "Force Free" : {
+
+    },
+    "Force Subscribed" : {
+
+    },
+    "Gaze probe (DEV)" : {
+
+    },
+    "Gaze readout on the camera" : {
+
+    },
+    "Geometry overlay (chromakey)" : {
+
+    },
     "hud.changeInSettings" : {
       "comment" : "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Tells the user the tapped attribute is configurable in the Settings tab. Paired with an Open Settings CTA. Kept short so it fits the HUD overlay width.",
       "extractionState" : "manual",
@@ -3069,6 +2540,26 @@
           }
         }
       }
+    },
+    "Import video as a recording" : {
+      "comment" : "A button that imports a video into Recordings.",
+      "isCommentAutoGenerated" : true
+    },
+    "iPhone Duo (DEV)" : {
+
+    },
+    "no" : {
+
+    },
+    "No events yet. Open the recording screen and record a few seconds, then come back." : {
+      "comment" : "A message displayed when there are no camera diagnostics events.",
+      "isCommentAutoGenerated" : true
+    },
+    "Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open." : {
+
+    },
+    "Notifications (DEV)" : {
+
     },
     "notifications.soft_ask.allow" : {
       "comment" : "Primary CTA on the in-app soft-ask sheet that triggers iOS's native notification permission prompt.",
@@ -3189,6 +2680,13 @@
           }
         }
       }
+    },
+    "Off (use RC)" : {
+
+    },
+    "OK" : {
+      "comment" : "A button that dismisses an alert.",
+      "isCommentAutoGenerated" : true
     },
     "onboarding_flow.leave.message" : {
       "comment" : "Alert message when the user tries to leave the guided first run.",
@@ -6804,6 +6302,66 @@
         }
       }
     },
+    "paywall.v3.feature.studioSound" : {
+      "comment" : "Paywall feature line, bold lead-in: Studio Sound, enhancement that removes noise and echo from the recording's audio. Followed by its detail sentence on the same line.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Studio sound."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonido de estudio."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Som de estúdio."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Студийный звук."
+          }
+        }
+      }
+    },
+    "paywall.v3.feature.studioSound.detail" : {
+      "comment" : "Paywall feature line, detail after 'Studio sound.'",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your voice without noise or echo."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu voz sin ruido ni eco."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua voz sem ruído nem eco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Голос без шума и эха."
+          }
+        }
+      }
+    },
     "paywall.v3.footnote.cancelAnytime" : {
       "comment" : "Line under the paywall button when the selected plan starts with a paid introductory price.",
       "extractionState" : "manual",
@@ -7194,6 +6752,15 @@
         }
       }
     },
+    "Pending push count" : {
+
+    },
+    "Preview Paywall" : {
+
+    },
+    "Preview Satisfaction Prompt" : {
+
+    },
     "preview.photosDenied.toast" : {
       "comment" : "Toast shown when the user tries to save but Photos access is denied or restricted. Has a 'Settings' action button.",
       "extractionState" : "manual",
@@ -7283,6 +6850,9 @@
           }
         }
       }
+    },
+    "Push status" : {
+
     },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
@@ -7915,6 +7485,9 @@
         }
       }
     },
+    "Recordings (DEV)" : {
+
+    },
     "recordings.action.delete" : {
       "comment" : "Recordings context-menu destructive action that removes the recording.",
       "extractionState" : "extracted_with_value",
@@ -8515,7 +8088,41 @@
         }
       }
     },
+    "Refresh" : {
+      "comment" : "A button that refreshes the list of camera diagnostics.",
+      "isCommentAutoGenerated" : true
+    },
+    "Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open." : {
+
+    },
+    "Request push permission" : {
+
+    },
+    "Reset AI Optimize Day Limit" : {
+
+    },
     "Reset Paywall Mode" : {
+
+    },
+    "Reset Pro AI counter" : {
+
+    },
+    "Reset Rate Limits" : {
+
+    },
+    "Reset satisfaction prompt state" : {
+
+    },
+    "Reset soft ask flag" : {
+
+    },
+    "Reset Tips" : {
+
+    },
+    "Reset to a new install?" : {
+
+    },
+    "Reset to new install (replays onboarding)" : {
 
     },
     "review.satisfaction.body" : {
@@ -8697,6 +8304,15 @@
           }
         }
       }
+    },
+    "Runs the front camera through the iPhone Duo camera path, starting upside down. With your face in the frame, the preview should turn upright within about two seconds and stay upright on the next open. Turning it on again restarts the test. Takes effect on next Recording open." : {
+
+    },
+    "Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only." : {
+
+    },
+    "Satisfaction prompt enabled (stands in for RC)" : {
+
     },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
@@ -10149,6 +9765,9 @@
           }
         }
       }
+    },
+    "Send Duo reports from this phone" : {
+
     },
     "settings.about.version" : {
       "comment" : "Row label in the About section of Settings showing the app version number.",
@@ -11781,6 +11400,36 @@
         }
       }
     },
+    "studio.button.enhanceRemaining" : {
+      "comment" : "VoiceOver label of the Studio Sound button before enhancing: how many enhancements are left out of the allowance.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhance sound, %1$lld of %2$lld left"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejorar el sonido, quedan %1$lld de %2$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorar o som, restam %1$lld de %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшить звук, осталось %1$lld из %2$lld"
+          }
+        }
+      }
+    },
     "studio.button.on" : {
       "comment" : "VoiceOver label of the Studio Sound toggle while the enhanced audio plays.",
       "extractionState" : "extracted_with_value",
@@ -11901,6 +11550,96 @@
         }
       }
     },
+    "studio.coach.free" : {
+      "comment" : "Tip above the Studio Sound button for a user without a subscription, who has one free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. Try it on a video where the sound matters."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. Pruébalo en un video donde el sonido importe."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. Teste em um vídeo em que o som importa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Попробуйте на ролике, где звук важен."
+          }
+        }
+      }
+    },
+    "studio.coach.free.title" : {
+      "comment" : "Title of the tip above the Studio Sound button for a user without a subscription.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Studio sound: one free try"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonido de estudio: una prueba gratis"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Som de estúdio: um teste grátis"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Студийный звук — 1 раз бесплатно"
+          }
+        }
+      }
+    },
+    "studio.coach.paid" : {
+      "comment" : "Tip above the Studio Sound button for a subscriber; explains the counter badge, which renews on the 1st.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. The number is how many enhancements are left until the end of the month."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan hasta fin de mes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam até o fim do mês."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось до конца месяца."
+          }
+        }
+      }
+    },
     "studio.coach.title" : {
       "comment" : "Title of the one-time tip above the Studio Sound button.",
       "extractionState" : "extracted_with_value",
@@ -11931,6 +11670,186 @@
         }
       }
     },
+    "studio.coach.trial" : {
+      "comment" : "Tip above the Studio Sound button during the free trial; explains the counter badge on the button.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes noise and echo. The number is how many enhancements are left in your trial."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quita el ruido y el eco. El número indica cuántas mejoras te quedan en la prueba."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído e eco. O número mostra quantas melhorias restam no seu teste."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает шум и эхо. Цифра — сколько улучшений осталось в пробном периоде."
+          }
+        }
+      }
+    },
+    "studio.confirm.cost" : {
+      "comment" : "Studio Sound confirmation: a video over 3 minutes costs one enhancement per started 3 minutes. The number is that cost (always 2 or more).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This video is longer than 3 minutes and uses %lld enhancements."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este video dura más de 3 minutos y usa %lld mejoras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este vídeo tem mais de 3 minutos e usa %lld melhorias."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ролик длиннее 3 минут, улучшений будет списано: %lld."
+          }
+        }
+      }
+    },
+    "studio.confirm.dontAsk" : {
+      "comment" : "Toggle on the Studio Sound sheets: don't show the confirmation before each enhancement from now on.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Don't show again"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No volver a mostrar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não mostrar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше не показывать"
+          }
+        }
+      }
+    },
+    "studio.confirm.free" : {
+      "comment" : "Studio Sound confirmation for a user without a subscription: this spends their single free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This uses your one free enhancement."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se usará tu única mejora gratis."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso usa sua única melhoria grátis."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Будет использовано ваше единственное бесплатное улучшение."
+          }
+        }
+      }
+    },
+    "studio.confirm.notEnough" : {
+      "comment" : "Studio Sound confirmation: the video costs more enhancements than are left. The number is the cost (always 2 or more).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This video is longer than 3 minutes and needs %lld enhancements, more than you have left."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este video dura más de 3 minutos y necesita %lld mejoras, más de las que te quedan."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este vídeo tem mais de 3 minutos e precisa de %lld melhorias, mais do que você tem."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ролик длиннее 3 минут, нужно улучшений: %lld — больше, чем осталось."
+          }
+        }
+      }
+    },
+    "studio.confirm.title" : {
+      "comment" : "Title of the confirmation sheet before Studio Sound spends an enhancement.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhance this video's sound?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Mejorar el sonido de este video?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorar o som deste vídeo?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшить звук этого ролика?"
+          }
+        }
+      }
+    },
     "studio.error.busy" : {
       "comment" : "Studio Sound failed because of a server-wide limit; trying later works.",
       "extractionState" : "extracted_with_value",
@@ -11957,6 +11876,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Studio Sound сейчас перегружен. Попробуйте позже."
+          }
+        }
+      }
+    },
+    "studio.error.freeLimit" : {
+      "comment" : "Studio Sound failed because the user without a subscription already used the one free enhancement.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your free enhancement is used. Subscribe to enhance more videos."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste tu mejora gratis. Suscríbete para mejorar más videos."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já usou sua melhoria grátis. Assine para melhorar mais vídeos."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатное улучшение уже использовано. Оформите подписку, чтобы улучшать больше роликов."
           }
         }
       }
@@ -12231,6 +12180,276 @@
         }
       }
     },
+    "studio.intro.body" : {
+      "comment" : "First-use sheet of Studio Sound: what the feature does.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes background noise and echo and evens out your voice."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina el ruido de fondo y el eco y equilibra tu voz."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove ruído de fundo e eco e equilibra sua voz."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убирает фоновый шум и эхо и выравнивает голос."
+          }
+        }
+      }
+    },
+    "studio.intro.continueFree" : {
+      "comment" : "First-use sheet of Studio Sound: main button for a user without a subscription, who spends their one free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhance for free"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejorar gratis"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorar grátis"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшить бесплатно"
+          }
+        }
+      }
+    },
+    "studio.intro.privacy" : {
+      "comment" : "First-use sheet of Studio Sound: discloses that the audio goes to a third-party processing partner, unnamed here (the privacy policy names it).",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Only the audio of this video is sent to our audio partner for processing, and we have it deleted there right after. The video stays on your phone."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo el audio de este video se envía a nuestro socio de audio para procesarlo, y pedimos que se borre allí de inmediato. El video se queda en tu teléfono."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apenas o áudio deste vídeo é enviado ao nosso parceiro de áudio para processamento, e pedimos que seja apagado lá logo em seguida. O vídeo fica no seu celular."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На обработку нашему партнёру по звуку уходит только звук этого ролика, и сразу после обработки мы удаляем его там. Видео остаётся на телефоне."
+          }
+        }
+      }
+    },
+    "studio.intro.quota.free" : {
+      "comment" : "First-use sheet of Studio Sound, for a user without a subscription: they have a single free try.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "One free enhancement. Use it on a video where the sound matters."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una mejora gratis. Úsala en un video donde el sonido importe."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma melhoria grátis. Use em um vídeo em que o som importa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Одно бесплатное улучшение. Выберите ролик, где звук важен."
+          }
+        }
+      }
+    },
+    "studio.intro.quota.paid" : {
+      "comment" : "First-use sheet of Studio Sound, for a subscriber. First number: left; second: the monthly total.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhancements left this month: %1$lld of %2$lld"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejoras restantes este mes: %1$lld de %2$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorias restantes este mês: %1$lld de %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осталось улучшений в этом месяце: %1$lld из %2$lld"
+          }
+        }
+      }
+    },
+    "studio.intro.quota.trial" : {
+      "comment" : "First-use sheet of Studio Sound, during the free trial. First number: left; second: the trial's total.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhancements left in your trial: %1$lld of %2$lld"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejoras restantes en tu prueba: %1$lld de %2$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melhorias restantes no seu teste: %1$lld de %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Осталось улучшений в пробном периоде: %1$lld из %2$lld"
+          }
+        }
+      }
+    },
+    "studio.limit.paid" : {
+      "comment" : "Studio Sound monthly allowance used up. The placeholder is the day the allowance renews, like 'November 1'. Buying extra enhancements is coming soon.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This month's enhancements are used up. New ones arrive on %@. Soon you'll be able to buy more."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste las mejoras de este mes. Habrá nuevas el %@. Pronto podrás comprar más."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As melhorias deste mês acabaram. Novas chegam em %@. Em breve você poderá comprar mais."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшения на этот месяц закончились. Новые появятся %@. Скоро можно будет докупить ещё."
+          }
+        }
+      }
+    },
+    "studio.limit.title" : {
+      "comment" : "Title of the sheet shown when the Studio Sound allowance is used up.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enhancements used up"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se acabaron las mejoras"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As melhorias acabaram"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшения закончились"
+          }
+        }
+      }
+    },
+    "studio.limit.trial" : {
+      "comment" : "Studio Sound allowance used up during the free trial. The number is the monthly allowance of the paid subscription.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "You've used the enhancements included in your trial. With the subscription: %lld a month."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste las mejoras incluidas en tu prueba. Con la suscripción: %lld al mes."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já usou as melhorias incluídas no seu teste. Com a assinatura: %lld por mês."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшения пробного периода закончились. С подпиской — %lld в месяц."
+          }
+        }
+      }
+    },
     "studio.sheet.body" : {
       "comment" : "Body of the sheet shown when the user saves a recording while Studio Sound is still processing.",
       "extractionState" : "extracted_with_value",
@@ -12380,6 +12599,9 @@
           }
         }
       }
+    },
+    "Subscription Override" : {
+
     },
     "take_result.autopause.body" : {
       "comment" : "Explanation under the pause-when-you-look-away toggle on the first-take result sheet.",
@@ -12654,6 +12876,12 @@
           }
         }
       }
+    },
+    "Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only." : {
+
+    },
+    "yes" : {
+
     }
   },
   "version" : "1.1"

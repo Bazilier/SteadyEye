@@ -44,6 +44,9 @@ enum ReviewPromptManager {
     enum Trigger: String {
         case greatTake = "great_take"
         case afterExport = "after_export"
+        /// Watched a take to the end with Studio Sound on, after comparing
+        /// it with the original.
+        case studioSound = "studio_sound"
     }
 
     /// Eye contact a take needs before it counts as a happy moment.

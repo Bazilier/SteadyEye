@@ -79,6 +79,9 @@ struct VideoPreviewView: View {
     /// "Don't show again" on the Studio Sound sheets. Subscribers only: the
     /// free try always asks.
     @AppStorage("studioSkipConfirm") private var studioSkipConfirm = false
+    /// Flipped between the two soundtracks during this visit: heard the
+    /// difference, which makes the end of the video a happy moment.
+    @State private var comparedStudioSound = false
     @ObservedObject private var studioSound = StudioSoundManager.shared
     @State private var showSaveSuccess = false
     @State private var showPhotosDeniedToast = false
@@ -441,19 +444,28 @@ struct VideoPreviewView: View {
             guard isVisible, recording.studioStatus == .ready, studioItem == nil else { return }
             Task { await attachStudioAudio(replacingCurrentItem: true) }
         }
-        // The happy moment: the user just watched a take of their own script
-        // that held eye contact. Ask then, not while they are on the way out.
+        // The happy moments: the user just watched a take of their own script
+        // that held eye contact, or watched one with Studio Sound on after
+        // comparing it with the original. Ask then, not on the way out.
         .onChange(of: playback.didPlayToEnd) { _, finished in
             guard finished,
                   firstTakeResult == nil,
-                  let eyeContact = takeEyeContact,
-                  eyeContact >= ReviewPromptManager.greatTakeThreshold,
                   !showPostSavePaywall, !showSatisfactionPrompt,
-                  scenePhase == .active,
-                  ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: isUserWrittenScript)
+                  scenePhase == .active
             else { return }
-            satisfactionTrigger = .greatTake
-            showSatisfactionPrompt = true
+            if let eyeContact = takeEyeContact,
+               eyeContact >= ReviewPromptManager.greatTakeThreshold,
+               ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: isUserWrittenScript) {
+                satisfactionTrigger = .greatTake
+                showSatisfactionPrompt = true
+            } else if comparedStudioSound,
+                      recording.usesStudioAudio,
+                      // The user's own voice, enhanced: a happy moment whatever
+                      // script it was read from, so the origin gate is passed.
+                      ReviewPromptManager.shouldPresentSatisfactionPrompt(isUserWrittenScript: true) {
+                satisfactionTrigger = .studioSound
+                showSatisfactionPrompt = true
+            }
         }
         .onDisappear {
             isVisible = false
@@ -957,6 +969,7 @@ struct VideoPreviewView: View {
             }
             UISelectionFeedbackGenerator().selectionChanged()
             flashStudioChip(isStudio: enabled)
+            comparedStudioSound = true
         default:
             break
         }
