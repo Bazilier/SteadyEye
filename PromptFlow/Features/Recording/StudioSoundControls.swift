@@ -285,6 +285,9 @@ struct StudioChip: View {
 /// user content to a third party), and what the user's allowance is.
 struct StudioIntroSheet: View {
     let quota: StudioSoundService.Quota?
+    /// "Don't ask again" for later enhancements; offered to subscribers and
+    /// trial users here already, so they never meet the confirmation sheet.
+    @Binding var dontAskAgain: Bool
     let onContinue: () -> Void
     let onCancel: () -> Void
 
@@ -331,7 +334,11 @@ struct StudioIntroSheet: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     .background(Theme.accentTint, in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 16)
+            }
+
+            if let quota, quota.tier != .free {
+                StudioDontAskToggle(isOn: $dontAskAgain)
             }
 
             Button(action: onContinue) {
@@ -350,7 +357,7 @@ struct StudioIntroSheet: View {
                     .frame(height: 44)
             }
         }
-        .studioSheetStyle(height: quota == nil ? 420 : 490)
+        .studioSheetStyle()
     }
 
     private func allowance(_ quota: StudioSoundService.Quota) -> String {
@@ -421,7 +428,7 @@ struct StudioLimitSheet: View {
                     .background(Color.white.opacity(0.1), in: Capsule())
             }
         }
-        .studioSheetStyle(height: 340)
+        .studioSheetStyle()
     }
 
     private var message: String {
@@ -483,16 +490,7 @@ struct StudioConfirmSheet: View {
             }
 
             if quota.tier != .free && affordable {
-                Toggle(isOn: $dontAskAgain) {
-                    Text(String(
-                        localized: "studio.confirm.dontAsk",
-                        defaultValue: "Don't ask again",
-                        comment: "Toggle on the Studio Sound confirmation sheet: skip this confirmation from now on."
-                    ))
-                    .font(.subheadline)
-                }
-                .tint(Theme.accent)
-                .padding(.bottom, 16)
+                StudioDontAskToggle(isOn: $dontAskAgain)
             }
 
             if affordable {
@@ -517,15 +515,7 @@ struct StudioConfirmSheet: View {
                     .frame(height: 44)
             }
         }
-        .studioSheetStyle(height: sheetHeight)
-    }
-
-    private var sheetHeight: CGFloat {
-        var height: CGFloat = 330
-        if units > 1 { height += 50 }
-        if quota.tier != .free && affordable { height += 50 }
-        if !affordable { height -= 56 }
-        return height
+        .studioSheetStyle()
     }
 
     private var remainingLine: String {
@@ -567,6 +557,23 @@ struct StudioConfirmSheet: View {
     }
 }
 
+private struct StudioDontAskToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            Text(String(
+                localized: "studio.confirm.dontAsk",
+                defaultValue: "Don't ask again",
+                comment: "Toggle on the Studio Sound sheets: skip the confirmation before each enhancement from now on."
+            ))
+            .font(.subheadline)
+        }
+        .tint(Theme.accent)
+        .padding(.bottom, 16)
+    }
+}
+
 private struct StudioSheetIcon: View {
     let name: String
 
@@ -581,11 +588,23 @@ private struct StudioSheetIcon: View {
 }
 
 private extension View {
-    func studioSheetStyle(height: CGFloat) -> some View {
-        self
+    /// Dark bottom sheet exactly as tall as its content, so nothing is cut
+    /// off by a wrapped title, a longer translation or a larger text size.
+    func studioSheetStyle() -> some View {
+        modifier(StudioSheetStyle())
+    }
+}
+
+private struct StudioSheetStyle: ViewModifier {
+    @State private var height: CGFloat = 420
+
+    func body(content: Content) -> some View {
+        content
             .padding(.horizontal, 20)
             .padding(.top, 24)
             .padding(.bottom, 8)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .presentationDetents([.height(height)])
             .presentationDragIndicator(.hidden)
             .presentationBackground(Color(white: 0.11))
@@ -660,13 +679,7 @@ struct StudioSaveSheet: View {
                     .frame(height: 44)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .padding(.bottom, 8)
-        .presentationDetents([.height(420)])
-        .presentationDragIndicator(.hidden)
-        .presentationBackground(Color(white: 0.11))
-        .preferredColorScheme(.dark)
+        .studioSheetStyle()
     }
 }
 

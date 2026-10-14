@@ -289,7 +289,7 @@
       }
     },
     "studio.confirm.dontAsk" : {
-      "comment" : "Toggle on the Studio Sound confirmation sheet: skip this confirmation from now on.",
+      "comment" : "Toggle on the Studio Sound sheets: skip the confirmation before each enhancement from now on.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {

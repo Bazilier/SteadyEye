@@ -381,6 +381,7 @@ struct VideoPreviewView: View {
         .sheet(isPresented: $showStudioIntro) {
             StudioIntroSheet(
                 quota: studioSound.quota,
+                dontAskAgain: $studioSkipConfirm,
                 onContinue: {
                     studioIntroAccepted = true
                     showStudioIntro = false
