@@ -56,7 +56,7 @@ Caveats:
 | 11b | Speech analyzer diag | `SpeechAnalyzerDiagButton` · `Features/Recording/SpeechAnalyzerDiag.swift:573` | Inline button in DEV Debug section | `#if DEV`, iOS 26+ |
 | 12 | Founder chat | `ChatView` · `Features/Chat/ChatView.swift:4`; `ChatBubbleView` `ChatBubbleView.swift:3` | Settings row (`SettingsView.swift:563-565`, `.welcome`); "Not really" in satisfaction prompt (`VideoPreviewView.swift:243-245`, `.satisfactionFollowUp`) | Settings path: `chat_enabled_for`. **Satisfaction path is not gated.** **No email fallback exists** in code (only Settings → Send feedback mailto, `SettingsView.swift:637-657`). |
 | 13 | Notification soft-ask | `SoftAskNotificationView` · `Features/Notifications/SoftAskNotificationView.swift:7` | Sheet from `ScriptListView.swift:145-158`, triggered `.onAppear` (`:170-192`) | 2nd cold launch after onboarding, once ever, status `.notDetermined`, 1.5 s delay, `PromptArbiter` |
-| 14 | Satisfaction pre-prompt | `SatisfactionPromptView` · `Features/Review/SatisfactionPromptView.swift:13` | Sheet from `VideoPreviewView.swift:216-242` after a Camera Roll save with no paywall due | **RC `review_prompt_enabled`, default `"off"`** (`Shared/ReviewPromptManager.swift:70-99`); user-written script; 14-day cooldown; blocked if any paywall was shown this session (`Shared/PromptArbiter.swift:68-71`). Yes → App Store write-review URL (no native `SKStoreReviewController`). No → ChatView. |
+| 14 | Satisfaction pre-prompt | `SatisfactionPromptView` · `Features/Review/SatisfactionPromptView.swift:13` | Sheet from `VideoPreviewView.swift:216-242` after a Camera Roll save with no paywall due | **RC `review_prompt_v2_enabled`, default `"off"`** (`Shared/ReviewPromptManager.swift:70-99`); user-written script; 14-day cooldown; blocked if any paywall was shown this session (`Shared/PromptArbiter.swift:68-71`). Yes → "would you rate?" step → App Store write-review URL (no native `SKStoreReviewController`). No → ChatView. |
 | 15 | Explainer overlays | `ExplainerOverlay` · `Shared/Components/ExplainerOverlay.swift:25` | Editor tip (`ScriptEditorView.swift:273-297`), bulk-import explainer (`BulkImportView.swift:83-95`), camera tip (`RecordingView.swift:431-442`) | `hasSeenEditorTip`, `hasSeenBulkImportExplainer`, `hasSeenCameraExplainer` |
 | 16 | Toasts | `ToastView` / `.toast()` · `Shared/ToastView.swift:25, 112` + 3 ad-hoc capsules | See §1.3 | — |
 | 17 | System surfaces | ATT, camera/mic/photos prompts, notifications prompt, StoreKit sheet, offer-code sheet, share sheet (`Shared/ActivityView.swift:6`), mailto, Safari | Onboarding sequence `OnboardingView.swift:195-321`; ATT at end of onboarding (`Shared/ATTManager.swift:39-57`) | ATT `isEnabled = true` (`ATTManager.swift:13`) |
@@ -105,7 +105,7 @@ Defaults at `Shared/RemoteConfigManager.swift:81-93`. DEV never reads RC (`:232-
 | `paywall_default_plan` | `annual` | Preselected / collapsed plan |
 | `experiment_paywall_v1` | `control` | Sticky; `"trial"` forces `"default"` offering |
 | `chat_enabled_for` | `all` | Settings chat row (live) |
-| `review_prompt_enabled` | `off` | Whole satisfaction flow |
+| `review_prompt_v2_enabled` | `off` | Whole satisfaction flow (`review_prompt_enabled` gates builds ≤ 1.7.0, which skip the rate step — keep it off) |
 
 ---
 

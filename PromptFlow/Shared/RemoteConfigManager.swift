@@ -89,7 +89,7 @@ final class RemoteConfigManager: ObservableObject {
         "paywall_default_plan":      "annual",
         "experiment_paywall_v1":     "control",
         "chat_enabled_for":          "all",
-        "review_prompt_enabled":     "off",
+        "review_prompt_v2_enabled":  "off",
     ]
 
     #if !DEV
