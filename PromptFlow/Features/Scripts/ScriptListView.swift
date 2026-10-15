@@ -282,7 +282,7 @@ struct ScriptListView: View {
         }) {
             SatisfactionPromptView(
                 trigger: .afterExport,
-                onYes: {
+                onRate: {
                     ReviewPromptManager.noteAnsweredYes()
                     ReviewPromptManager.openWriteReviewPage()
                 },

@@ -676,9 +676,16 @@ struct PaywallView: View {
     /// Lowest `eyeContact` the chip states.
     static let eyeContactChipThreshold = 0.8
 
-    /// The pill always shows the three-line reader, whatever the user picked
-    /// for the camera: one word at a time says too little at a glance.
+    /// The pill shows the three-line reader, whatever the user picked for
+    /// the camera: one word at a time says too little at a glance.
     private let isClassicMode = true
+
+    /// Without a cutout (iPhone SE) the screen is too short to spend three
+    /// lines' height on the pill above the plans, so it reads one word at a
+    /// time there.
+    private var cameraPillIsClassicMode: Bool {
+        isClassicMode && DeviceDetectionService.shared.cutoutType != .none
+    }
 
     /// Nil on every device but iPhone Duo.
     @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
@@ -831,7 +838,7 @@ struct PaywallView: View {
             let g = PrompterPillPreview.Layout(
                 safeTop: geo.safeAreaInsets.top,
                 screenWidth: geo.size.width,
-                isClassicMode: isClassicMode,
+                isClassicMode: cameraPillIsClassicMode,
                 spacing: 28
             )
             ZStack(alignment: .topLeading) {
@@ -845,7 +852,7 @@ struct PaywallView: View {
                 }
                 PrompterPillPreview(
                     phrase: pillText,
-                    isClassicMode: isClassicMode
+                    isClassicMode: cameraPillIsClassicMode
                 )
                 .allowsHitTesting(false)
                 closeButton(size: g.closeSize)
@@ -1459,15 +1466,18 @@ struct PaywallView: View {
                         if detail != nil { badgeView }
                     }
                     if let detail {
+                        // Wraps to a second line when the price beside it
+                        // needs the room (375 pt screens, long currencies).
                         Text(detail)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         badgeView
                     }
                 }
-                // Takes the width it needs before the spacer splits the rest,
-                // so the detail line stays on one line.
+                // Takes what the price leaves before the spacer splits the
+                // rest.
                 .layoutPriority(1)
 
                 Spacer(minLength: 8)
@@ -1480,7 +1490,7 @@ struct PaywallView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.7)
                     if let secondary = trial?.secondary ?? intro?.secondary {
                         Text(secondary)
                             .font(.footnote)
@@ -1492,6 +1502,11 @@ struct PaywallView: View {
                 // truncating — a truncated price is worse than a tall row.
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
+                // Sized first: the price is what the row is for, so the
+                // detail line on the left wraps to make room for it (375 pt
+                // screens, "USD 17.99"). It shrinks only when the name and
+                // badge alone leave too little.
+                .layoutPriority(2)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

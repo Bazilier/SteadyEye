@@ -8215,6 +8215,126 @@
         }
       }
     },
+    "review.satisfaction.rate.body" : {
+      "comment" : "Body of the satisfaction prompt's second step, shown after the user said they are happy. Asks, in the founder's first-person voice, whether they would rate the app; nothing opens until they agree.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Would you rate SteadyEye on the App Store? It takes a few seconds and helps other creators find it."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Calificarías SteadyEye en el App Store? Son unos segundos y ayuda a otros creadores a encontrarlo."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você avaliaria o SteadyEye na App Store? Leva poucos segundos e ajuda outros criadores a encontrá-lo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оценишь SteadyEye в App Store? Это пара секунд, а другим авторам будет проще его найти."
+          }
+        }
+      }
+    },
+    "review.satisfaction.rate.later" : {
+      "comment" : "Secondary button on the satisfaction prompt's second step. Closes the sheet without opening the App Store.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora no"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora não"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не сейчас"
+          }
+        }
+      }
+    },
+    "review.satisfaction.rate.title" : {
+      "comment" : "Title of the satisfaction prompt's second step, shown after the user said they are happy. Keep it ungendered.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glad to hear it!"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Qué bueno!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Que bom!"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рад это слышать!"
+          }
+        }
+      }
+    },
+    "review.satisfaction.rate.yes" : {
+      "comment" : "Primary button on the satisfaction prompt's second step. Opens the App Store review page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rate on the App Store"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calificar en el App Store"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avaliar na App Store"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оценить в App Store"
+          }
+        }
+      }
+    },
     "review.satisfaction.title.export" : {
       "comment" : "Satisfaction question when the user comes back to the app after exporting a take to share.",
       "extractionState" : "manual",

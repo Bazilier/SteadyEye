@@ -455,7 +455,7 @@ struct SettingsView: View {
                         devShowSatisfactionPrompt = true
                     }
                     // Remote Config is off in DEV, and its default keeps the
-                    // prompt off: this stands in for review_prompt_enabled=on.
+                    // prompt off: this stands in for review_prompt_v2_enabled=on.
                     Toggle("Satisfaction prompt enabled (stands in for RC)", isOn: $devReviewPromptEnabled)
                         .tint(Theme.accent)
                     Button("Reset satisfaction prompt state") {
@@ -742,7 +742,7 @@ struct SettingsView: View {
                 SatisfactionPromptView(
                     trigger: .greatTake,
                     eyeContactPercent: 92,
-                    onYes: { ReviewPromptManager.openWriteReviewPage() },
+                    onRate: { ReviewPromptManager.openWriteReviewPage() },
                     onNo: { devPendingFounderChat = true }
                 )
             }

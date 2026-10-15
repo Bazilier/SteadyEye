@@ -346,7 +346,7 @@ struct VideoPreviewView: View {
                 eyeContactPercent: satisfactionTrigger == .greatTake
                     ? takeEyeContact.map { Int(($0 * 100).rounded()) }
                     : nil,
-                onYes: {
+                onRate: {
                     ReviewPromptManager.noteAnsweredYes()
                     ReviewPromptManager.openWriteReviewPage()
                 },

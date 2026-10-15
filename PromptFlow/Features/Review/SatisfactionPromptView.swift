@@ -4,9 +4,11 @@ import SwiftUI
 /// `ReviewPromptManager.Trigger`): after watching a take that held eye
 /// contact, with its score up top, or after coming back from sharing one.
 ///
-/// Yes routes to the App Store review page, No opens the founder chat — so
-/// the App Store only ever hears from people who already said they were
-/// happy, and everyone else reaches a person instead of a rating field.
+/// Yes asks, as a second step, whether they would rate the app, and only an
+/// agreement there opens the App Store review page — never straight from
+/// Yes, which reads as being thrown out of the app. No opens the founder
+/// chat — so the App Store only ever hears from people who already said they
+/// were happy, and everyone else reaches a person instead of a rating field.
 /// Structure deliberately mirrors `SoftAskNotificationView`, the house
 /// pattern for a two-button app-styled prompt.
 ///
@@ -17,8 +19,12 @@ struct SatisfactionPromptView: View {
     var trigger: ReviewPromptManager.Trigger = .afterExport
     /// The take's eye contact, 0...100, shown above the question.
     var eyeContactPercent: Int? = nil
-    let onYes: () -> Void
+    /// Yes, and then agreed to rate.
+    let onRate: () -> Void
     let onNo: () -> Void
+
+    /// Yes moves the sheet to the rating ask instead of closing it.
+    @State private var isAskingToRate = false
 
     /// Drives the one-shot pulse of the badge star. Never animates under
     /// Reduce Motion — see `pulseStarOnce()`.
@@ -32,7 +38,7 @@ struct SatisfactionPromptView: View {
         VStack(spacing: 0) {
             iconBlock
 
-            if let percent = eyeContactPercent {
+            if !isAskingToRate, let percent = eyeContactPercent {
                 Label {
                     Text(String(
                         localized: "review.satisfaction.eye_contact",
@@ -53,9 +59,9 @@ struct SatisfactionPromptView: View {
             Text(title)
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
-                .padding(.top, eyeContactPercent == nil ? 24 : 12)
+                .padding(.top, isAskingToRate || eyeContactPercent == nil ? 24 : 12)
 
-            Text("review.satisfaction.body")
+            Text(isAskingToRate ? "review.satisfaction.rate.body" : "review.satisfaction.body")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -67,33 +73,10 @@ struct SatisfactionPromptView: View {
 
             Spacer().frame(height: 28)
 
-            VStack(spacing: 12) {
-                Button {
-                    AppAnalytics.log("satisfaction_prompt_yes", params: ["trigger": trigger.rawValue])
-                    onYes()
-                    dismiss()
-                } label: {
-                    Text("review.satisfaction.yes")
-                        .font(.body.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                // Same construction as the soft-ask's Allow CTA — the app's
-                // primary button. Tint re-applied because sheets don't
-                // inherit the TabView's `.tint`.
-                .primaryButtonStyle()
-                .tint(Theme.accent)
-
-                Button {
-                    AppAnalytics.log("satisfaction_prompt_no", params: ["trigger": trigger.rawValue])
-                    onNo()
-                    dismiss()
-                } label: {
-                    Text("review.satisfaction.no")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.plain)
+            if isAskingToRate {
+                rateButtons
+            } else {
+                questionButtons
             }
         }
         .padding(.horizontal, 20)
@@ -115,7 +98,69 @@ struct SatisfactionPromptView: View {
         }
     }
 
+    private var questionButtons: some View {
+        VStack(spacing: 12) {
+            Button {
+                AppAnalytics.log("satisfaction_prompt_yes", params: ["trigger": trigger.rawValue])
+                withAnimation(.easeInOut(duration: 0.25)) { isAskingToRate = true }
+            } label: {
+                Text("review.satisfaction.yes")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            // Same construction as the soft-ask's Allow CTA — the app's
+            // primary button. Tint re-applied because sheets don't
+            // inherit the TabView's `.tint`.
+            .primaryButtonStyle()
+            .tint(Theme.accent)
+
+            Button {
+                AppAnalytics.log("satisfaction_prompt_no", params: ["trigger": trigger.rawValue])
+                onNo()
+                dismiss()
+            } label: {
+                Text("review.satisfaction.no")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Second step, after Yes. Not now just closes: nothing is burned, so
+    /// the usual re-ask window applies.
+    private var rateButtons: some View {
+        VStack(spacing: 12) {
+            Button {
+                AppAnalytics.log("satisfaction_rate_yes", params: ["trigger": trigger.rawValue])
+                onRate()
+                dismiss()
+            } label: {
+                Text("review.satisfaction.rate.yes")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .primaryButtonStyle()
+            .tint(Theme.accent)
+
+            Button {
+                AppAnalytics.log("satisfaction_rate_later", params: ["trigger": trigger.rawValue])
+                dismiss()
+            } label: {
+                Text("review.satisfaction.rate.later")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var title: String {
+        if isAskingToRate {
+            return String(localized: "review.satisfaction.rate.title", defaultValue: "Glad to hear it!", comment: "Title of the satisfaction prompt's second step, shown after the user said they are happy. Keep it ungendered.")
+        }
         switch trigger {
         case .greatTake:
             return String(localized: "review.satisfaction.title.take", defaultValue: "Happy with this take?", comment: "Satisfaction question right after the user watched a take that held eye contact.")
@@ -175,7 +220,7 @@ struct SatisfactionPromptView: View {
 #Preview("Satisfaction") {
     Color.black
         .sheet(isPresented: .constant(true)) {
-            SatisfactionPromptView(onYes: {}, onNo: {})
+            SatisfactionPromptView(onRate: {}, onNo: {})
         }
         .preferredColorScheme(.dark)
 }
@@ -183,7 +228,7 @@ struct SatisfactionPromptView: View {
 #Preview("Satisfaction — xxLarge") {
     Color.black
         .sheet(isPresented: .constant(true)) {
-            SatisfactionPromptView(onYes: {}, onNo: {})
+            SatisfactionPromptView(onRate: {}, onNo: {})
                 .dynamicTypeSize(.xxLarge)
         }
         .preferredColorScheme(.dark)

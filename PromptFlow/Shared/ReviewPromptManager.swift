@@ -11,8 +11,9 @@ import UIKit
 ///
 /// Replaces the native `SKStoreReviewController` prompt. Apple's review
 /// guidelines discourage putting a pre-prompt in front of the system dialog,
-/// so the Yes branch opens a `?action=write-review` URL instead: no
-/// three-per-year cap, no silent no-op, and it works in TestFlight.
+/// so the Yes branch (after a second "would you rate?" step) opens a
+/// `?action=write-review` URL instead: no three-per-year cap, no silent
+/// no-op, and it works in TestFlight.
 ///
 /// The prompt itself is `SatisfactionPromptView`; the arbiter is wired at the
 /// call site in `VideoPreviewView`, matching the soft-ask.
@@ -23,8 +24,9 @@ enum ReviewPromptManager {
     /// prompt, whose trigger is now the first own-script Camera Roll save.
     private static let successfulRecordingCountKey = "successful_recording_count"
 
-    /// Burned once the user answers Yes: they have been sent to the App Store
-    /// and the prompt never returns. Deliberately NOT
+    /// Burned once the user answers Yes and then agrees to rate: they have
+    /// been sent to the App Store and the prompt never returns. A Yes followed
+    /// by Not now burns nothing. Deliberately NOT
     /// `postFirstOwnRecordingPaywallShown`, which is written only when the
     /// paywall actually appears and so is always false for subscribers.
     /// Codebase convention is unprefixed camelCase (see `installDate`,
@@ -108,13 +110,17 @@ enum ReviewPromptManager {
     /// Canonical value is `"on"`; `"true"` is accepted so a plausible console
     /// entry is not a silent no-op. Everything else — the seeded `"off"`, an
     /// empty value, a typo — leaves the prompt disabled.
+    ///
+    /// `_v2`: builds up to 1.7.0 read `review_prompt_enabled`, and their Yes
+    /// opens the App Store with no "would you rate?" step. That key stays
+    /// off for good; this one turns on only builds that ask first.
     static var isSatisfactionPromptEnabled: Bool {
         #if DEV
         // No Remote Config in DEV: a Settings toggle stands in for it.
         if UserDefaults.standard.bool(forKey: "dev_review_prompt_enabled") { return true }
         #endif
         let raw = RemoteConfigManager.shared
-            .string("review_prompt_enabled")
+            .string("review_prompt_v2_enabled")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return raw == "on" || raw == "true"
@@ -148,7 +154,8 @@ enum ReviewPromptManager {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastShownKey)
     }
 
-    /// Records a Yes. The prompt never shows again on this install.
+    /// Records a Yes that went on to the App Store. The prompt never shows
+    /// again on this install.
     static func noteAnsweredYes() {
         UserDefaults.standard.set(true, forKey: answeredYesKey)
     }
