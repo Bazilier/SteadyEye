@@ -5,6 +5,8 @@ import SwiftUI
 struct PlaceholderLoopView: View {
     let fontSize: CGFloat
     let isClassicMode: Bool
+    /// Rows in classic mode: 3, or 2 with the current word on the bottom row.
+    var lineCount: Int = 3
     /// Text to cycle. Nil: the "your script will appear here" placeholder.
     var phrase: String? = nil
     /// Word brightness. Dimmed by default, since it stands in for a script.
@@ -94,7 +96,7 @@ struct PlaceholderLoopView: View {
 
     private var classicPlaceholder: some View {
         VStack(spacing: 0) {
-            ForEach(0..<3, id: \.self) { row in
+            ForEach(0..<lineCount, id: \.self) { row in
                 let idx = currentIndex - 1 + row
                 let count = max(chunks.count, 1)
                 let text = (idx < 0 || chunks.isEmpty) ? "" : chunks[idx % count]
@@ -120,7 +122,7 @@ struct PlaceholderLoopView: View {
                 .frame(height: classicLineHeight)
             }
         }
-        .frame(height: classicLineHeight * 3, alignment: .top)
+        .frame(height: classicLineHeight * CGFloat(lineCount), alignment: .top)
         .padding(.horizontal, 16)
     }
 
@@ -338,12 +340,15 @@ struct WordByWordView: View {
     }
 }
 
-// MARK: - Classic 3-line display (rendering only)
+// MARK: - Classic 2/3-line display (rendering only)
 
 struct ClassicThreeLineView: View {
     @ObservedObject var player: ChunkPlayerEngine
     /// Same size as the single-line mode; the prompter plate grows to fit.
     let fontSize: CGFloat
+    /// 3: previous, current, next. 2: previous and current — the
+    /// highlighted row is the bottom one.
+    var lineCount: Int = 3
 
     /// Row height for a given font size. `RecordingView` sizes the plate from
     /// this, so the plate and the rows can never disagree.
@@ -352,6 +357,7 @@ struct ClassicThreeLineView: View {
     }
 
     /// Opacity per row: previous word, current word (middle), next word.
+    /// The 2-line mode drops the last row.
     /// The eyes run a word or two ahead of the voice when reading aloud, so
     /// the word being spoken is usually the one above the highlighted row —
     /// keeping it on screen gives the voice an anchor and the eyes a place
@@ -390,14 +396,14 @@ struct ClassicThreeLineView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(0..<3, id: \.self) { row in
+            ForEach(0..<lineCount, id: \.self) { row in
                 line(chunkText(at: displayIndex - 1 + row))
                     .opacity(Self.rowOpacity(row))
                     .frame(maxWidth: .infinity)
                     .frame(height: lineHeight)
             }
         }
-        .frame(height: lineHeight * 3, alignment: .top)
+        .frame(height: lineHeight * CGFloat(lineCount), alignment: .top)
         .multilineTextAlignment(.center)
         .padding(.horizontal, 16)
         .onAppear {

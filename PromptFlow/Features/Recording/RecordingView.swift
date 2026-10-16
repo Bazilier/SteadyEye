@@ -213,7 +213,15 @@ struct RecordingView: View {
     @State private var previewIsFirstTake = false
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
-    private var isClassicMode: Bool { displayMode == "classic" }
+    private var isClassicMode: Bool { lineCount > 1 }
+    /// Prompter rows: 1 word-by-word, 2 ("twoLine"), 3 ("classic").
+    private var lineCount: Int {
+        switch displayMode {
+        case "classic": return 3
+        case "twoLine": return 2
+        default: return 1
+        }
+    }
 
     // Container positioning — persisted
     @AppStorage("textContainerOffsetX") private var savedOffsetX: Double = 20
@@ -994,7 +1002,7 @@ struct RecordingView: View {
             safeAreaTop: geo.safeAreaInsets.top
         )
         let wbwContentHeight: CGFloat = fontSize + 4 + 10
-        let classicContentHeight: CGFloat = ClassicThreeLineView.lineHeight(for: fontSize) * 3 + 10
+        let classicContentHeight: CGFloat = ClassicThreeLineView.lineHeight(for: fontSize) * CGFloat(lineCount) + 10
         if !isLandscape, let duoState = duoMonitor?.state {
             return duoPrompterGeometry(
                 duoState,
@@ -1330,20 +1338,33 @@ struct RecordingView: View {
         GazeIndicator(state: gazeAttention.state, isLandscape: isLandscape)
     }
 
-    /// Word-by-word / 3-line mode toggle.
+    /// Line-count toggle: a circular arrow around the current count,
+    /// stepping 1 → 2 → 3 → 1.
     private var modeToggleButton: some View {
         Group {
             if isExpanded {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        displayMode = isClassicMode ? "wbw" : "classic"
+                        switch lineCount {
+                        case 1: displayMode = "twoLine"
+                        case 2: displayMode = "classic"
+                        default: displayMode = "wbw"
+                        }
                     }
                 } label: {
-                    Image(systemName: isClassicMode ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "arrow.trianglehead.clockwise")
+                        .font(.system(size: 24, weight: .regular))
+                        .overlay {
+                            Text(verbatim: "\(lineCount)")
+                                .font(.system(size: 11, weight: .bold).monospacedDigit())
+                                .contentTransition(.numericText())
+                                // The ring sits low in the symbol's box,
+                                // under the arrowhead.
+                                .offset(y: 1.5)
+                        }
                         .foregroundStyle(.white.opacity(0.4))
-                        .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
-                        .frame(width: 44, height: 44)
+                    .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
+                    .frame(width: 44, height: 44)
                 }
             }
         }
@@ -1610,12 +1631,12 @@ struct RecordingView: View {
         Group {
             if hasStartedPlayback && player.isReady {
                 if isClassicMode {
-                    ClassicThreeLineView(player: player, fontSize: fontSize)
+                    ClassicThreeLineView(player: player, fontSize: fontSize, lineCount: lineCount)
                 } else {
                     WordByWordView(player: player, fontSize: fontSize)
                 }
             } else {
-                PlaceholderLoopView(fontSize: fontSize, isClassicMode: isClassicMode)
+                PlaceholderLoopView(fontSize: fontSize, isClassicMode: isClassicMode, lineCount: lineCount)
             }
         }
     }
@@ -2311,4 +2332,3 @@ private extension View {
         ))
     }
 }
-
