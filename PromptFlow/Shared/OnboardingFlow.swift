@@ -52,6 +52,10 @@ enum OnboardingFlow {
     /// come back with camera and microphone on, the camera opens on the
     /// flow's script without asking.
     static let awaitingSettingsKey = "onboardingAwaitingSettings"
+    /// Set by the list when an unfolded iPhone Duo sends the user back to
+    /// onboarding's access step to wait for the fold: the same run resumes,
+    /// not a new one. Cleared by onboarding as it appears.
+    static let reopenedForFoldKey = "onboardingReopenedForFold"
 
     /// The script the flow is waiting to see recorded, if any.
     static var flowScriptID: UUID? {
@@ -73,7 +77,7 @@ enum OnboardingFlow {
         let defaults = UserDefaults.standard
         for key in ["pendingOwnScriptAfterFirstTake", "ownTakeCoachPending",
                     "ownTakePaywallDue", flowScriptIDKey, awaitingSettingsKey,
-                    pendingRecordingKey,
+                    pendingRecordingKey, reopenedForFoldKey,
                     OwnTakePaywall.scriptIDKey, OwnTakePaywall.eyeContactKey] {
             defaults.removeObject(forKey: key)
         }

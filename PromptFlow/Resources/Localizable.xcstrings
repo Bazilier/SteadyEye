@@ -2170,6 +2170,156 @@
         }
       }
     },
+    "onboarding.duo.phone.access" : {
+      "comment" : "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone on the access screen (camera, microphone, photos).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All three are for the outer screen: that’s where you’ll film."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los tres son para la pantalla exterior: ahí vas a grabar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os três são para a tela externa: é nela que você vai gravar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всё это — для внешнего экрана: снимать будете на нём."
+          }
+        }
+      }
+    },
+    "onboarding.duo.phone.fold" : {
+      "comment" : "Onboarding on an unfolded iPhone Duo, access granted: caption under the picture of the folded phone. Folding opens the camera.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fold now: the camera opens on the outer screen with your script."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciérralo ahora: la cámara se abre en la pantalla exterior con tu guion."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feche agora: a câmera abre na tela externa com seu roteiro."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сложите iPhone: камера откроется на внешнем экране с вашим текстом."
+          }
+        }
+      }
+    },
+    "onboarding.duo.phone.script" : {
+      "comment" : "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone while the user writes their first script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script will run here, under the outer camera."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion pasará aquí, bajo la cámara exterior."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro vai passar aqui, abaixo da câmera externa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваш текст побежит здесь, под внешней камерой."
+          }
+        }
+      }
+    },
+    "onboarding.duo.phone.welcome" : {
+      "comment" : "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone on the first screen. Recording works folded only, on the outer screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You film folded: the words run right under the outer camera."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grabas con el iPhone cerrado: las palabras pasan justo bajo la cámara exterior."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você grava com ele fechado: as palavras passam logo abaixo da câmera externa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Снимаете со сложенным: слова бегут прямо под внешней камерой."
+          }
+        }
+      }
+    },
+    "onboarding.duo.welcome.caption_next" : {
+      "comment" : "Caption under the Continue button on the first onboarding screen on an unfolded iPhone Duo: what comes next; recording works folded only.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: your script. You’ll film with iPhone folded."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Después: tu guion. Grabarás con el iPhone cerrado."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois: seu roteiro. Você grava com o iPhone fechado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дальше — ваш текст. Снимать будете со сложенным iPhone."
+          }
+        }
+      }
+    },
     "onboarding_flow.leave.camera_message" : {
       "comment" : "Alert message when the user closes the camera before the first take of their own script during the guided first run. The script is kept in the scripts list.",
       "extractionState" : "manual",

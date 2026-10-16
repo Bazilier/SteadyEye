@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import AVFoundation
 import Photos
 import UIKit
@@ -29,10 +30,82 @@ struct OnboardingView: View {
     @State private var cameraGranted: Bool = false
     @State private var micGranted: Bool = false
     @State private var photosGranted: Bool = false
+    /// Injected at the app root; its `state` is nil except on iPhone Duo.
+    @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
+    @Environment(\.modelContext) private var modelContext
+    /// Unfolded iPhone Duo, access granted: filming is folded only, so the
+    /// access step stays, with the fold toast, until the phone is folded.
+    @State private var isWaitingForFold = false
+    @State private var showFoldToast = false
 
     @State private var didLogStart: Bool = false
 
     var body: some View {
+        Group {
+            if let halves = duoHalves {
+                duoLayout(halves)
+            } else {
+                stages
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: stage)
+        // Welcome shows the pill where it sits on the camera, whose screen
+        // hides the status bar; the clock would collide with the pill's eye.
+        .statusBarHidden(stage == .welcome && duoHalves == nil)
+        .preferredColorScheme(.dark)
+        .onAppear {
+            // Back from the list after unfolding before the first take: the
+            // same run, not a new one.
+            let isReopenedForFold = UserDefaults.standard.bool(forKey: OnboardingFlow.reopenedForFoldKey)
+            UserDefaults.standard.removeObject(forKey: OnboardingFlow.reopenedForFoldKey)
+            if !didLogStart {
+                didLogStart = true
+                if !isReopenedForFold { AppAnalytics.log("onboarding_started") }
+            }
+            OnboardingFlow.start()
+            // Three lines is the new-user default: it shows the next word,
+            // which the eyes want before the voice gets there.
+            if !didDefaultReadingStyle {
+                didDefaultReadingStyle = true
+                if !isReopenedForFold { displayMode = "classic" }
+            }
+            // Relaunched after the script was saved: pick up at access.
+            if stage == .welcome, OnboardingFlow.isActive, OnboardingFlow.flowScriptID != nil {
+                stage = .access
+            }
+            // Unfolded with access already granted: straight to the fold.
+            if stage == .access, shouldWaitForFold,
+               AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
+               AVAudioApplication.shared.recordPermission == .granted {
+                cameraGranted = true
+                micGranted = true
+                let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+                photosGranted = (photosStatus == .authorized || photosStatus == .limited)
+                waitForFold()
+            }
+        }
+        .onChange(of: duoMonitor?.state?.posture) { _, posture in
+            guard isWaitingForFold, posture == .folded else { return }
+            isWaitingForFold = false
+            showFoldToast = false
+            AppAnalytics.log("duo_onboarding_folded")
+            finishOnboarding(path: "folded_on_duo")
+        }
+        .onChange(of: stage) { _, newStage in
+            switch newStage {
+            case .script:
+                break
+            case .access:
+                AppAnalytics.log("onboarding_access_shown")
+            case .permissionExplainer:
+                AppAnalytics.log("onboarding_permission_explainer_shown")
+            case .welcome:
+                break
+            }
+        }
+    }
+
+    private var stages: some View {
         ZStack {
             switch stage {
             case .welcome:
@@ -60,52 +133,146 @@ struct OnboardingView: View {
                 explainerView
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: stage)
-        // Welcome shows the pill where it sits on the camera, whose screen
-        // hides the status bar; the clock would collide with the pill's eye.
-        .statusBarHidden(stage == .welcome)
-        .preferredColorScheme(.dark)
-        .onAppear {
-            if !didLogStart {
-                didLogStart = true
-                AppAnalytics.log("onboarding_started")
-            }
-            OnboardingFlow.start()
-            // Three lines is the new-user default: it shows the next word,
-            // which the eyes want before the voice gets there.
-            if !didDefaultReadingStyle {
-                didDefaultReadingStyle = true
-                displayMode = "classic"
-            }
-            // Relaunched after the script was saved: pick up at access.
-            if stage == .welcome, OnboardingFlow.isActive, OnboardingFlow.flowScriptID != nil {
-                stage = .access
-            }
+    }
+
+    // MARK: - iPhone Duo, unfolded
+
+    /// Unfolded iPhone Duo, in window coordinates: the steps take one half,
+    /// the folded phone they lead to the other, so nothing sits on the
+    /// crease. Held like a book the steps are on the leading half; upright,
+    /// on the bottom one, under the phone.
+    private var duoHalves: (steps: CGRect, phone: CGRect)? {
+        guard let state = duoMonitor?.state, state.posture == .unfolded,
+              let crease = state.creaseFrame else { return nil }
+        let window = state.windowSize
+        if crease.height >= crease.width {
+            return (CGRect(x: 0, y: 0, width: crease.minX, height: window.height),
+                    CGRect(x: crease.maxX, y: 0, width: max(0, window.width - crease.maxX), height: window.height))
         }
-        .onChange(of: stage) { _, newStage in
-            switch newStage {
-            case .script:
-                break
-            case .access:
-                AppAnalytics.log("onboarding_access_shown")
-            case .permissionExplainer:
-                AppAnalytics.log("onboarding_permission_explainer_shown")
-            case .welcome:
-                break
+        return (CGRect(x: 0, y: crease.maxY, width: window.width, height: max(0, window.height - crease.maxY)),
+                CGRect(x: 0, y: 0, width: window.width, height: crease.minY))
+    }
+
+    private func duoLayout(_ halves: (steps: CGRect, phone: CGRect)) -> some View {
+        GeometryReader { outer in
+            let insets = outer.safeAreaInsets
+            GeometryReader { geo in
+                let size = geo.size
+                ZStack(alignment: .topLeading) {
+                    backgroundGradient
+                    stages
+                        .padding(Self.insets(insets, for: halves.steps, in: size))
+                        .frame(width: halves.steps.width, height: halves.steps.height)
+                        .clipped()
+                        .position(x: halves.steps.midX, y: halves.steps.midY)
+                    duoPhonePane(in: halves.phone.size)
+                        .padding(Self.insets(insets, for: halves.phone, in: size))
+                        .frame(width: halves.phone.width, height: halves.phone.height)
+                        .position(x: halves.phone.midX, y: halves.phone.midY)
+                }
             }
+            .ignoresSafeArea()
         }
+    }
+
+    /// The window's safe-area insets on the edges `rect` touches.
+    private static func insets(_ insets: EdgeInsets, for rect: CGRect, in size: CGSize) -> EdgeInsets {
+        EdgeInsets(
+            top: rect.minY < 1 ? insets.top : 0,
+            leading: rect.minX < 1 ? insets.leading : 0,
+            bottom: rect.maxY > size.height - 1 ? insets.bottom : 0,
+            trailing: rect.maxX > size.width - 1 ? insets.trailing : 0
+        )
+    }
+
+    /// The folded phone the steps lead to, with what its pill will show:
+    /// the welcome words, then the placeholder, then the user's script.
+    private func duoPhonePane(in size: CGSize) -> some View {
+        let width = min(250, size.width * 0.55, max(120, (size.height - 150) * 250 / 350))
+        return VStack(spacing: 14) {
+            DuoFoldedMockup(phrase: duoPhonePhrase, eyeContact: stage != .script, width: width)
+            Text(duoPhoneCaption)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var duoPhonePhrase: String? {
+        switch stage {
+        case .welcome:
+            return welcomePillPhrase
+        case .script:
+            return nil
+        case .access, .permissionExplainer:
+            return flowScriptOpening
+        }
+    }
+
+    private var duoPhoneCaption: String {
+        switch stage {
+        case .welcome:
+            return String(
+                localized: "onboarding.duo.phone.welcome",
+                defaultValue: "You film folded: the words run right under the outer camera.",
+                comment: "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone on the first screen. Recording works folded only, on the outer screen."
+            )
+        case .script:
+            return String(
+                localized: "onboarding.duo.phone.script",
+                defaultValue: "Your script will run here, under the outer camera.",
+                comment: "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone while the user writes their first script."
+            )
+        case .access, .permissionExplainer:
+            if isWaitingForFold {
+                return String(
+                    localized: "onboarding.duo.phone.fold",
+                    defaultValue: "Fold now: the camera opens on the outer screen with your script.",
+                    comment: "Onboarding on an unfolded iPhone Duo, access granted: caption under the picture of the folded phone. Folding opens the camera."
+                )
+            }
+            return String(
+                localized: "onboarding.duo.phone.access",
+                defaultValue: "All three are for the outer screen: that’s where you’ll film.",
+                comment: "Onboarding on an unfolded iPhone Duo: caption under the picture of the folded phone on the access screen (camera, microphone, photos)."
+            )
+        }
+    }
+
+    /// The start of the script onboarding saved, for the phone's pill.
+    private var flowScriptOpening: String? {
+        guard let id = OnboardingFlow.flowScriptID else { return nil }
+        var descriptor = FetchDescriptor<Script>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let script = try? modelContext.fetch(descriptor).first else { return nil }
+        return script.content.split(whereSeparator: \.isWhitespace).prefix(14).joined(separator: " ")
+    }
+
+    /// Unfolded iPhone Duo with the script saved: the camera has to wait for
+    /// the fold.
+    private var shouldWaitForFold: Bool {
+        duoHalves != nil && OnboardingFlow.flowScriptID != nil
+    }
+
+    private func waitForFold() {
+        if !isWaitingForFold { AppAnalytics.log("duo_onboarding_fold_wait") }
+        isWaitingForFold = true
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        withAnimation { showFoldToast = true }
     }
 
     // MARK: - Stages
 
     private var welcomeView: some View {
         ZStack(alignment: .top) {
-            pillBackdrop
-            PrompterPillPreview(phrase: String(
-                localized: "onboarding.welcome.pill_phrase",
-                defaultValue: "Read your script and keep your eyes on the camera",
-                comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
-            ))
+            if duoHalves == nil {
+                pillBackdrop
+                PrompterPillPreview(phrase: welcomePillPhrase)
+            }
             VStack(alignment: .leading, spacing: 16) {
                 Spacer()
                 Text(String(
@@ -156,11 +323,17 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .primaryButtonStyle()
-                Text(String(
-                    localized: "onboarding.welcome.caption_next",
-                    defaultValue: "Next: your script, then your first take",
-                    comment: "Caption under the Continue button on the first onboarding screen: what comes next."
-                ))
+                Text(duoHalves == nil
+                     ? String(
+                        localized: "onboarding.welcome.caption_next",
+                        defaultValue: "Next: your script, then your first take",
+                        comment: "Caption under the Continue button on the first onboarding screen: what comes next."
+                     )
+                     : String(
+                        localized: "onboarding.duo.welcome.caption_next",
+                        defaultValue: "Next: your script. You’ll film with iPhone folded.",
+                        comment: "Caption under the Continue button on the first onboarding screen on an unfolded iPhone Duo: what comes next; recording works folded only."
+                     ))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.6))
                     .frame(maxWidth: .infinity)
@@ -168,8 +341,16 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, 24)
             // Clear of the pill: cutout band plus its three rows.
-            .padding(.top, 180)
+            .padding(.top, duoHalves == nil ? 180 : 40)
         }
+    }
+
+    private var welcomePillPhrase: String {
+        String(
+            localized: "onboarding.welcome.pill_phrase",
+            defaultValue: "Read your script and keep your eyes on the camera",
+            comment: "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural."
+        )
     }
 
     /// Lighter at the top than `backgroundGradient`, so the black pill reads
@@ -210,7 +391,9 @@ struct OnboardingView: View {
     private var accessView: some View {
         ZStack {
             backgroundGradient
-            VStack(alignment: .leading, spacing: 24) {
+            // Half an unfolded Duo, held upright, leaves room for the rows and
+            // the fold toast only when packed tighter.
+            VStack(alignment: .leading, spacing: duoHalves == nil ? 24 : 16) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(String(
                         localized: "onboarding.access.title_ready",
@@ -229,20 +412,23 @@ struct OnboardingView: View {
                         .foregroundStyle(.white.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, 40)
+                .padding(.top, duoHalves == nil ? 40 : 16)
                 VStack(spacing: 10) {
                     accessRow(
                         icon: "video.fill",
+                        isOn: isWaitingForFold,
                         title: String(localized: "onboarding.access.camera.title", defaultValue: "Camera", comment: "Onboarding permissions screen: camera row title."),
                         detail: String(localized: "onboarding.access.camera.detail", defaultValue: "To record you, and to see where you look", comment: "Onboarding permissions screen: why the camera is needed. Mentions eye-contact tracking, which runs on the camera frames.")
                     )
                     accessRow(
                         icon: "mic.fill",
+                        isOn: isWaitingForFold,
                         title: String(localized: "onboarding.access.mic.title", defaultValue: "Microphone", comment: "Onboarding permissions screen: microphone row title."),
                         detail: String(localized: "onboarding.access.mic.detail", defaultValue: "For your voice", comment: "Onboarding permissions screen: why the microphone is needed.")
                     )
                     accessRow(
                         icon: "photo.on.rectangle.angled",
+                        isOn: isWaitingForFold && photosGranted,
                         title: String(localized: "onboarding.access.photos.title", defaultValue: "Photos", comment: "Onboarding permissions screen: photos row title."),
                         detail: String(localized: "onboarding.access.photos.detail", defaultValue: "Only to save takes to your library", comment: "Onboarding permissions screen: why photo library (add-only) access is needed.")
                     )
@@ -264,9 +450,16 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, 24)
         }
+        // Unfolded iPhone Duo: stays until the fold (or its cross).
+        .toast(
+            isPresented: $showFoldToast,
+            message: String(localized: "duo.fold_to_record.toast", defaultValue: "Fold your iPhone to record. The text sits under the outer camera.", comment: "Toast on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera: recording works folded only."),
+            style: .warning,
+            duration: nil
+        )
     }
 
-    private func accessRow(icon: String, title: String, detail: String) -> some View {
+    private func accessRow(icon: String, isOn: Bool = false, title: String, detail: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 20, weight: .semibold))
@@ -283,8 +476,17 @@ struct OnboardingView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if isOn {
+                Label(
+                    String(localized: "onboarding.denied.on", defaultValue: "On", comment: "Status of a permission on the onboarding access-denied screen: granted."),
+                    systemImage: "checkmark"
+                )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.green)
+            }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, duoHalves == nil ? 16 : 10)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
     }
 
@@ -418,6 +620,10 @@ struct OnboardingView: View {
             micGranted = true
             let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
             photosGranted = (photosStatus == .authorized || photosStatus == .limited)
+            if shouldWaitForFold {
+                waitForFold()
+                return
+            }
             finishOnboarding(path: "already_granted")
             return
         }
@@ -530,6 +736,10 @@ struct OnboardingView: View {
             return
         }
 
+        if shouldWaitForFold {
+            waitForFold()
+            return
+        }
         finishOnboarding(path: "permissions_complete")
     }
 
