@@ -147,12 +147,16 @@ struct AnimatedRSVPHeadline: View {
 // ORP formula — copied from ORPAlignment.orpIndex(for:) — keep in sync if production logic changes.
 private func headlineORPIndex(for word: String) -> Int {
     let clean = word.trimmingCharacters(in: .punctuationCharacters)
+    guard !clean.isEmpty else { return 0 }
+    let leading = word.prefix {
+        $0.unicodeScalars.allSatisfy(CharacterSet.punctuationCharacters.contains)
+    }.count
     let len = clean.count
     switch len {
-    case 0...1: return 0
-    case 2...5: return 1
-    case 6...9: return 2
-    case 10...13: return 3
-    default: return 4
+    case 0...1: return leading
+    case 2...5: return leading + 1
+    case 6...9: return leading + 2
+    case 10...13: return leading + 3
+    default: return leading + 4
     }
 }

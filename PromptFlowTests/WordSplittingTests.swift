@@ -29,6 +29,15 @@ final class WordSplittingTests: XCTestCase {
     func testOrpIndexEdgeCases() {
         XCTAssertEqual(orpIndex(for: ""), 0)
         XCTAssertEqual(orpIndex(for: "x"), 0)
+        XCTAssertEqual(orpIndex(for: "—"), 0)
+    }
+
+    func testOrpIndexSkipsLeadingPunctuation() {
+        // The anchor lands on the same letter with or without the opening mark.
+        let cases = [("¿Qué?", "Qué"), ("¡Hola!", "Hola"), ("«Привет»", "Привет"), ("\"Hello", "Hello"), ("«Я»", "Я")]
+        for (word, bare) in cases {
+            XCTAssertEqual(Array(word)[orpIndex(for: word)], Array(bare)[orpIndex(for: bare)], word)
+        }
     }
 
     // MARK: - Group 2: hyphenationPoints (system dictionary smoke tests)
@@ -220,6 +229,23 @@ final class WordSplittingTests: XCTestCase {
         // Joining parts (stripping continuation hyphens) gives back the original.
         let rejoined = result.map { $0.hasSuffix("-") ? String($0.dropLast()) : $0 }.joined()
         XCTAssertEqual(rejoined, "telephone")
+    }
+
+    func testEnforceBudgetIgnoresLeadingPunctuation() {
+        // Anchor-to-end is 6 chars in each, the same as the bare word plus its
+        // closing marks; the opening mark sits left of the anchor.
+        XCTAssertEqual(enforceBudget("«Привет».", rightBudget: 6), ["«Привет»."])
+        XCTAssertEqual(enforceBudget("¿Cómo", rightBudget: 6), ["¿Cómo"])
+    }
+
+    func testChunksPerWordQuotedRussian() {
+        let chunks = LatinLanguageStrategy().chunksPerWord(text: "«Привет», сказал он.", baseSpeedMs: 300)
+        XCTAssertEqual(chunks, ["«Привет»,", "сказал", "он."])
+    }
+
+    func testChunksPerWordInvertedMarksSpanish() {
+        let chunks = LatinLanguageStrategy().chunksPerWord(text: "¿Cómo estás? ¡Hola!", baseSpeedMs: 300)
+        XCTAssertEqual(chunks, ["¿Cómo", "estás?", "¡Hola!"])
     }
 
     func testEnforceBudgetMinSyllableLength() {
