@@ -14,6 +14,18 @@ struct FirstTakeResultSheet: View {
     let result: FirstTakeResult
     let onContinue: () -> Void
 
+    /// Below this the score is left out. The first take is the one where
+    /// the measurement is least settled (no baseline before it), and a low
+    /// number at the moment that should feel good would mislead more than
+    /// it tells.
+    static let minimumShownEyeContact = 0.6
+
+    /// Eye contact worth showing, if any.
+    private var gaze: GazeAttention.TakeSummary? {
+        guard let gaze = result.gaze, gaze.lookingFraction >= Self.minimumShownEyeContact else { return nil }
+        return gaze
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Capsule()
@@ -38,7 +50,7 @@ struct FirstTakeResultSheet: View {
                         .foregroundStyle(.white.opacity(0.65))
                 }
                 Spacer(minLength: 8)
-                if let gaze = result.gaze {
+                if let gaze {
                     HStack(spacing: 6) {
                         Image(systemName: "eye.fill")
                             .font(.system(size: 15, weight: .semibold))
@@ -55,7 +67,7 @@ struct FirstTakeResultSheet: View {
                 }
             }
 
-            if let gaze = result.gaze {
+            if let gaze {
                 timeline(gaze)
             }
 
@@ -88,16 +100,20 @@ struct FirstTakeResultSheet: View {
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    /// The take as a green bar with a grey tick wherever the eyes left.
+    /// The measured part of the take (calibration left out, as it is from
+    /// the percentage) as a green bar, grey wherever the eyes were away and
+    /// for as long, so it agrees with the percentage.
     private func timeline(_ gaze: GazeAttention.TakeSummary) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.green)
-                ForEach(Array(gaze.awayMoments.enumerated()), id: \.offset) { _, moment in
+                ForEach(Array(gaze.awaySpans.enumerated()), id: \.offset) { _, span in
+                    let x = position(span.lowerBound, of: gaze, width: geo.size.width)
+                    let end = position(span.upperBound, of: gaze, width: geo.size.width)
                     Rectangle()
                         .fill(Color(white: 0.4))
-                        .frame(width: 6)
-                        .offset(x: tickOffset(moment, width: geo.size.width))
+                        .frame(width: max(3, end - x))
+                        .offset(x: min(x, geo.size.width - 3))
                 }
             }
             .clipShape(Capsule())
@@ -106,8 +122,9 @@ struct FirstTakeResultSheet: View {
         .accessibilityHidden(true)
     }
 
-    private func tickOffset(_ moment: TimeInterval, width: CGFloat) -> CGFloat {
-        let fraction = CGFloat(moment / max(result.duration, 1))
-        return max(0, min(width - 6, width * fraction))
+    private func position(_ time: TimeInterval, of gaze: GazeAttention.TakeSummary, width: CGFloat) -> CGFloat {
+        let span = max(result.duration - gaze.trackedFrom, 1)
+        let fraction = CGFloat((time - gaze.trackedFrom) / span)
+        return max(0, min(width, width * fraction))
     }
 }
