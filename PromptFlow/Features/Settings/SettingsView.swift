@@ -26,6 +26,7 @@ struct SettingsView: View {
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
     @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
+    @AppStorage(FirstTakeResultSheet.enabledKey) private var takeEyeContactSheetEnabled: Bool = true
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
@@ -364,6 +365,23 @@ struct SettingsView: View {
                             localized: "settings.recording.gazeAutoPauseFooter",
                             defaultValue: "The prompter waits while you look down at the screen and picks up on the same word. Beta.",
                             comment: "Helper text below the pause-when-you-look-away toggle."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $takeEyeContactSheetEnabled) {
+                            Text(String(
+                                localized: "settings.recording.takeEyeContactSheet",
+                                defaultValue: "Eye contact after each take",
+                                comment: "Toggle: show a short eye-contact summary over each take's preview."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.takeEyeContactSheetFooter",
+                            defaultValue: "A short summary over the take when the eye-contact indicator is on. Swipe it down to watch.",
+                            comment: "Helper text below the eye-contact-after-each-take toggle."
                         ))
                             .font(.caption)
                             .foregroundStyle(.secondary)

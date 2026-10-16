@@ -7,14 +7,25 @@ struct FirstTakeResult: Equatable {
     var gaze: GazeAttention.TakeSummary?
 }
 
-/// Short bottom sheet over the preview of the guided first run's take: how
-/// long it was, the eye contact it held, and one way on. Low enough that
-/// the take itself stays in view (tap it to play).
+/// Short bottom sheet over a take's preview: how long it was and the eye
+/// contact it held. Low enough that the take itself stays in view (tap it to
+/// play).
+///
+/// Two uses. The guided first run's take passes `onContinue`: its one way on.
+/// After any other take (eye contact on), it has no button: the preview
+/// swipes it away, and "Don't show again" turns it off (Settings turns it
+/// back on).
 struct FirstTakeResultSheet: View {
     let result: FirstTakeResult
-    let onContinue: () -> Void
+    var onContinue: (() -> Void)? = nil
 
-    /// Below this the score is left out. The first take is the one where
+    @AppStorage(Self.enabledKey) private var showsAfterTakes = true
+    /// Whether the sheet follows an ordinary take (eye contact on).
+    static let enabledKey = "takeEyeContactSheetEnabled"
+
+    private var isFirstTake: Bool { onContinue != nil }
+
+    /// Below this the first take's score is left out. That take is the one where
     /// the measurement is least settled (no baseline before it), and a low
     /// number at the moment that should feel good would mislead more than
     /// it tells.
@@ -22,7 +33,8 @@ struct FirstTakeResultSheet: View {
 
     /// Eye contact worth showing, if any.
     private var gaze: GazeAttention.TakeSummary? {
-        guard let gaze = result.gaze, gaze.lookingFraction >= Self.minimumShownEyeContact else { return nil }
+        guard let gaze = result.gaze else { return nil }
+        if isFirstTake, gaze.lookingFraction < Self.minimumShownEyeContact { return nil }
         return gaze
     }
 
@@ -35,17 +47,25 @@ struct FirstTakeResultSheet: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(
-                        localized: "take_result.title",
-                        defaultValue: "Your first take",
-                        comment: "Title of the short sheet shown over the preview of the user's first take in the guided first run."
-                    ))
+                    Text(isFirstTake
+                        ? String(
+                            localized: "take_result.title",
+                            defaultValue: "Your first take",
+                            comment: "Title of the short sheet shown over the preview of the user's first take in the guided first run."
+                        )
+                        : String(
+                            localized: "take_result.regular_title",
+                            defaultValue: "Eye contact",
+                            comment: "Title of the short sheet shown over a take's preview with the eye contact the take held."
+                        ))
                         .font(.title3.bold())
-                    Text(String(
-                        localized: "take_result.subtitle_duration",
-                        defaultValue: "\(durationText) · Saved to Recordings",
-                        comment: "Subtitle on the first-take result sheet. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab."
-                    ))
+                    Text(isFirstTake
+                        ? String(
+                            localized: "take_result.subtitle_duration",
+                            defaultValue: "\(durationText) · Saved to Recordings",
+                            comment: "Subtitle on the first-take result sheet. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab."
+                        )
+                        : durationText)
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.65))
                 }
@@ -71,18 +91,34 @@ struct FirstTakeResultSheet: View {
                 timeline(gaze)
             }
 
-            Button(action: onContinue) {
-                Text(String(
-                    localized: "take_result.continue",
-                    defaultValue: "Continue",
-                    comment: "The one button on the first-take result sheet: closes the preview and goes on (to the paywall for free users)."
-                ))
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .background(Theme.accent, in: Capsule())
+            if let onContinue {
+                Button(action: onContinue) {
+                    Text(String(
+                        localized: "take_result.continue",
+                        defaultValue: "Continue",
+                        comment: "The one button on the first-take result sheet: closes the preview and goes on (to the paywall for free users)."
+                    ))
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .background(Theme.accent, in: Capsule())
+                }
+                .padding(.top, 4)
+            } else {
+                Toggle(isOn: Binding(get: { !showsAfterTakes }, set: { showsAfterTakes = !$0 })) {
+                    Text(String(
+                        localized: "take_result.dont_show",
+                        defaultValue: "Don’t show again",
+                        comment: "Toggle on the eye-contact sheet after a take: stop showing this sheet after takes. It can be turned back on in Settings."
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .tint(Theme.accent)
+                .onChange(of: showsAfterTakes) { _, shows in
+                    AppAnalytics.log("take_eye_contact_sheet_toggled", params: ["shows": shows])
+                }
             }
-            .padding(.top, 4)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 20)

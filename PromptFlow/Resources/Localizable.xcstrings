@@ -10489,6 +10489,66 @@
         }
       }
     },
+    "settings.recording.takeEyeContactSheet" : {
+      "comment" : "Toggle: show a short eye-contact summary over each take's preview.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eye contact after each take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacto visual tras cada toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contato visual após cada gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зрительный контакт после дубля"
+          }
+        }
+      }
+    },
+    "settings.recording.takeEyeContactSheetFooter" : {
+      "comment" : "Helper text below the eye-contact-after-each-take toggle.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A short summary over the take when the eye-contact indicator is on. Swipe it down to watch."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un breve resumen sobre la toma cuando el indicador de contacto visual está activo. Desliza hacia abajo para verla."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um resumo curto sobre a gravação quando o indicador de contato visual está ativo. Deslize para baixo para assistir."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Короткая сводка поверх дубля, когда включён индикатор взгляда. Смахните вниз, чтобы посмотреть видео."
+          }
+        }
+      }
+    },
     "settings.restore.button" : {
       "comment" : "Settings button that triggers RevenueCat restorePurchases against the active Apple ID. Required by App Store review and used by users installing on a new device.",
       "extractionState" : "manual",
@@ -12663,6 +12723,36 @@
         }
       }
     },
+    "take_result.dont_show" : {
+      "comment" : "Toggle on the eye-contact sheet after a take: stop showing this sheet after takes. It can be turned back on in Settings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t show again"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No volver a mostrar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não mostrar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Больше не показывать"
+          }
+        }
+      }
+    },
     "take_result.eye_contact_a11y" : {
       "comment" : "VoiceOver label for the eye-contact score on the first-take result sheet. %lld is the whole percent.",
       "extractionState" : "manual",
@@ -12689,6 +12779,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Зрительный контакт: %lld%%"
+          }
+        }
+      }
+    },
+    "take_result.regular_title" : {
+      "comment" : "Title of the short sheet shown over a take's preview with the eye contact the take held.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eye contact"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contacto visual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contato visual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зрительный контакт"
           }
         }
       }
