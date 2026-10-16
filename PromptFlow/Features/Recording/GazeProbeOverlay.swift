@@ -24,7 +24,7 @@ struct GazeProbeOverlay: View {
                 Text(model.verdictText)
                     .font(.caption.bold())
             }
-            Text("auto: \(String(describing: attention.state))")
+            Text(verbatim: "auto: \(String(describing: attention.state))")
                 .font(.caption2.bold())
                 .foregroundStyle(.white.opacity(0.7))
             Text(model.detailsText)

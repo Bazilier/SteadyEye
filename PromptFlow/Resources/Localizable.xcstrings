@@ -48,846 +48,6 @@
         }
       }
     },
-    "common.back" : {
-      "comment" : "Back button.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atrás"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voltar"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Назад"
-          }
-        }
-      }
-    },
-    "onboarding.access.title_ready" : {
-      "comment" : "Title of the onboarding screen shown right before the camera, microphone and photos permission prompts, after the user's first script was saved.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your script is ready. Let’s film it."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu guion está listo. ¡A grabar!"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu roteiro está pronto. Vamos gravar."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Текст готов. Снимаем!"
-          }
-        }
-      }
-    },
-    "onboarding.denied.body" : {
-      "comment" : "Body of the onboarding access-denied screen. The user's script is already saved; after enabling access in iOS Settings, returning to the app opens the camera with it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your script is saved. Switch these on in Settings and come back. We’ll open the camera with your script."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu guion está guardado. Actívalos en Configuración y vuelve: abriremos la cámara con tu guion."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu roteiro está salvo. Ative em Ajustes e volte: abriremos a câmera com seu roteiro."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ваш текст сохранён. Включите доступ в Настройках и возвращайтесь — откроем камеру с вашим текстом."
-          }
-        }
-      }
-    },
-    "onboarding.denied.not_now" : {
-      "comment" : "Quiet button on the onboarding access-denied screen: go to the scripts list; the saved script waits there.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not now"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ahora no"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agora não"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Не сейчас"
-          }
-        }
-      }
-    },
-    "onboarding.denied.off" : {
-      "comment" : "Status of a permission on the onboarding access-denied screen: not granted.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Off"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desactivado"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desativado"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выкл."
-          }
-        }
-      }
-    },
-    "onboarding.denied.on" : {
-      "comment" : "Status of a permission on the onboarding access-denied screen: granted.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "On"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activado"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ativado"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вкл."
-          }
-        }
-      }
-    },
-    "onboarding.denied.optional" : {
-      "comment" : "Small label next to Photos on the onboarding access-denied screen: recording works without it.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "optional"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "opcional"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "opcional"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "необязательно"
-          }
-        }
-      }
-    },
-    "onboarding.denied.title" : {
-      "comment" : "Title of the onboarding screen shown when the user turned down camera or microphone access.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Turn on the camera to film"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activa la cámara para grabar"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ative a câmera para gravar"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Включите камеру, чтобы снимать"
-          }
-        }
-      }
-    },
-    "onboarding.sample.content" : {
-      "comment" : "Ready-made sample script a new user records in onboarding when they have no topic yet. Read aloud on camera, first person; keep it short and natural.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hi! This is my first take with SteadyEye. The words appear right under the lens, so I can read and still look you in the eye. No notes, no looking down. Just me and the camera."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¡Hola! Esta es mi primera toma con SteadyEye. Las palabras aparecen justo debajo del lente, así que puedo leer y seguir mirándote a los ojos. Sin notas, sin mirar hacia abajo. Solo yo y la cámara."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oi! Esta é a minha primeira gravação com o SteadyEye. As palavras aparecem logo abaixo da lente, então posso ler e continuar olhando nos seus olhos. Sem anotações, sem olhar para baixo. Só eu e a câmera."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Привет! Это мой первый дубль в SteadyEye. Слова появляются прямо под объективом, поэтому я читаю и при этом смотрю вам в глаза. Без шпаргалок и взглядов вниз. Только я и камера."
-          }
-        }
-      }
-    },
-    "onboarding.sample.title" : {
-      "comment" : "Title of the ready-made sample script a new user gets when they leave the topic empty in onboarding.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My first take"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mi primera toma"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minha primeira gravação"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Мой первый дубль"
-          }
-        }
-      }
-    },
-    "onboarding.script.empty_hint" : {
-      "comment" : "Hint under the topic field on the onboarding script step: an empty topic gets a ready-made sample script.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No idea yet? Leave it empty and we’ll give you a sample script to try."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Aún sin idea? Déjalo vacío y te daremos un guion de ejemplo para probar."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ainda sem ideia? Deixe em branco e daremos um roteiro de exemplo para testar."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пока нет идеи? Оставьте поле пустым — дадим пример текста, чтобы попробовать."
-          }
-        }
-      }
-    },
-    "onboarding.script.error.quota" : {
-      "comment" : "Error on the onboarding script step when the free daily AI drafts are used up.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You’ve used today’s free drafts. Leave the topic empty for a sample, or paste your own text."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ya usaste los borradores gratis de hoy. Deja el tema vacío para un ejemplo o pega tu propio texto."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você já usou os rascunhos grátis de hoje. Deixe o tema em branco para um exemplo ou cole seu próprio texto."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Бесплатные черновики на сегодня закончились. Оставьте тему пустой для примера или вставьте свой текст."
-          }
-        }
-      }
-    },
-    "onboarding.script.paste" : {
-      "comment" : "Secondary button on the onboarding script step: paste or type an own script instead of the AI.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I have my own text"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tengo mi propio texto"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tenho meu próprio texto"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "У меня есть свой текст"
-          }
-        }
-      }
-    },
-    "onboarding.script.paste_back_ai" : {
-      "comment" : "Quiet link on the onboarding paste-your-script step: back to the topic for the AI.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Write it with AI instead"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mejor escribirlo con IA"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escrever com IA"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Лучше написать с ИИ"
-          }
-        }
-      }
-    },
-    "onboarding.script.paste_placeholder" : {
-      "comment" : "Placeholder in the text area on the onboarding paste-your-script step.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paste or type what you’ll say"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pega o escribe lo que vas a decir"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cole ou digite o que você vai dizer"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставьте или напишите, что скажете"
-          }
-        }
-      }
-    },
-    "onboarding.script.paste_subtitle" : {
-      "comment" : "Subtitle on the onboarding paste-your-script step.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Any length. You can fix it later."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Del largo que quieras. Puedes editarlo después."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qualquer tamanho. Você pode ajustar depois."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Любой длины. Поправить можно потом."
-          }
-        }
-      }
-    },
-    "onboarding.script.paste_title" : {
-      "comment" : "Title of the onboarding step where the user pastes or types their own script.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paste your script"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pega tu guion"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cole seu roteiro"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вставьте свой текст"
-          }
-        }
-      }
-    },
-    "onboarding.script.sample_label" : {
-      "comment" : "Line under 'Your script' on the onboarding script step when the user left the topic empty and got the ready-made sample.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A sample to try. Your own topic next time."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un ejemplo para probar. La próxima vez, tu propio tema."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Um exemplo para testar. Da próxima vez, o seu próprio tema."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пример, чтобы попробовать. В следующий раз — ваша тема."
-          }
-        }
-      }
-    },
-    "onboarding.script.skip" : {
-      "comment" : "Quiet button at the top of the onboarding script step: leave onboarding without writing a script.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skip"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Omitir"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pular"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Пропустить"
-          }
-        }
-      }
-    },
-    "onboarding.script.subtitle" : {
-      "comment" : "Subtitle on the onboarding script step, under 'What's your video about?'.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One line is enough. We’ll write a 30-second script you can read right away."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Con una línea basta. Escribiremos un guion de 30 segundos que puedes leer de inmediato."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uma linha basta. Vamos escrever um roteiro de 30 segundos para você ler na hora."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Достаточно одной строки. Мы напишем текст на 30 секунд, который можно сразу читать."
-          }
-        }
-      }
-    },
-    "onboarding.script.write" : {
-      "comment" : "Primary button on the onboarding script step: the AI writes a script from the topic, or, with no topic, the ready-made sample is used.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Write my script"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escribir mi guion"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escrever meu roteiro"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Написать мой текст"
-          }
-        }
-      }
-    },
-    "onboarding.welcome.caption_next" : {
-      "comment" : "Caption under the Continue button on the first onboarding screen: what comes next.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Next: your script, then your first take"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Después: tu guion y tu primera toma"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Depois: seu roteiro e sua primeira gravação"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Дальше: ваш текст и первый дубль"
-          }
-        }
-      }
-    },
-    "onboarding.welcome.eye_row.detail" : {
-      "comment" : "First onboarding screen, detail under 'Green eye means eye contact'.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "It goes grey when you look away from the lens."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se pone gris cuando apartas la vista de la cámara."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fica cinza quando você desvia o olhar da câmera."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Становится серым, когда вы отводите взгляд от объектива."
-          }
-        }
-      }
-    },
-    "onboarding.welcome.eye_row.title" : {
-      "comment" : "First onboarding screen, second explanation row: the eye on the prompter pill turns green while the user looks at the lens.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Green eye means eye contact"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ojo verde: contacto visual"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Olho verde: contato visual"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Зелёный глаз — зрительный контакт"
-          }
-        }
-      }
-    },
-    "onboarding.welcome.text_row.detail" : {
-      "comment" : "First onboarding screen, detail under 'Your script runs under the camera'.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Word by word, right where you look."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Palabra por palabra, justo donde miras."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Palavra por palavra, bem onde você olha."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Слово за словом, там, куда вы смотрите."
-          }
-        }
-      }
-    },
-    "onboarding.welcome.text_row.title" : {
-      "comment" : "First onboarding screen, first explanation row: the prompter text runs right under the lens.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your script runs under the camera"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu guion pasa justo debajo de la cámara"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu roteiro passa logo abaixo da câmera"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Текст идёт прямо под камерой"
-          }
-        }
-      }
-    },
-    "onboarding_flow.leave.camera_message" : {
-      "comment" : "Alert message when the user closes the camera before the first take of their own script during the guided first run. The script is kept in the scripts list.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your script stays in the list. Record it whenever you’re ready."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu guion se queda en la lista. Grábalo cuando quieras."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu roteiro fica na lista. Grave quando quiser."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Текст останется в списке. Запишите его, когда будете готовы."
-          }
-        }
-      }
-    },
-    "review.satisfaction.title.studio" : {
-      "comment" : "Satisfaction question after the user compared the original and the Studio Sound (enhanced) audio of a take and watched it to the end.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "How does it sound?"
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Qué te parece el sonido?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O que achou do som?"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Как вам звук?"
-          }
-        }
-      }
-    },
     "·" : {
       "comment" : "An ellipsis character used to separate related items.",
       "extractionState" : "stale",
@@ -997,19 +157,6 @@
         }
       }
     },
-    "%lld / 20" : {
-
-    },
-    "%lld events copied. Paste them into the chat." : {
-      "comment" : "A message in the alert that appears when the user copies the camera diagnostics.",
-      "isCommentAutoGenerated" : true
-    },
-    "Adds a video from Photos to Recordings as a take, to see the library and the preview without a camera. Simulator: xcrun simctl addmedia booted <file> first." : {
-
-    },
-    "AI optimize used today" : {
-
-    },
     "ai.proDailyLimit.body" : {
       "comment" : "Body of the Pro AI daily-limit alert.",
       "extractionState" : "extracted_with_value",
@@ -1069,22 +216,6 @@
           }
         }
       }
-    },
-    "API calls today" : {
-
-    },
-    "auto: %@" : {
-
-    },
-    "Build: DEV" : {
-
-    },
-    "Camera Diagnostics" : {
-      "comment" : "A screen that shows a list of camera diagnostics events.",
-      "isCommentAutoGenerated" : true
-    },
-    "Camera self-correction test" : {
-
     },
     "camera.audio.iPhoneMic" : {
       "comment" : "Default audio source name displayed in the recording HUD when no external mic is connected.",
@@ -1295,12 +426,6 @@
           }
         }
       }
-    },
-    "Cancel" : {
-
-    },
-    "Cancel all pending notifications" : {
-
     },
     "chat.empty" : {
       "comment" : "Empty-state hint shown in the chat when there are no messages yet.",
@@ -1632,18 +757,38 @@
         }
       }
     },
-    "Chromakey (DEV)" : {
-
-    },
-    "Chromakey background (replace camera)" : {
-
-    },
-    "Clear" : {
-      "comment" : "A button that clears all camera diagnostics.",
-      "isCommentAutoGenerated" : true
-    },
     "Clears the frozen paywall_mode so the next resolution re-reads Remote Config. Non-production Firebase projects only." : {
 
+    },
+    "common.back" : {
+      "comment" : "Back button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назад"
+          }
+        }
+      }
     },
     "common.beta" : {
       "comment" : "Badge shown beside the Recording Orientation setting, marking the landscape recording mode as a beta feature.",
@@ -2034,29 +1179,6 @@
           }
         }
       }
-    },
-    "Copied" : {
-      "comment" : "A confirmation alert that appears when the user copies the camera diagnostics.",
-      "isCommentAutoGenerated" : true
-    },
-    "Copy" : {
-      "comment" : "A button that copies the contents of the screen to the clipboard.",
-      "isCommentAutoGenerated" : true
-    },
-    "Crop sideways takes to 9:16" : {
-
-    },
-    "Debug" : {
-
-    },
-    "Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay." : {
-
-    },
-    "DEV" : {
-
-    },
-    "DEV only. Forces isSubscribed state for testing." : {
-
     },
     "draft.drafting" : {
       "comment" : "Shown on the draft button while the AI writes the script.",
@@ -2688,9 +1810,6 @@
         }
       }
     },
-    "Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only." : {
-
-    },
     "duo.fold_to_record.toast" : {
       "comment" : "Toast on an unfolded iPhone Duo when the user tries to record, or after unfolding closed the camera: recording works folded only.",
       "extractionState" : "manual",
@@ -2841,21 +1960,6 @@
         }
       }
     },
-    "Erase everything and quit" : {
-
-    },
-    "Fire inactive_3_days in 5s" : {
-
-    },
-    "Fire trial_day_5 in 5s" : {
-
-    },
-    "Fire trial_ending_24h in 5s" : {
-
-    },
-    "Fire trial_started in 5s" : {
-
-    },
     "first_take.compact" : {
       "comment" : "One-line coach above the spotlit record button when the user records their own script for the first time.",
       "extractionState" : "manual",
@@ -2886,21 +1990,6 @@
         }
       }
     },
-    "Force Free" : {
-
-    },
-    "Force Subscribed" : {
-
-    },
-    "Gaze probe (DEV)" : {
-
-    },
-    "Gaze readout on the camera" : {
-
-    },
-    "Geometry overlay (chromakey)" : {
-
-    },
     "hud.changeInSettings" : {
       "comment" : "Short imperative shown in the recording-HUD discovery toasts (mic indicator + resolution label). Tells the user the tapped attribute is configurable in the Settings tab. Paired with an Open Settings CTA. Kept short so it fits the HUD overlay width.",
       "extractionState" : "manual",
@@ -2930,26 +2019,6 @@
           }
         }
       }
-    },
-    "Import video as a recording" : {
-      "comment" : "A button that imports a video into Recordings.",
-      "isCommentAutoGenerated" : true
-    },
-    "iPhone Duo (DEV)" : {
-
-    },
-    "no" : {
-
-    },
-    "No events yet. Open the recording screen and record a few seconds, then come back." : {
-      "comment" : "A message displayed when there are no camera diagnostics events.",
-      "isCommentAutoGenerated" : true
-    },
-    "Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open." : {
-
-    },
-    "Notifications (DEV)" : {
-
     },
     "notifications.soft_ask.allow" : {
       "comment" : "Primary CTA on the in-app soft-ask sheet that triggers iOS's native notification permission prompt.",
@@ -3071,12 +2140,35 @@
         }
       }
     },
-    "Off (use RC)" : {
-
-    },
-    "OK" : {
-      "comment" : "A button that dismisses an alert.",
-      "isCommentAutoGenerated" : true
+    "onboarding_flow.leave.camera_message" : {
+      "comment" : "Alert message when the user closes the camera before the first take of their own script during the guided first run. The script is kept in the scripts list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script stays in the list. Record it whenever you’re ready."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion se queda en la lista. Grábalo cuando quieras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro fica na lista. Grave quando quiser."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст останется в списке. Запишите его, когда будете готовы."
+          }
+        }
+      }
     },
     "onboarding_flow.leave.message" : {
       "comment" : "Alert message when the user tries to leave the guided first run.",
@@ -3558,6 +2650,216 @@
         }
       }
     },
+    "onboarding.access.title_ready" : {
+      "comment" : "Title of the onboarding screen shown right before the camera, microphone and photos permission prompts, after the user's first script was saved.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script is ready. Let’s film it."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion está listo. ¡A grabar!"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro está pronto. Vamos gravar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст готов. Снимаем!"
+          }
+        }
+      }
+    },
+    "onboarding.denied.body" : {
+      "comment" : "Body of the onboarding access-denied screen. The user's script is already saved; after enabling access in iOS Settings, returning to the app opens the camera with it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script is saved. Switch these on in Settings and come back. We’ll open the camera with your script."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion está guardado. Actívalos en Configuración y vuelve: abriremos la cámara con tu guion."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro está salvo. Ative em Ajustes e volte: abriremos a câmera com seu roteiro."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваш текст сохранён. Включите доступ в Настройках и возвращайтесь — откроем камеру с вашим текстом."
+          }
+        }
+      }
+    },
+    "onboarding.denied.not_now" : {
+      "comment" : "Quiet button on the onboarding access-denied screen: go to the scripts list; the saved script waits there.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora no"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora não"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не сейчас"
+          }
+        }
+      }
+    },
+    "onboarding.denied.off" : {
+      "comment" : "Status of a permission on the onboarding access-denied screen: not granted.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выкл."
+          }
+        }
+      }
+    },
+    "onboarding.denied.on" : {
+      "comment" : "Status of a permission on the onboarding access-denied screen: granted.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вкл."
+          }
+        }
+      }
+    },
+    "onboarding.denied.optional" : {
+      "comment" : "Small label next to Photos on the onboarding access-denied screen: recording works without it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "optional"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opcional"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opcional"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "необязательно"
+          }
+        }
+      }
+    },
+    "onboarding.denied.title" : {
+      "comment" : "Title of the onboarding screen shown when the user turned down camera or microphone access.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the camera to film"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa la cámara para grabar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative a câmera para gravar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Включите камеру, чтобы снимать"
+          }
+        }
+      }
+    },
     "onboarding.mini_wbw.script" : {
       "comment" : "Short looping phrase shown in the onboarding priming-screen MiniWBW animation. Independent of demo.script.content. Should be 8-12 short words that read naturally word-by-word.",
       "extractionState" : "manual",
@@ -3708,6 +3010,486 @@
         }
       }
     },
+    "onboarding.sample.content" : {
+      "comment" : "Ready-made sample script a new user records in onboarding when they have no topic yet. Read aloud on camera, first person; keep it short and natural.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi! This is my first take with SteadyEye. The words appear right under the lens, so I can read and still look you in the eye. No notes, no looking down. Just me and the camera."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Hola! Esta es mi primera toma con SteadyEye. Las palabras aparecen justo debajo del lente, así que puedo leer y seguir mirándote a los ojos. Sin notas, sin mirar hacia abajo. Solo yo y la cámara."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oi! Esta é a minha primeira gravação com o SteadyEye. As palavras aparecem logo abaixo da lente, então posso ler e continuar olhando nos seus olhos. Sem anotações, sem olhar para baixo. Só eu e a câmera."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет! Это мой первый дубль в SteadyEye. Слова появляются прямо под объективом, поэтому я читаю и при этом смотрю вам в глаза. Без шпаргалок и взглядов вниз. Только я и камера."
+          }
+        }
+      }
+    },
+    "onboarding.sample.title" : {
+      "comment" : "Title of the ready-made sample script a new user gets when they leave the topic empty in onboarding.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My first take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mi primera toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minha primeira gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мой первый дубль"
+          }
+        }
+      }
+    },
+    "onboarding.script.empty_hint" : {
+      "comment" : "Hint under the topic field on the onboarding script step: an empty topic gets a ready-made sample script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No idea yet? Leave it empty and we’ll give you a sample script to try."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Aún sin idea? Déjalo vacío y te daremos un guion de ejemplo para probar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda sem ideia? Deixe em branco e daremos um roteiro de exemplo para testar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока нет идеи? Оставьте поле пустым — дадим пример текста, чтобы попробовать."
+          }
+        }
+      }
+    },
+    "onboarding.script.error.quota" : {
+      "comment" : "Error on the onboarding script step when the free daily AI drafts are used up.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve used today’s free drafts. Leave the topic empty for a sample, or paste your own text."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya usaste los borradores gratis de hoy. Deja el tema vacío para un ejemplo o pega tu propio texto."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você já usou os rascunhos grátis de hoje. Deixe o tema em branco para um exemplo ou cole seu próprio texto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бесплатные черновики на сегодня закончились. Оставьте тему пустой для примера или вставьте свой текст."
+          }
+        }
+      }
+    },
+    "onboarding.script.paste" : {
+      "comment" : "Secondary button on the onboarding script step: paste or type an own script instead of the AI.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I have my own text"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tengo mi propio texto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tenho meu próprio texto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У меня есть свой текст"
+          }
+        }
+      }
+    },
+    "onboarding.script.paste_back_ai" : {
+      "comment" : "Quiet link on the onboarding paste-your-script step: back to the topic for the AI.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write it with AI instead"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejor escribirlo con IA"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever com IA"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лучше написать с ИИ"
+          }
+        }
+      }
+    },
+    "onboarding.script.paste_placeholder" : {
+      "comment" : "Placeholder in the text area on the onboarding paste-your-script step.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste or type what you’ll say"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega o escribe lo que vas a decir"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole ou digite o que você vai dizer"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставьте или напишите, что скажете"
+          }
+        }
+      }
+    },
+    "onboarding.script.paste_subtitle" : {
+      "comment" : "Subtitle on the onboarding paste-your-script step.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any length. You can fix it later."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Del largo que quieras. Puedes editarlo después."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualquer tamanho. Você pode ajustar depois."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Любой длины. Поправить можно потом."
+          }
+        }
+      }
+    },
+    "onboarding.script.paste_title" : {
+      "comment" : "Title of the onboarding step where the user pastes or types their own script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste your script"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pega tu guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole seu roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставьте свой текст"
+          }
+        }
+      }
+    },
+    "onboarding.script.sample_label" : {
+      "comment" : "Line under 'Your script' on the onboarding script step when the user left the topic empty and got the ready-made sample.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sample to try. Your own topic next time."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un ejemplo para probar. La próxima vez, tu propio tema."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um exemplo para testar. Da próxima vez, o seu próprio tema."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пример, чтобы попробовать. В следующий раз — ваша тема."
+          }
+        }
+      }
+    },
+    "onboarding.script.skip" : {
+      "comment" : "Quiet button at the top of the onboarding script step: leave onboarding without writing a script.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pular"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить"
+          }
+        }
+      }
+    },
+    "onboarding.script.subtitle" : {
+      "comment" : "Subtitle on the onboarding script step, under 'What's your video about?'.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One line is enough. We’ll write a 30-second script you can read right away."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con una línea basta. Escribiremos un guion de 30 segundos que puedes leer de inmediato."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma linha basta. Vamos escrever um roteiro de 30 segundos para você ler na hora."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Достаточно одной строки. Мы напишем текст на 30 секунд, который можно сразу читать."
+          }
+        }
+      }
+    },
+    "onboarding.script.write" : {
+      "comment" : "Primary button on the onboarding script step: the AI writes a script from the topic, or, with no topic, the ready-made sample is used.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write my script"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir mi guion"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever meu roteiro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Написать мой текст"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.caption_next" : {
+      "comment" : "Caption under the Continue button on the first onboarding screen: what comes next.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: your script, then your first take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Después: tu guion y tu primera toma"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depois: seu roteiro e sua primeira gravação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дальше: ваш текст и первый дубль"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.eye_row.detail" : {
+      "comment" : "First onboarding screen, detail under 'Green eye means eye contact'.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It goes grey when you look away from the lens."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se pone gris cuando apartas la vista de la cámara."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fica cinza quando você desvia o olhar da câmera."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Становится серым, когда вы отводите взгляд от объектива."
+          }
+        }
+      }
+    },
+    "onboarding.welcome.eye_row.title" : {
+      "comment" : "First onboarding screen, second explanation row: the eye on the prompter pill turns green while the user looks at the lens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Green eye means eye contact"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ojo verde: contacto visual"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olho verde: contato visual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зелёный глаз — зрительный контакт"
+          }
+        }
+      }
+    },
     "onboarding.welcome.pill_phrase" : {
       "comment" : "Words cycled through the prompter pill on the first onboarding screen, three at a time, one word per line. Keep it short and natural.",
       "extractionState" : "manual",
@@ -3734,6 +3516,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Читайте свой текст и смотрите прямо в камеру"
+          }
+        }
+      }
+    },
+    "onboarding.welcome.text_row.detail" : {
+      "comment" : "First onboarding screen, detail under 'Your script runs under the camera'.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Word by word, right where you look."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palabra por palabra, justo donde miras."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palavra por palavra, bem onde você olha."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слово за словом, там, куда вы смотрите."
+          }
+        }
+      }
+    },
+    "onboarding.welcome.text_row.title" : {
+      "comment" : "First onboarding screen, first explanation row: the prompter text runs right under the lens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your script runs under the camera"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu guion pasa justo debajo de la cámara"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu roteiro passa logo abaixo da câmera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст идёт прямо под камерой"
           }
         }
       }
@@ -6722,15 +6564,6 @@
         }
       }
     },
-    "Pending push count" : {
-
-    },
-    "Preview Paywall" : {
-
-    },
-    "Preview Satisfaction Prompt" : {
-
-    },
     "preview.photosDenied.toast" : {
       "comment" : "Toast shown when the user tries to save but Photos access is denied or restricted. Has a 'Settings' action button.",
       "extractionState" : "manual",
@@ -6820,9 +6653,6 @@
           }
         }
       }
-    },
-    "Push status" : {
-
     },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
@@ -7455,9 +7285,6 @@
         }
       }
     },
-    "Recordings (DEV)" : {
-
-    },
     "recordings.action.delete" : {
       "comment" : "Recordings context-menu destructive action that removes the recording.",
       "extractionState" : "extracted_with_value",
@@ -7909,7 +7736,7 @@
       }
     },
     "recordings.preview.saveToCameraRoll" : {
-      "comment" : "Button on the preview screen to save the recording to the Photos library.\nPrimary button in the recording preview that exports the (already-persisted) video to the Photos library.",
+      "comment" : "Primary button in the recording preview that exports the (already-persisted) video to the Photos library.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
@@ -8058,41 +7885,7 @@
         }
       }
     },
-    "Refresh" : {
-      "comment" : "A button that refreshes the list of camera diagnostics.",
-      "isCommentAutoGenerated" : true
-    },
-    "Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open." : {
-
-    },
-    "Request push permission" : {
-
-    },
-    "Reset AI Optimize Day Limit" : {
-
-    },
     "Reset Paywall Mode" : {
-
-    },
-    "Reset Pro AI counter" : {
-
-    },
-    "Reset Rate Limits" : {
-
-    },
-    "Reset satisfaction prompt state" : {
-
-    },
-    "Reset soft ask flag" : {
-
-    },
-    "Reset Tips" : {
-
-    },
-    "Reset to a new install?" : {
-
-    },
-    "Reset to new install (replays onboarding)" : {
 
     },
     "review.satisfaction.body" : {
@@ -8335,6 +8128,36 @@
         }
       }
     },
+    "review.satisfaction.title.studio" : {
+      "comment" : "Satisfaction question after the user compared the original and the Studio Sound (enhanced) audio of a take and watched it to the end.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "How does it sound?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué te parece el sonido?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que achou do som?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как вам звук?"
+          }
+        }
+      }
+    },
     "review.satisfaction.title.take" : {
       "comment" : "Satisfaction question right after the user watched a take that held eye contact.",
       "extractionState" : "manual",
@@ -8394,15 +8217,6 @@
           }
         }
       }
-    },
-    "Runs the front camera through the iPhone Duo camera path, starting upside down. With your face in the frame, the preview should turn upright within about two seconds and stay upright on the next open. Turning it on again restarts the test. Takes effect on next Recording open." : {
-
-    },
-    "Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only." : {
-
-    },
-    "Satisfaction prompt enabled (stands in for RC)" : {
-
     },
     "script.aiProRemainingCaption" : {
       "comment" : "Footer in the editor stats bar shown to Pro users when they have 5 or fewer AI optimizations left in their 30/day daily quota. %1$lld is the remaining count.",
@@ -9855,9 +9669,6 @@
           }
         }
       }
-    },
-    "Send Duo reports from this phone" : {
-
     },
     "settings.about.version" : {
       "comment" : "Row label in the About section of Settings showing the app version number.",
@@ -12690,9 +12501,6 @@
         }
       }
     },
-    "Subscription Override" : {
-
-    },
     "take_result.continue" : {
       "comment" : "The one button on the first-take result sheet: closes the preview and goes on (to the paywall for free users).",
       "extractionState" : "manual",
@@ -12936,12 +12744,6 @@
           }
         }
       }
-    },
-    "Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only." : {
-
-    },
-    "yes" : {
-
     }
   },
   "version" : "1.1"

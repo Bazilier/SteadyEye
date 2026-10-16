@@ -18,7 +18,7 @@ struct CameraDiagnosticsView: View {
     var body: some View {
         List {
             if entries.isEmpty {
-                Text("No events yet. Open the recording screen and record a few seconds, then come back.")
+                Text(verbatim: "No events yet. Open the recording screen and record a few seconds, then come back.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -35,11 +35,11 @@ struct CameraDiagnosticsView: View {
                 }
             }
         }
-        .navigationTitle("Camera Diagnostics")
+        .navigationTitle(devLabel("Camera Diagnostics"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Copy") {
+                Button(devLabel("Copy")) {
                     UIPasteboard.general.string = plainText
                     showCopied = true
                 }
@@ -47,19 +47,19 @@ struct CameraDiagnosticsView: View {
             }
             ToolbarItem(placement: .bottomBar) {
                 HStack {
-                    Button("Refresh") { reload() }
+                    Button(devLabel("Refresh")) { reload() }
                     Spacer()
-                    Button("Clear", role: .destructive) {
+                    Button(devLabel("Clear"), role: .destructive) {
                         CameraDiagnosticsLog.clear()
                         reload()
                     }
                 }
             }
         }
-        .alert("Copied", isPresented: $showCopied) {
-            Button("OK", role: .cancel) {}
+        .alert(devLabel("Copied"), isPresented: $showCopied) {
+            Button(devLabel("OK"), role: .cancel) {}
         } message: {
-            Text("\(entries.count) events copied. Paste them into the chat.")
+            Text(verbatim: "\(entries.count) events copied. Paste them into the chat.")
         }
         .onAppear { reload() }
     }

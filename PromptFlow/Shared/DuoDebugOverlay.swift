@@ -97,7 +97,7 @@ struct DuoDebugOverlay: View {
         VStack(spacing: 2) {
             Image(systemName: "arrow.up")
                 .font(.system(size: 28, weight: .bold))
-            Text("UP").font(.caption.bold())
+            Text(verbatim: "UP").font(.caption.bold())
         }
         .foregroundStyle(.white)
         .padding(6)
@@ -108,13 +108,13 @@ struct DuoDebugOverlay: View {
     private var infoBlock: some View {
         let target = infoArea
         return VStack(alignment: .leading, spacing: 2) {
-            Text("posture: \(state.posture.rawValue)")
+            Text(verbatim: "posture: \(state.posture.rawValue)")
             Text("hinge: \(state.hingeStatus.rawValue) \(String(format: "%.1f°", monitor?.hingeAngleDegrees ?? 0))")
-            Text("window: \(DuoDisplayMonitor.fmt(state.windowSize))")
-            Text("interface: \(interfaceOrientation)")
-            Text("device: \(Self.describe(deviceOrientation))")
-            Text("lensFrame: \(DuoDisplayMonitor.fmt(state.lensFrame))")
-            Text("lensEdge: \(state.lensEdge.rawValue)")
+            Text(verbatim: "window: \(DuoDisplayMonitor.fmt(state.windowSize))")
+            Text(verbatim: "interface: \(interfaceOrientation)")
+            Text(verbatim: "device: \(Self.describe(deviceOrientation))")
+            Text(verbatim: "lensFrame: \(DuoDisplayMonitor.fmt(state.lensFrame))")
+            Text(verbatim: "lensEdge: \(state.lensEdge.rawValue)")
         }
         .font(.system(size: 12, design: .monospaced))
         .foregroundStyle(.white)
