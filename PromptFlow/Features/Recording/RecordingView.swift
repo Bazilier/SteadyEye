@@ -1352,17 +1352,18 @@ struct RecordingView: View {
                         }
                     }
                 } label: {
+                    // Sized and toned to match the eye (`GazeIndicator`).
                     Image(systemName: "arrow.trianglehead.clockwise")
-                        .font(.system(size: 24, weight: .regular))
+                        .font(.system(size: 16, weight: .semibold))
                         .overlay {
                             Text(verbatim: "\(lineCount)")
-                                .font(.system(size: 11, weight: .bold).monospacedDigit())
+                                .font(.system(size: 8, weight: .bold).monospacedDigit())
                                 .contentTransition(.numericText())
                                 // The ring sits low in the symbol's box,
                                 // under the arrowhead.
-                                .offset(y: 1.5)
+                                .offset(y: 1)
                         }
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.white.opacity(0.25))
                     .rotationEffect(isLandscape ? .degrees(90) : .degrees(0))
                     .frame(width: 44, height: 44)
                 }

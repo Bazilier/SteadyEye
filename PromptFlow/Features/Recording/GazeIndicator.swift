@@ -24,7 +24,7 @@ struct GazeIndicator: View {
 
     private var color: Color {
         switch state {
-        case .idle, .away: return .white.opacity(0.35)
+        case .idle, .away: return .white.opacity(0.25)
         case .calibrating: return Theme.accent
         case .looking: return .green
         }
