@@ -173,13 +173,20 @@ nonisolated private func fixedLengthSplit(_ word: String, threshold: Int) -> [St
 }
 
 /// Splits a long word into syllables using hyphenation, adding a trailing "-"
-/// to continuation syllables. Words containing "-" are first split on the hyphen
-/// and each segment is recursively split.
+/// to continuation syllables. Words longer than `threshold` that contain "-"
+/// are first split on the hyphen and each segment is recursively split.
 ///
 /// Locale handling: per-word language is detected via NLLanguageRecognizer.
 /// The passed-in `locale` is used as a fallback when detection fails.
 /// If hyphenation returns no points, falls back to fixed-length splitting.
 nonisolated func splitLongWord(_ word: String, threshold: Int, locale: Locale?) -> [String] {
+    // 0. A run of hyphens is a dash between words, not a word: it stays an
+    // empty (pause) chunk.
+    if !word.isEmpty, word.allSatisfy({ $0 == "-" }) { return [""] }
+
+    // Short enough → no split, hyphenated or not ("что-то", "Wi-Fi").
+    if word.count <= threshold { return [word] }
+
     // 1. Split on existing hyphens first, recurse on each segment.
     if word.contains("-") {
         let parts = word.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
@@ -204,11 +211,17 @@ nonisolated func splitLongWord(_ word: String, threshold: Int, locale: Locale?) 
                 }
             }
         }
-        return mergeShortTail(result)
+        // A short last segment follows the word's own hyphen, so it merges
+        // back with the hyphen kept ("бург-" + "то" → "бург-то").
+        // mergeShortTail would drop it as a syllable break.
+        let trailingTrim = CharacterSet(charactersIn: "-,.!?;:")
+        if result.count >= 2,
+           result[result.count - 1].trimmingCharacters(in: trailingTrim).count < minSyllableLength {
+            let last = result.removeLast()
+            result[result.count - 1] += last
+        }
+        return result
     }
-
-    // 2. Short enough → no split.
-    if word.count <= threshold { return [word] }
 
     // 3. Detect per-word locale; fall back to passed-in locale.
     let fallbackLocale = locale

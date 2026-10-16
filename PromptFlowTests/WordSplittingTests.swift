@@ -170,6 +170,33 @@ final class WordSplittingTests: XCTestCase {
         }
     }
 
+    func testShortHyphenatedWordsStayWhole() {
+        let words = ["что-то", "кто-то,", "из-за", "по-русски", "ex-novio", "e-mail", "Wi-Fi"]
+        for word in words {
+            XCTAssertEqual(splitLongWord(word, threshold: 12, locale: Locale(identifier: "en_US")), [word])
+        }
+    }
+
+    func testLongHyphenatedWordKeepsHyphenBeforeShortTail() {
+        let parts = splitLongWord("Санкт-Петербург-то", threshold: 12, locale: Locale(identifier: "ru_RU"))
+        XCTAssertTrue(parts.last?.hasSuffix("-то") ?? false, "Real hyphen dropped: \(parts)")
+    }
+
+    func testChunksPerWordKeepsHyphenatedWordsRussian() {
+        let chunks = LatinLanguageStrategy().chunksPerWord(text: "Это что-то из-за Wi-Fi.", baseSpeedMs: 300)
+        XCTAssertEqual(chunks, ["Это", "что-то", "из-за", "Wi-Fi."])
+    }
+
+    func testChunksPerWordKeepsHyphenatedWordsSpanish() {
+        let chunks = LatinLanguageStrategy().chunksPerWord(text: "Mi ex-novio usa e-mail", baseSpeedMs: 300)
+        XCTAssertEqual(chunks, ["Mi", "ex-novio", "usa", "e-mail"])
+    }
+
+    func testChunksPerWordLoneHyphenIsPause() {
+        let chunks = LatinLanguageStrategy().chunksPerWord(text: "Hola - mundo", baseSpeedMs: 300)
+        XCTAssertEqual(chunks, ["Hola", "", "mundo"])
+    }
+
     // MARK: - Group 5: enforceBudget
 
     func testEnforceBudgetWithinLimit() {
