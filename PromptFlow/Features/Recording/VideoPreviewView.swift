@@ -33,7 +33,8 @@ struct VideoPreviewView: View {
     /// the preview (see `FirstTakeResultSheet`).
     var firstTakeResult: FirstTakeResult? = nil
     /// Any other take's eye contact, when it was tracked and the user keeps
-    /// the sheet on: shown over the preview until swiped down.
+    /// the card on: floats over the progress bar until closed (see
+    /// `EyeContactToast`).
     var takeResult: FirstTakeResult? = nil
     /// Eye contact over the take just recorded, 0...1; nil when it was not
     /// tracked or the preview was opened from the Recordings tab.
@@ -44,7 +45,6 @@ struct VideoPreviewView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var isTakeResultHidden = false
-    @State private var takeResultDrag: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Injected at the app root; its `state` is nil except on iPhone Duo.
     @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
@@ -203,9 +203,26 @@ struct VideoPreviewView: View {
                     }
                 }
                 // Floats above the controls without pushing the video up.
+                // The take's eye contact goes first; the Studio Sound hint
+                // waits until it is closed.
                 .overlay(alignment: .topLeading) {
-                    studioHint
-                        .alignmentGuide(.top) { $0[.bottom] + 12 }
+                    Group {
+                        if let result = takeResult, !isTakeResultHidden {
+                            EyeContactToast(result: result) {
+                                withAnimation(.easeOut(duration: 0.2)) { isTakeResultHidden = true }
+                                AppAnalytics.log("take_eye_contact_sheet_closed")
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .onAppear {
+                                AppAnalytics.log("take_eye_contact_sheet_shown", params: [
+                                    "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
+                                ])
+                            }
+                        } else {
+                            studioHint
+                        }
+                    }
+                    .alignmentGuide(.top) { $0[.bottom] + 12 }
                 }
                 .frame(maxWidth: controlsMaxWidth)
                 .padding(.horizontal, 20)
@@ -236,30 +253,6 @@ struct VideoPreviewView: View {
                 .transition(.move(edge: .bottom))
                 .onAppear {
                     AppAnalytics.log("take_result_shown", params: [
-                        "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
-                    ])
-                }
-            } else if let result = takeResult, !isTakeResultHidden {
-                VStack {
-                    Spacer()
-                    FirstTakeResultSheet(result: result)
-                        .offset(y: max(0, takeResultDrag))
-                        .gesture(
-                            DragGesture()
-                                .onChanged { takeResultDrag = $0.translation.height }
-                                .onEnded { value in
-                                    if value.translation.height > 60 || value.predictedEndTranslation.height > 160 {
-                                        withAnimation(.spring(duration: 0.3)) { isTakeResultHidden = true }
-                                        AppAnalytics.log("take_eye_contact_sheet_swiped")
-                                    } else {
-                                        withAnimation(.spring(duration: 0.3)) { takeResultDrag = 0 }
-                                    }
-                                }
-                        )
-                }
-                .transition(.move(edge: .bottom))
-                .onAppear {
-                    AppAnalytics.log("take_eye_contact_sheet_shown", params: [
                         "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
                     ])
                 }

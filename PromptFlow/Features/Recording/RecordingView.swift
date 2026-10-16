@@ -192,8 +192,8 @@ struct RecordingView: View {
     }
     /// Auto-pause shows the eye too: it is what explains a paused prompter.
     private var showsGazeIndicator: Bool { gazeIndicatorEnabled || gazeAutoPauseEnabled }
-    /// The eye-contact sheet over a take's preview (see `FirstTakeResultSheet`).
-    @AppStorage(FirstTakeResultSheet.enabledKey) private var takeEyeContactSheetEnabled = true
+    /// The eye-contact card over a take's preview (see `EyeContactToast`).
+    @AppStorage(EyeContactToast.enabledKey) private var takeEyeContactSheetEnabled = true
     /// Freeze the prompter while the user looks away from the lens.
     private var gazeAutoPauses: Bool { gazeAutoPauseEnabled }
     /// The "tap record to start" coach over the record button.

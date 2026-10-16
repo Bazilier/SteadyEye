@@ -26,7 +26,7 @@ struct SettingsView: View {
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
     @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
-    @AppStorage(FirstTakeResultSheet.enabledKey) private var takeEyeContactSheetEnabled: Bool = true
+    @AppStorage(EyeContactToast.enabledKey) private var takeEyeContactSheetEnabled: Bool = true
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
@@ -380,7 +380,7 @@ struct SettingsView: View {
                         .tint(Theme.accent)
                         Text(String(
                             localized: "settings.recording.takeEyeContactSheetFooter",
-                            defaultValue: "A short summary over the take when the eye-contact indicator is on. Swipe it down to watch.",
+                            defaultValue: "A short card above the take's timeline when the eye-contact indicator is on.",
                             comment: "Helper text below the eye-contact-after-each-take toggle."
                         ))
                             .font(.caption)

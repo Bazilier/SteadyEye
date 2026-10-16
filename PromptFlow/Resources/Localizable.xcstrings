@@ -850,6 +850,36 @@
         }
       }
     },
+    "common.close" : {
+      "comment" : "Close button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть"
+          }
+        }
+      }
+    },
     "common.dailyLimit.message" : {
       "comment" : "Body text for the 'Daily limit reached' alert. Used by both the script editor and the bulk import view.",
       "extractionState" : "manual",
@@ -10337,25 +10367,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A short summary over the take when the eye-contact indicator is on. Swipe it down to watch."
+            "value" : "A short card above the take's timeline when the eye-contact indicator is on."
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un breve resumen sobre la toma cuando el indicador de contacto visual está activo. Desliza hacia abajo para verla."
+            "value" : "Una tarjeta breve sobre la línea de tiempo de la toma cuando el indicador de contacto visual está activo."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Um resumo curto sobre a gravação quando o indicador de contato visual está ativo. Deslize para baixo para assistir."
+            "value" : "Um card curto acima da linha do tempo da gravação quando o indicador de contato visual está ativo."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Короткая сводка поверх дубля, когда включён индикатор взгляда. Смахните вниз, чтобы посмотреть видео."
+            "value" : "Небольшая карточка над таймлайном дубля, когда включён индикатор взгляда."
           }
         }
       }
@@ -12532,7 +12562,7 @@
       }
     },
     "take_result.dont_show" : {
-      "comment" : "Toggle on the eye-contact sheet after a take: stop showing this sheet after takes. It can be turned back on in Settings.",
+      "comment" : "Quiet button on the eye-contact card after a take: stop showing it after takes. It can be turned back on in Settings.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -12592,7 +12622,7 @@
       }
     },
     "take_result.regular_title" : {
-      "comment" : "Title of the short sheet shown over a take's preview with the eye contact the take held.",
+      "comment" : "Title of the short card shown over a take's preview with the eye contact the take held.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
