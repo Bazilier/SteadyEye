@@ -12621,32 +12621,62 @@
         }
       }
     },
-    "take_result.regular_title" : {
-      "comment" : "Title of the short card shown over a take's preview with the eye contact the take held.",
+    "take_result.eye_contact_label" : {
+      "comment" : "Words after the percentage on the card over a take's preview, as in \"94% eye contact\": the share of the take the speaker looked at the lens. Lowercase where the language allows.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eye contact"
+            "value" : "eye contact"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contacto visual"
+            "value" : "contacto visual"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contato visual"
+            "value" : "contato visual"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Зрительный контакт"
+            "value" : "взгляд в камеру"
+          }
+        }
+      }
+    },
+    "take_result.first_subtitle" : {
+      "comment" : "Line under the eye-contact score on the card over the user's first take in the guided first run. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your first take · %@ · Saved to Recordings"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu primera toma · %@ · Guardada en Grabaciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua primeira gravação · %@ · Salva em Gravações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ваш первый дубль · %@ · Сохранено в «Записи»"
           }
         }
       }

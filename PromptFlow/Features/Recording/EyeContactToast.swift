@@ -38,19 +38,24 @@ struct EyeContactToast: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 if let gaze {
-                    EyeContactScore(fraction: gaze.lookingFraction, size: 22)
+                    EyeContactScore(fraction: gaze.lookingFraction)
+                } else {
+                    Text(String(
+                        localized: "take_result.title",
+                        defaultValue: "Your first take",
+                        comment: "Title of the short sheet shown over the preview of the user's first take in the guided first run."
+                    ))
+                        .font(.headline)
                 }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
+                if isFirstTake {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.white.opacity(0.6))
                 }
-                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 34)
 
             if let gaze {
@@ -104,42 +109,43 @@ struct EyeContactToast: View {
         .shadow(color: .black.opacity(0.5), radius: 14, y: 8)
     }
 
-    private var title: String {
-        isFirstTake
-            ? String(
-                localized: "take_result.title",
-                defaultValue: "Your first take",
-                comment: "Title of the short sheet shown over the preview of the user's first take in the guided first run."
-            )
-            : String(
-                localized: "take_result.regular_title",
-                defaultValue: "Eye contact",
-                comment: "Title of the short card shown over a take's preview with the eye contact the take held."
-            )
-    }
-
+    /// First take only. Under the score it names the take; with the score
+    /// left out, the title above already does.
     private var subtitle: String {
         let duration = EyeContactBar.timeText(result.duration)
-        guard isFirstTake else { return duration }
+        guard gaze != nil else {
+            return String(
+                localized: "take_result.subtitle_duration",
+                defaultValue: "\(duration) · Saved to Recordings",
+                comment: "Subtitle on the first-take result sheet. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab."
+            )
+        }
         return String(
-            localized: "take_result.subtitle_duration",
-            defaultValue: "\(duration) · Saved to Recordings",
-            comment: "Subtitle on the first-take result sheet. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab."
+            localized: "take_result.first_subtitle",
+            defaultValue: "Your first take · \(duration) · Saved to Recordings",
+            comment: "Line under the eye-contact score on the card over the user's first take in the guided first run. %@ is the take's length as m:ss; the take is already saved in the app's Recordings tab."
         )
     }
 }
 
-/// The eye icon and the percentage, in green.
+/// "👁 94% eye contact", in green.
 private struct EyeContactScore: View {
     let fraction: Double
-    let size: CGFloat
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
             Image(systemName: "eye.fill")
-                .font(.system(size: size * 0.7, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
             Text(fraction, format: .percent.precision(.fractionLength(0)))
-                .font(.system(size: size, weight: .heavy).monospacedDigit())
+                .font(.system(size: 22, weight: .heavy).monospacedDigit())
+            Text(String(
+                localized: "take_result.eye_contact_label",
+                defaultValue: "eye contact",
+                comment: "Words after the percentage on the card over a take's preview, as in \"94% eye contact\": the share of the take the speaker looked at the lens. Lowercase where the language allows."
+            ))
+                .font(.system(size: 17, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .foregroundStyle(.green)
         .accessibilityElement(children: .ignore)
