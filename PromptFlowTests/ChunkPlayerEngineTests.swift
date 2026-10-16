@@ -133,4 +133,25 @@ final class ChunkPlayerEngineTests: XCTestCase {
         XCTAssertFalse(seen.contains { $0.count > 2 }, "The cancelled load wrote its chunks")
         XCTAssertEqual(engine.chunks, ["Привет,", "мир."])
     }
+
+    @MainActor
+    func testReloadWhilePlayingResumesAfterSlowLoad() async throws {
+        let engine = ChunkPlayerEngine()
+        engine.orpEnabled = false
+        // Several times the 50 ms the resume used to wait.
+        engine.loadScript(Array(repeating: slowScript, count: 3).joined(separator: " "))
+        await engine.loadTask?.value
+        engine.play()
+        XCTAssertTrue(engine.isPlaying)
+
+        // Anchor mode re-chunks through hyphenation: the slow path.
+        engine.orpEnabled = true
+        engine.reloadChunks()
+        await engine.loadTask?.value
+        // The resume runs right after the load, on the next main-actor turn.
+        for _ in 0..<100 where !engine.isPlaying {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(engine.isPlaying, "Playback did not resume after re-chunking")
+    }
 }

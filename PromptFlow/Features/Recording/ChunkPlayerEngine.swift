@@ -147,9 +147,11 @@ final class ChunkPlayerEngine: ObservableObject {
         isPlaying = false
         loadScript(loadedScriptText)
         if wasPlaying {
+            let load = loadTask
             Task { @MainActor [weak self] in
-                // Wait for async loadTask to finish
-                try? await Task.sleep(nanoseconds: 50_000_000)
+                // Resume once the re-chunking is in; it can take far longer
+                // than a frame for a long script.
+                await load?.value
                 self?.play()
             }
         }
