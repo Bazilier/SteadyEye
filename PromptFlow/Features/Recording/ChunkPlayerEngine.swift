@@ -70,7 +70,9 @@ final class ChunkPlayerEngine: ObservableObject {
     }
     private var loadedScriptText: String = ""
     private var advanceTask: Task<Void, Never>?
-    private var loadTask: Task<Void, Never>?
+    /// The chunking run for the latest `loadScript`. Readable so callers
+    /// (and tests) can wait for it.
+    private(set) var loadTask: Task<Void, Never>?
 
     private var orpBaseSpeedMs: Int {
         ChunkTimingCalculator.orpBaseSpeedMs(sliderValue: sliderValue)
@@ -122,7 +124,10 @@ final class ChunkPlayerEngine: ObservableObject {
                     return (chunks, Array(repeating: ChunkMetadata(), count: chunks.count))
                 }
             }.value
-            guard let self else { return }
+            // A newer loadScript cancelled this run; its chunks are stale.
+            // The detached chunking above doesn't see the cancellation, so
+            // check before writing.
+            guard let self, !Task.isCancelled else { return }
             // Strategy is cheap to recreate on MainActor
             self.strategy = LanguageDetector.detect(scriptText)
             self.chunks = result.chunks

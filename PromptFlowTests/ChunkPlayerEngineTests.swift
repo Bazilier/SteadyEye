@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import PromptFlow
 
 final class ChunkPlayerEngineTests: XCTestCase {
@@ -106,5 +107,30 @@ final class ChunkPlayerEngineTests: XCTestCase {
         let d = ChunkTimingCalculator.calculateDuration(
             for: "안녕", sliderValue: slider, strategy: CJKLanguageStrategy(language: "ko"))
         XCTAssertGreaterThan(d, 0)
+    }
+
+    // MARK: - Engine loading
+
+    /// Long words go through hyphenation in anchor mode, so chunking this
+    /// takes well over 50 ms.
+    private let slowScript = Array(repeating: "extraordinariamente responsabilidad", count: 100)
+        .joined(separator: " ")
+
+    @MainActor
+    func testCancelledLoadDoesNotWrite() async {
+        let engine = ChunkPlayerEngine()
+        engine.orpEnabled = true
+        // Every value the chunks take, so the check holds whichever run
+        // finishes first.
+        var seen: [[String]] = []
+        let sink = engine.$chunks.sink { seen.append($0) }
+        engine.loadScript(slowScript)
+        let stale = engine.loadTask
+        engine.loadScript("Привет, мир.")
+        await stale?.value
+        await engine.loadTask?.value
+        sink.cancel()
+        XCTAssertFalse(seen.contains { $0.count > 2 }, "The cancelled load wrote its chunks")
+        XCTAssertEqual(engine.chunks, ["Привет,", "мир."])
     }
 }
