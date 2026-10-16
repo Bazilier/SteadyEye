@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import PromptFlow
 
 final class ChunkPlayerEngineTests: XCTestCase {
@@ -106,5 +107,51 @@ final class ChunkPlayerEngineTests: XCTestCase {
         let d = ChunkTimingCalculator.calculateDuration(
             for: "안녕", sliderValue: slider, strategy: CJKLanguageStrategy(language: "ko"))
         XCTAssertGreaterThan(d, 0)
+    }
+
+    // MARK: - Engine loading
+
+    /// Long words go through hyphenation in anchor mode, so chunking this
+    /// takes well over 50 ms.
+    private let slowScript = Array(repeating: "extraordinariamente responsabilidad", count: 100)
+        .joined(separator: " ")
+
+    @MainActor
+    func testCancelledLoadDoesNotWrite() async {
+        let engine = ChunkPlayerEngine()
+        engine.orpEnabled = true
+        // Every value the chunks take, so the check holds whichever run
+        // finishes first.
+        var seen: [[String]] = []
+        let sink = engine.$chunks.sink { seen.append($0) }
+        engine.loadScript(slowScript)
+        let stale = engine.loadTask
+        engine.loadScript("Привет, мир.")
+        await stale?.value
+        await engine.loadTask?.value
+        sink.cancel()
+        XCTAssertFalse(seen.contains { $0.count > 2 }, "The cancelled load wrote its chunks")
+        XCTAssertEqual(engine.chunks, ["Привет,", "мир."])
+    }
+
+    @MainActor
+    func testReloadWhilePlayingResumesAfterSlowLoad() async throws {
+        let engine = ChunkPlayerEngine()
+        engine.orpEnabled = false
+        // Several times the 50 ms the resume used to wait.
+        engine.loadScript(Array(repeating: slowScript, count: 3).joined(separator: " "))
+        await engine.loadTask?.value
+        engine.play()
+        XCTAssertTrue(engine.isPlaying)
+
+        // Anchor mode re-chunks through hyphenation: the slow path.
+        engine.orpEnabled = true
+        engine.reloadChunks()
+        await engine.loadTask?.value
+        // The resume runs right after the load, on the next main-actor turn.
+        for _ in 0..<100 where !engine.isPlaying {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(engine.isPlaying, "Playback did not resume after re-chunking")
     }
 }

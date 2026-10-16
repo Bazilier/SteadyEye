@@ -3,15 +3,21 @@ import UIKit
 
 /// Optimal Recognition Point index for a word.
 /// Anchor letter index used for horizontal alignment (Spritz-style).
+/// The index points into `word` itself, past any leading punctuation
+/// ("¿Qué", "«Привет»"), while the word's length is counted without it.
 nonisolated func orpIndex(for word: String) -> Int {
     let clean = word.trimmingCharacters(in: .punctuationCharacters)
+    guard !clean.isEmpty else { return 0 }
+    let leading = word.prefix {
+        $0.unicodeScalars.allSatisfy(CharacterSet.punctuationCharacters.contains)
+    }.count
     let len = clean.count
     switch len {
-    case 0...1: return 0
-    case 2...5: return 1
-    case 6...9: return 2
-    case 10...13: return 3
-    default: return 4
+    case 0...1: return leading
+    case 2...5: return leading + 1
+    case 6...9: return leading + 2
+    case 10...13: return leading + 3
+    default: return leading + 4
     }
 }
 
