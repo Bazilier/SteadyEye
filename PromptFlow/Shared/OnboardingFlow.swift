@@ -3,9 +3,7 @@ import Foundation
 /// Whether a new user is still inside the guided first run: onboarding
 /// (which now ends with the user's own script, written, drafted or the
 /// ready-made sample) and the first take of that script, which ends in the
-/// one paywall the flow plans for. Installs from before this version may
-/// still be on the older path: a sample take first, then
-/// "What's your video about?".
+/// one paywall the flow plans for.
 ///
 /// While it is active, nothing automatic may interrupt it: `PromptArbiter`
 /// denies every automatic prompt except `.onboardingPaywall`, the record
@@ -85,24 +83,19 @@ enum OnboardingFlow {
     enum ResumeStep: Equatable {
         /// Only the planned paywall is left: shown without asking.
         case paywall
-        case sampleTake
         case draft
         case ownTake(scriptID: UUID)
     }
 
-    static func resumeStep(hasRecordedAnything: Bool) -> ResumeStep? {
+    static func resumeStep() -> ResumeStep? {
         guard isActive else { return nil }
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "ownTakePaywallDue") { return .paywall }
-        // The own script's take comes before the older sample path: since
-        // onboarding writes the script, a run can reach it with nothing
-        // recorded yet.
-        if defaults.bool(forKey: "ownTakeCoachPending"), let id = flowScriptID {
-            return .ownTake(scriptID: id)
+        if defaults.bool(forKey: "ownTakeCoachPending") {
+            if let id = flowScriptID { return .ownTake(scriptID: id) }
+            return .draft
         }
         if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") { return .draft }
-        if !hasRecordedAnything { return .sampleTake }
-        if defaults.bool(forKey: "ownTakeCoachPending") { return .draft }
         return nil
     }
 

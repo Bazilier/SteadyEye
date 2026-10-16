@@ -44,7 +44,6 @@ struct ScriptListView: View {
     @State private var showDraftScript = false
     /// The draft sheet closed through one of its outcomes, not the X.
     @State private var draftOutcomeTaken = false
-    @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
     /// "Pick up where you left off?" after a relaunch mid-run.
     @State private var showResumeAlert = false
     @State private var pendingResumeStep: OnboardingFlow.ResumeStep?
@@ -624,7 +623,7 @@ struct ScriptListView: View {
             guard scriptToRecord == nil, editorMode == nil, paywallPresentation == nil,
                   !showDraftScript, !showBulkImport
             else { return }
-            switch OnboardingFlow.resumeStep(hasRecordedAnything: hasCompletedFirstRecording) {
+            switch OnboardingFlow.resumeStep() {
             case .none:
                 OnboardingFlow.finish(reason: "nothing_left")
             case .paywall:
@@ -642,12 +641,6 @@ struct ScriptListView: View {
         switch step {
         case .paywall:
             continueOnboardingFlow(after: 0)
-        case .sampleTake:
-            if let demo = scripts.first(where: { $0.isDemo }) {
-                scriptToRecord = demo
-            } else {
-                OnboardingFlow.abandon(reason: "sample_missing")
-            }
         case .draft:
             UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
             showDraftScript = true
