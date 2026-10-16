@@ -48,8 +48,15 @@ final class GazeAttention: ObservableObject {
     /// The probe runs only while it plays or a take records (`updateProbe`):
     /// Vision face landmarks at ~10 Hz cost ~12% of a core on an iPhone 16,
     /// for nothing while the camera merely sits open.
+    /// A take counts eye contact only while it is set: once the script has
+    /// run out, the eyes go to the stop button, and that is not a look away.
     var isReading = false {
-        didSet { if oldValue != isReading { updateProbe() } }
+        willSet { if newValue != isReading { tick() } }
+        didSet {
+            guard oldValue != isReading else { return }
+            if !isReading { closeAwaySpan() }
+            updateProbe()
+        }
     }
     private var isProbing = false
 
@@ -60,9 +67,11 @@ final class GazeAttention: ObservableObject {
         var lookingFraction: Double
         /// Each look-away, as seconds into the take from start to end.
         var awaySpans: [ClosedRange<TimeInterval>]
-        /// Seconds into the take when tracking began (calibration over). The
-        /// share above covers only the take from here on.
+        /// The measured stretch of the take, in seconds into it: from the end
+        /// of calibration to the last moment the script was running. The
+        /// share above covers only this.
         var trackedFrom: TimeInterval
+        var trackedUntil: TimeInterval
     }
 
     private var takeStart: Date?
@@ -72,8 +81,9 @@ final class GazeAttention: ObservableObject {
     private var awaySpans: [ClosedRange<TimeInterval>] = []
     /// Start of the look-away still in progress, seconds into the take.
     private var openAwayStart: TimeInterval?
-    /// When the take's first looking or away time was credited.
+    /// When the take's first and latest looking or away time was credited.
     private var trackedFrom: TimeInterval?
+    private var trackedUntil: TimeInterval = 0
     /// Below this much tracked time a percentage would mean nothing.
     private static let minimumTrackedTime: TimeInterval = 3
 
@@ -135,6 +145,7 @@ final class GazeAttention: ObservableObject {
         awaySpans = []
         openAwayStart = nil
         trackedFrom = nil
+        trackedUntil = 0
         updateProbe()
     }
 
@@ -148,7 +159,8 @@ final class GazeAttention: ObservableObject {
         return TakeSummary(
             lookingFraction: lookingTime / tracked,
             awaySpans: awaySpans,
-            trackedFrom: trackedFrom ?? 0
+            trackedFrom: trackedFrom ?? 0,
+            trackedUntil: trackedUntil
         )
     }
 
@@ -158,9 +170,9 @@ final class GazeAttention: ObservableObject {
         let now = Date()
         let elapsed = now.timeIntervalSince(last)
         lastTick = now
-        if trackedFrom == nil, state == .looking || state == .away {
-            trackedFrom = last.timeIntervalSince(takeStart)
-        }
+        guard isReading, state == .looking || state == .away else { return }
+        if trackedFrom == nil { trackedFrom = last.timeIntervalSince(takeStart) }
+        trackedUntil = now.timeIntervalSince(takeStart)
         switch state {
         case .looking: lookingTime += elapsed
         case .away: awayTime += elapsed
@@ -230,11 +242,11 @@ final class GazeAttention: ObservableObject {
             if state != .away, Date().timeIntervalSince(since) >= Self.awayDelay {
                 let onset = since.addingTimeInterval(-Self.pipelineLag)
                 awayOnset = onset
-                if let start = takeStart {
+                if let start = takeStart, isReading {
                     openAwayStart = max(0, onset.timeIntervalSince(start))
                 }
                 // Credit the confirmation delay to away, not looking.
-                if takeStart != nil {
+                if takeStart != nil, isReading {
                     let delay = Date().timeIntervalSince(onset)
                     let moved = min(delay, lookingTime)
                     lookingTime -= moved

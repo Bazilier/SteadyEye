@@ -100,8 +100,9 @@ struct FirstTakeResultSheet: View {
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    /// The measured part of the take (calibration left out, as it is from
-    /// the percentage) as a green bar, grey wherever the eyes were away and
+    /// The measured part of the take (calibration and the time after the
+    /// script ran out are left out, as they are from the percentage) as a
+    /// green bar, grey wherever the eyes were away and
     /// for as long, so it agrees with the percentage.
     private func timeline(_ gaze: GazeAttention.TakeSummary) -> some View {
         GeometryReader { geo in
@@ -123,7 +124,7 @@ struct FirstTakeResultSheet: View {
     }
 
     private func position(_ time: TimeInterval, of gaze: GazeAttention.TakeSummary, width: CGFloat) -> CGFloat {
-        let span = max(result.duration - gaze.trackedFrom, 1)
+        let span = max(gaze.trackedUntil - gaze.trackedFrom, 1)
         let fraction = CGFloat((time - gaze.trackedFrom) / span)
         return max(0, min(width, width * fraction))
     }
