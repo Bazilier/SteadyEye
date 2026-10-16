@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import SwiftData
 
 /// Identifiable wrapper for the editor sheet — guarantees the correct value
@@ -79,17 +80,17 @@ struct ScriptListView: View {
     /// subscription; subsequent taps route Pro users to the real flow
     /// and free users to the post-demo paywall.
     @AppStorage("hasSeenBulkImportDemo") private var hasSeenBulkImportDemo: Bool = false
-    /// Set true by `OnboardingView.finishOnboarding` when camera permission
-    /// was granted. Consumed by either `.onChange(of: hasSeenOnboarding)`
-    /// (the primary trigger — fires when the onboarding cover starts
-    /// dismissing) or `.onAppear` (defensive backup for cold launches where
-    /// the flag persisted across a kill mid-flow). Both consumers reset
-    /// pendingDemoRecording to false BEFORE setting `scriptToRecord`, so
-    /// they're idempotent and don't fight each other.
-    @AppStorage("pendingDemoRecording") private var pendingDemoRecording: Bool = false
+    /// Set true by `OnboardingView.finishOnboarding` when camera and
+    /// microphone were granted. Consumed by either `.onChange(of:
+    /// hasSeenOnboarding)` (the primary trigger — fires when the onboarding
+    /// cover starts dismissing) or `.onAppear` (defensive backup for cold
+    /// launches where the flag persisted across a kill mid-flow). Both
+    /// consumers go through `openFlowScriptAfterOnboarding`, which resets it
+    /// BEFORE setting `scriptToRecord`, so they don't fight each other.
+    @AppStorage(OnboardingFlow.pendingRecordingKey) private var pendingFlowRecording: Bool = false
     /// Observed (not written) here. The flip false → true happens inside
     /// `OnboardingView.finishOnboarding`; ScriptsList watches that flip
-    /// to drive the demo auto-open. `.onAppear` doesn't fire reliably
+    /// to drive the first-take auto-open. `.onAppear` doesn't fire reliably
     /// when a fullScreenCover dismisses on top of an already-mounted view,
     /// so direct binding observation is the load-bearing trigger.
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
@@ -271,8 +272,11 @@ struct ScriptListView: View {
         }
         .preferredColorScheme(.dark)
         .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            // Back from Settings with camera and microphone on: the first take.
+            openFlowScriptIfBackFromSettings()
             // Back from posting the video they exported: a good moment to ask.
-            if phase == .active { offerAfterExportReviewIfDue() }
+            offerAfterExportReviewIfDue()
         }
         .sheet(isPresented: $showAfterExportPrompt, onDismiss: {
             // Sequenced, not stacked: the chat waits for this sheet to close.
@@ -372,7 +376,8 @@ struct ScriptListView: View {
             // An unfinished guided run after a relaunch: offer to pick it up.
             // (The cold-start paywall and soft-ask stand down while it is
             // active, so nothing competes with this.)
-            if !Self.didResumeFlowThisLaunch, !pendingDemoRecording {
+            if !Self.didResumeFlowThisLaunch, !pendingFlowRecording,
+               !UserDefaults.standard.bool(forKey: OnboardingFlow.awaitingSettingsKey) {
                 Self.didResumeFlowThisLaunch = true
                 offerToResumeFlow()
                 offerAfterExportReviewIfDue()
@@ -383,40 +388,18 @@ struct ScriptListView: View {
             // `.onChange(of: hasSeenOnboarding)` handler below. This block
             // covers the cold-launch edge case where the flag persisted
             // across a kill mid-flow (rare but possible).
-            if pendingDemoRecording {
-                pendingDemoRecording = false
-                if let demo = scripts.first(where: { $0.isDemo }) {
-                    // Transient signal consumed by RecordingView's
-                    // .onAppear to suppress the camera explainer for
-                    // exactly this one auto-open mount. Without this
-                    // flag, RecordingView would have to use
-                    // `script.isDemo` as a proxy, which would also
-                    // suppress the explainer on later manual demo-script
-                    // opens (wrong — only the onboarding auto-open
-                    // should be silent).
-                    UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
-                    scriptToRecord = demo
-                }
-            }
+            openFlowScriptAfterOnboarding()
+            openFlowScriptIfBackFromSettings()
         }
         .onChange(of: hasSeenOnboarding) { _, newValue in
             // Primary auto-open trigger: fires the moment onboarding
             // completes (`finishOnboarding` flips the AppStorage value to
-            // true, after having already set pendingDemoRecording). The
+            // true, after having already set pendingFlowRecording). The
             // outer onboarding cover's dismiss animation runs in parallel
             // with the inner cover's present animation, so by the time
             // the user sees ScriptsList revealed, RecordingView is already
             // sliding up on top of it.
-            if newValue && pendingDemoRecording {
-                pendingDemoRecording = false
-                if let demo = scripts.first(where: { $0.isDemo }) {
-                    #if DEBUG
-                    print("📋 Auto-opening demo recording after onboarding")
-                    #endif
-                    UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
-                    scriptToRecord = demo
-                }
-            }
+            if newValue { openFlowScriptAfterOnboarding() }
             // Mark the onboarding session itself as cold-start "1" so
             // the next true cold start observed by SteadyEyeApp.init()
             // bumps to 2 and trips the notification soft-ask. Idempotent:
@@ -429,45 +412,60 @@ struct ScriptListView: View {
 
     // MARK: - Subviews
 
+    /// No scripts yet (a new user who skipped the script in onboarding, or
+    /// someone who deleted them all): the same two ways in as onboarding.
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 14) {
             Image(systemName: "doc.text")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-            Text("scripts.empty.title", comment: "Empty state title when the user has no scripts")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 64, height: 64)
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            Text(String(
+                localized: "scripts.empty.first_title",
+                defaultValue: "Your first script goes here",
+                comment: "Empty state title on the scripts list when the user has no scripts."
+            ))
                 .font(.title2.bold())
-            Text("scripts.empty.body", comment: "Empty state body when the user has no scripts")
+                .multilineTextAlignment(.center)
+            Text(String(
+                localized: "scripts.empty.first_body",
+                defaultValue: "Tell us what your video is about and we’ll write it, or paste your own text.",
+                comment: "Empty state body on the scripts list: the AI drafts a script from a topic, or the user pastes their own."
+            ))
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+                .fixedSize(horizontal: false, vertical: true)
             Button {
-                editorMode = .new
+                AppAnalytics.log("scripts_empty_write_tapped")
+                showDraftScript = true
             } label: {
-                Label {
-                    Text("scripts.new", comment: "New Script button label and editor nav title")
-                } icon: {
-                    Image(systemName: "plus")
-                }
-                    .padding(.horizontal, 24)
+                Label(
+                    String(localized: "onboarding.script.write", defaultValue: "Write my script", comment: "Primary button on the onboarding script step: the AI writes a script from the topic, or, with no topic, the ready-made sample is used."),
+                    systemImage: "sparkles"
+                )
+                .frame(maxWidth: .infinity)
             }
-            .primaryButtonStyle(fullWidth: false)
-            .tint(Theme.accent)
-
+            .primaryButtonStyle()
+            .padding(.top, 8)
             Button {
-                handleBulkImportTap(entryPoint: "empty_state")
+                AppAnalytics.log("scripts_empty_paste_tapped")
+                editorMode = .newSelfWritten
             } label: {
-                Label {
-                    Text("scripts.import.title", comment: "Import Multiple Scripts button label")
-                } icon: {
-                    Image(systemName: "doc.on.doc")
-                }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
+                Text(String(
+                    localized: "scripts.empty.paste",
+                    defaultValue: "Paste my own text",
+                    comment: "Secondary button on the empty scripts list: open an empty script editor to paste or type a script."
+                ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.bordered)
-            .tint(.secondary)
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: 420)
     }
 
     /// One `Section` per script so each row renders as its own card while
@@ -661,6 +659,43 @@ struct ScriptListView: View {
                 showDraftScript = true
             }
         }
+    }
+
+    /// Onboarding ended with access granted: the camera opens on the script
+    /// it saved, for the first take.
+    private func openFlowScriptAfterOnboarding() {
+        guard pendingFlowRecording else { return }
+        pendingFlowRecording = false
+        guard let id = OnboardingFlow.flowScriptID,
+              let script = scripts.first(where: { $0.id == id })
+        else { return }
+        // Transient signal consumed by RecordingView's .onAppear to suppress
+        // the camera explainer for exactly this one auto-open mount.
+        UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
+        scriptToRecord = script
+    }
+
+    /// The user went to Settings from onboarding's access-denied screen. Back
+    /// with camera and microphone on, the camera opens on their script; back
+    /// without, nothing happens and the script waits in the list.
+    private func openFlowScriptIfBackFromSettings() {
+        let defaults = UserDefaults.standard
+        guard hasSeenOnboarding, defaults.bool(forKey: OnboardingFlow.awaitingSettingsKey) else { return }
+        guard OnboardingFlow.isActive,
+              let id = OnboardingFlow.flowScriptID,
+              let script = scripts.first(where: { $0.id == id })
+        else {
+            defaults.removeObject(forKey: OnboardingFlow.awaitingSettingsKey)
+            return
+        }
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized,
+              AVAudioApplication.shared.recordPermission == .granted,
+              scriptToRecord == nil, editorMode == nil, paywallPresentation == nil
+        else { return }
+        defaults.removeObject(forKey: OnboardingFlow.awaitingSettingsKey)
+        AppAnalytics.log("onboarding_back_from_settings_camera_opened")
+        UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
+        scriptToRecord = script
     }
 
     /// The deferred after-export ask (see `ReviewPromptManager`), when it is

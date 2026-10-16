@@ -29,13 +29,14 @@ struct VideoPreviewView: View {
     /// draws its first frame, so the zoom from the card never shows black.
     /// `nil` (the recording screen right after a take) keeps today's look.
     var poster: UIImage? = nil
-    /// Set only for the user's very first take: shows the result sheet over
+    /// Set only for the guided first run's take: shows the result sheet over
     /// the preview (see `FirstTakeResultSheet`).
     var firstTakeResult: FirstTakeResult? = nil
     /// Eye contact over the take just recorded, 0...1; nil when it was not
     /// tracked or the preview was opened from the Recordings tab.
     var takeEyeContact: Double? = nil
-    /// The result sheet's main action: leave and write an own script.
+    /// The result sheet's Continue: leave the camera; the list takes the
+    /// guided run on from there (its paywall, or the older own-script offer).
     var onRecordOwnScript: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
@@ -50,8 +51,6 @@ struct VideoPreviewView: View {
     /// Set by a pinch: in shows the whole frame, out fills the width. Nil
     /// keeps the default for the screen (`showsWholeFrame`).
     @State private var pinchedWholeFrame: Bool?
-    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
-    @State private var isResultSheetHidden = false
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
     @StateObject private var playback = PlaybackController()
@@ -215,25 +214,14 @@ struct VideoPreviewView: View {
                 Spacer()
             }
 
-            if let result = firstTakeResult, !isResultSheetHidden {
+            if let result = firstTakeResult {
                 VStack {
                     Spacer()
                     FirstTakeResultSheet(
                         result: result,
-                        autoPause: $gazeAutoPauseEnabled,
-                        onOwnScript: {
-                            AppAnalytics.log("take_result_own_script_tapped")
+                        onContinue: {
+                            AppAnalytics.log("take_result_continue_tapped")
                             onRecordOwnScript?()
-                        },
-                        onWatch: {
-                            AppAnalytics.log("take_result_watch_tapped")
-                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
-                            if !playback.isPlaying { playback.togglePlayPause() }
-                        },
-                        onSave: {
-                            AppAnalytics.log("take_result_save_tapped")
-                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
-                            handleSaveTap()
                         }
                     )
                 }
@@ -244,10 +232,6 @@ struct VideoPreviewView: View {
                     ])
                 }
             }
-        }
-        .onChange(of: gazeAutoPauseEnabled) { _, enabled in
-            guard firstTakeResult != nil else { return }
-            AppAnalytics.log("take_result_autopause_toggled", params: ["enabled": enabled])
         }
         .statusBarHidden()
         .toolbar(.hidden, for: .navigationBar)
@@ -913,7 +897,7 @@ struct VideoPreviewView: View {
 
     @ViewBuilder
     private var studioHint: some View {
-        if showsStudioButton && (firstTakeResult == nil || isResultSheetHidden) {
+        if showsStudioButton {
             switch recording.studioStatus {
             case .preparing, .uploading, .processing, .downloading:
                 StudioHintCard(kind: .processing)

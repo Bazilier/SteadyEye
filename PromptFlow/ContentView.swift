@@ -6,8 +6,6 @@ enum AppTab: String, Hashable {
 }
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @AppStorage("demoScriptCreated") private var demoScriptCreated = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
     @AppStorage("lastColdStartPaywallDate") private var lastColdStartPaywallDateInterval: Double = 0
     @AppStorage("lastAnyPaywallShownAt") private var lastAnyPaywallShownAt: Double = 0
@@ -73,7 +71,6 @@ struct ContentView: View {
             if installDateInterval == 0 {
                 installDateInterval = Date().timeIntervalSince1970
             }
-            createDemoScriptIfNeeded()
             triggerColdStartPaywallIfNeeded()
         }
         .fullScreenCover(isPresented: Binding(
@@ -222,36 +219,5 @@ struct ContentView: View {
         }
 
         return true
-    }
-
-    private func createDemoScriptIfNeeded() {
-        guard !demoScriptCreated else { return }
-        // The original English demo title is intentionally hardcoded in the
-        // existence-check predicate so users who already had the seeded English
-        // demo on their device do not get a second copy after upgrading.
-        let descriptor = FetchDescriptor<Script>(
-            predicate: #Predicate { $0.title == "Demo Script" || $0.title == "Try it now" }
-        )
-        let existing = (try? modelContext.fetch(descriptor)) ?? []
-        guard existing.isEmpty else { demoScriptCreated = true; return }
-
-        let demoTitle = String(
-            localized: "demo.script.title",
-            defaultValue: "Demo Script",
-            comment: "Title of the seeded demo script created on first launch."
-        )
-        let demoContent = String(
-            localized: "demo.script.content",
-            defaultValue: "Hi. I'm reading a script right now, but my eyes stay on the camera. Words appear right under the lens, one at a time. Natural eye contact. Try it yourself — create your own script.",
-            comment: "Body of the seeded demo script created on first launch. Plays through the WBW prompter to demonstrate the eye-contact mechanic. Translate naturally; the second-person closing invites the user to create their own script."
-        )
-        let demo = Script(
-            title: demoTitle,
-            content: demoContent
-        )
-        demo.isDemo = true
-        modelContext.insert(demo)
-        try? modelContext.save()
-        demoScriptCreated = true
     }
 }

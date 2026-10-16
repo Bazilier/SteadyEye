@@ -584,7 +584,7 @@ struct RecordingView: View {
                 close()
             }
         } message: {
-            Text(LeaveSetupCopy.message)
+            Text(LeaveSetupCopy.cameraMessage)
         }
         // The record button can be tapped straight through the coach's
         // spotlight: clear the coach as soon as the countdown starts.
@@ -2197,9 +2197,10 @@ struct RecordingView: View {
                     "was_first": wasFirst,
                     "via": "auto_persist"
                 ])
-                // The result sheet and the own-script follow-up belong to the
-                // sample take; a first take of an own script skips them.
-                previewIsFirstTake = wasFirst && script.isDemo
+                // The result sheet: the guided first run's take (its own
+                // script, or the older sample take). Read before the coach
+                // mark is cleared below.
+                previewIsFirstTake = needsGuidedTake || (wasFirst && script.isDemo)
                 // The paywall waits for real value: a successful take of the
                 // user's own script, not the sample. Shown once the camera
                 // closes (see ScriptListView), once per install — the same
