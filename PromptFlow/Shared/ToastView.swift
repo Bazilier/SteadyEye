@@ -120,7 +120,8 @@ struct ToastModifier: ViewModifier {
     @Binding var isPresented: Bool
     let message: String
     let style: ToastStyle
-    let duration: TimeInterval
+    /// Nil: stays until closed or `isPresented` turns false.
+    let duration: TimeInterval?
     let actionLabel: String?
     let action: (() -> Void)?
     let tapAction: (() -> Void)?
@@ -147,6 +148,7 @@ struct ToastModifier: ViewModifier {
                     .padding(.bottom, 100)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task {
+                        guard let duration else { return }
                         try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
                         withAnimation { isPresented = false }
                     }
@@ -161,7 +163,7 @@ extension View {
         isPresented: Binding<Bool>,
         message: String,
         style: ToastStyle,
-        duration: TimeInterval = 2.5,
+        duration: TimeInterval? = 2.5,
         actionLabel: String? = nil,
         action: (() -> Void)? = nil,
         tapAction: (() -> Void)? = nil,

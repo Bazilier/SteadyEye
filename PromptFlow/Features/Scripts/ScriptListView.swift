@@ -160,7 +160,17 @@ struct ScriptListView: View {
 
     /// iPhone Duo records folded only: a warning tap and a toast, not a
     /// modal in the way of the list.
-    private func showFoldToRecord() {
+    /// The first take of onboarding's script, not yet filmed, goes back to
+    /// onboarding's access step, which waits there for the fold; anything
+    /// else gets the toast.
+    private func showFoldToRecord(for script: Script? = nil) {
+        if let script, OnboardingFlow.isActive, OnboardingFlow.flowScriptID == script.id,
+           UserDefaults.standard.bool(forKey: "ownTakeCoachPending") {
+            AppAnalytics.log("duo_onboarding_fold_reshown")
+            UserDefaults.standard.set(true, forKey: OnboardingFlow.reopenedForFoldKey)
+            hasSeenOnboarding = false
+            return
+        }
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
         showFoldToRecordToast = true
     }
@@ -235,7 +245,7 @@ struct ScriptListView: View {
                     selectedTab: $selectedTab,
                     // After the cover is down, so the toast shows on the list.
                     onClosedByUnfold: {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showFoldToRecord() }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showFoldToRecord(for: script) }
                     }
                 )
                     .cardZoomTransition(id: script.id, in: recordZoom)
@@ -249,7 +259,7 @@ struct ScriptListView: View {
                         "script_source": script.isDemo ? "demo" : "user"
                     ])
                     scriptToRecord = nil
-                    showFoldToRecord()
+                    showFoldToRecord(for: script)
                     return
                 }
                 // Closed before the presentation completed.
