@@ -81,7 +81,10 @@ struct OnboardingView: View {
                 micGranted = true
                 let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
                 photosGranted = (photosStatus == .authorized || photosStatus == .limited)
-                waitForFold()
+                Task {
+                    await requestTrackingBeforeFold()
+                    waitForFold()
+                }
             }
         }
         .onChange(of: duoMonitor?.state?.posture) { _, posture in
@@ -256,6 +259,14 @@ struct OnboardingView: View {
     /// the fold.
     private var shouldWaitForFold: Bool {
         duoHalves != nil && OnboardingFlow.flowScriptID != nil
+    }
+
+    /// The tracking prompt, right after the other three as on any iPhone.
+    /// Left to `finishOnboarding` it would come after the fold, over the
+    /// camera; there it is then a no-op.
+    private func requestTrackingBeforeFold() async {
+        await ATTManager.requestIfNeeded()
+        AppServices.attribution?.syncToRevenueCat()
     }
 
     private func waitForFold() {
@@ -621,6 +632,7 @@ struct OnboardingView: View {
             let photosStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
             photosGranted = (photosStatus == .authorized || photosStatus == .limited)
             if shouldWaitForFold {
+                await requestTrackingBeforeFold()
                 waitForFold()
                 return
             }
@@ -737,6 +749,7 @@ struct OnboardingView: View {
         }
 
         if shouldWaitForFold {
+            await requestTrackingBeforeFold()
             waitForFold()
             return
         }
