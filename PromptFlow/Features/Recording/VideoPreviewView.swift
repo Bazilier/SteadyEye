@@ -209,9 +209,12 @@ struct VideoPreviewView: View {
                 .background(Color.black.ignoresSafeArea(edges: .bottom))
             }
 
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
+            // The guided run's take has one way out: the sheet's Continue.
+            if firstTakeResult == nil {
+                VStack(spacing: 0) {
+                    topBar
+                    Spacer()
+                }
             }
 
             if let result = firstTakeResult {
