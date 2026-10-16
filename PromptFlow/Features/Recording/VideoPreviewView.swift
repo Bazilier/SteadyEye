@@ -29,16 +29,22 @@ struct VideoPreviewView: View {
     /// draws its first frame, so the zoom from the card never shows black.
     /// `nil` (the recording screen right after a take) keeps today's look.
     var poster: UIImage? = nil
-    /// Set only for the user's very first take: shows the result sheet over
-    /// the preview (see `FirstTakeResultSheet`).
+    /// Set only for the guided first run's take: shows the result toast over
+    /// the progress bar and Continue as the one button (see `EyeContactToast`).
     var firstTakeResult: FirstTakeResult? = nil
+    /// Any other take's eye contact, when it was tracked and the user keeps
+    /// the card on: floats over the progress bar until closed (see
+    /// `EyeContactToast`).
+    var takeResult: FirstTakeResult? = nil
     /// Eye contact over the take just recorded, 0...1; nil when it was not
     /// tracked or the preview was opened from the Recordings tab.
     var takeEyeContact: Double? = nil
-    /// The result sheet's main action: leave and write an own script.
+    /// The first take's Continue: leave the camera; the list takes the
+    /// guided run on from there (its paywall, or the older own-script offer).
     var onRecordOwnScript: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
+    @State private var isTakeResultHidden = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Injected at the app root; its `state` is nil except on iPhone Duo.
     @Environment(DuoDisplayMonitor.self) private var duoMonitor: DuoDisplayMonitor?
@@ -50,8 +56,6 @@ struct VideoPreviewView: View {
     /// Set by a pinch: in shows the whole frame, out fills the width. Nil
     /// keeps the default for the screen (`showsWholeFrame`).
     @State private var pinchedWholeFrame: Bool?
-    @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
-    @State private var isResultSheetHidden = false
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
     @StateObject private var playback = PlaybackController()
@@ -188,20 +192,42 @@ struct VideoPreviewView: View {
                 VStack(spacing: 8) {
                     scrubberRow
                     HStack(spacing: 10) {
-                        if showsStudioButton {
-                            StudioSoundButton(
-                                recording: recording,
-                                quota: studioSound.quota,
-                                action: handleStudioTap
-                            )
+                        if firstTakeResult != nil {
+                            continueButton
+                        } else {
+                            if showsStudioButton {
+                                StudioSoundButton(
+                                    recording: recording,
+                                    quota: studioSound.quota,
+                                    action: handleStudioTap
+                                )
+                            }
+                            saveButton
                         }
-                        saveButton
                     }
                 }
                 // Floats above the controls without pushing the video up.
+                // The take's eye contact goes first; the Studio Sound hint
+                // waits until it is closed.
                 .overlay(alignment: .topLeading) {
-                    studioHint
-                        .alignmentGuide(.top) { $0[.bottom] + 12 }
+                    Group {
+                        if let result = firstTakeResult ?? takeResult, !isTakeResultHidden {
+                            let isFirstTake = firstTakeResult != nil
+                            EyeContactToast(result: result, isFirstTake: isFirstTake) {
+                                withAnimation(.easeOut(duration: 0.2)) { isTakeResultHidden = true }
+                                AppAnalytics.log(isFirstTake ? "take_result_closed" : "take_eye_contact_sheet_closed")
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .onAppear {
+                                AppAnalytics.log(isFirstTake ? "take_result_shown" : "take_eye_contact_sheet_shown", params: [
+                                    "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
+                                ])
+                            }
+                        } else {
+                            studioHint
+                        }
+                    }
+                    .alignmentGuide(.top) { $0[.bottom] + 12 }
                 }
                 .frame(maxWidth: controlsMaxWidth)
                 .padding(.horizontal, 20)
@@ -210,44 +236,14 @@ struct VideoPreviewView: View {
                 .background(Color.black.ignoresSafeArea(edges: .bottom))
             }
 
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
+            // The guided run's take has one way out: Continue.
+            if firstTakeResult == nil {
+                VStack(spacing: 0) {
+                    topBar
+                    Spacer()
+                }
             }
 
-            if let result = firstTakeResult, !isResultSheetHidden {
-                VStack {
-                    Spacer()
-                    FirstTakeResultSheet(
-                        result: result,
-                        autoPause: $gazeAutoPauseEnabled,
-                        onOwnScript: {
-                            AppAnalytics.log("take_result_own_script_tapped")
-                            onRecordOwnScript?()
-                        },
-                        onWatch: {
-                            AppAnalytics.log("take_result_watch_tapped")
-                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
-                            if !playback.isPlaying { playback.togglePlayPause() }
-                        },
-                        onSave: {
-                            AppAnalytics.log("take_result_save_tapped")
-                            withAnimation(.spring(duration: 0.3)) { isResultSheetHidden = true }
-                            handleSaveTap()
-                        }
-                    )
-                }
-                .transition(.move(edge: .bottom))
-                .onAppear {
-                    AppAnalytics.log("take_result_shown", params: [
-                        "eye_contact_pct": result.gaze.map { Int(($0.lookingFraction * 100).rounded()) } ?? -1
-                    ])
-                }
-            }
-        }
-        .onChange(of: gazeAutoPauseEnabled) { _, enabled in
-            guard firstTakeResult != nil else { return }
-            AppAnalytics.log("take_result_autopause_toggled", params: ["enabled": enabled])
         }
         .statusBarHidden()
         .toolbar(.hidden, for: .navigationBar)
@@ -581,6 +577,22 @@ struct VideoPreviewView: View {
 
     // MARK: - Save CTA
 
+    /// The guided first run's one way on, in Save's place.
+    private var continueButton: some View {
+        Button {
+            AppAnalytics.log("take_result_continue_tapped")
+            onRecordOwnScript?()
+        } label: {
+            Text(String(
+                localized: "take_result.continue",
+                defaultValue: "Continue",
+                comment: "The one button on the first-take result sheet: closes the preview and goes on (to the paywall for free users)."
+            ))
+            .frame(maxWidth: .infinity)
+        }
+        .primaryButtonStyle()
+    }
+
     private var saveButton: some View {
         Button {
             handleSaveTap()
@@ -913,7 +925,7 @@ struct VideoPreviewView: View {
 
     @ViewBuilder
     private var studioHint: some View {
-        if showsStudioButton && (firstTakeResult == nil || isResultSheetHidden) {
+        if showsStudioButton {
             switch recording.studioStatus {
             case .preparing, .uploading, .processing, .downloading:
                 StudioHintCard(kind: .processing)

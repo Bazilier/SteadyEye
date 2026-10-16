@@ -26,6 +26,7 @@ struct SettingsView: View {
     @AppStorage("orpHighlightAnchor") private var orpHighlightAnchor: Bool = true
     @AppStorage("gazeIndicatorEnabled") private var gazeIndicatorEnabled: Bool = true
     @AppStorage("gazeAutoPauseEnabled") private var gazeAutoPauseEnabled: Bool = false
+    @AppStorage(EyeContactToast.enabledKey) private var takeEyeContactSheetEnabled: Bool = true
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
     @State private var isRestoring = false
@@ -369,6 +370,23 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     VStack(alignment: .leading, spacing: 4) {
+                        Toggle(isOn: $takeEyeContactSheetEnabled) {
+                            Text(String(
+                                localized: "settings.recording.takeEyeContactSheet",
+                                defaultValue: "Eye contact after each take",
+                                comment: "Toggle: show a short eye-contact summary over each take's preview."
+                            ))
+                        }
+                        .tint(Theme.accent)
+                        Text(String(
+                            localized: "settings.recording.takeEyeContactSheetFooter",
+                            defaultValue: "A short card above the take's timeline when the eye-contact indicator is on.",
+                            comment: "Helper text below the eye-contact-after-each-take toggle."
+                        ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
                         Toggle(isOn: $useBluetoothMic) {
                             Text("settings.allowBluetoothMics", comment: "Toggle: allow Bluetooth microphones (AirPods etc.) as audio input. Off by default because BT forces 16kHz HFP audio.")
                         }
@@ -411,74 +429,74 @@ struct SettingsView: View {
                 .listRowSeparator(.hidden)
 
                 #if DEV
-                Section("Debug") {
-                    Button("Reset to new install (replays onboarding)", role: .destructive) {
+                Section(devLabel("Debug")) {
+                    Button(devLabel("Reset to new install (replays onboarding)"), role: .destructive) {
                         devConfirmFreshInstall = true
                     }
-                    .alert("Reset to a new install?", isPresented: $devConfirmFreshInstall) {
-                        Button("Cancel", role: .cancel) {}
-                        Button("Erase everything and quit", role: .destructive) {
+                    .alert(devLabel("Reset to a new install?"), isPresented: $devConfirmFreshInstall) {
+                        Button(devLabel("Cancel"), role: .cancel) {}
+                        Button(devLabel("Erase everything and quit"), role: .destructive) {
                             DevReset.resetToFreshInstallAndQuit()
                         }
                     } message: {
-                        Text("Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay.")
+                        Text(verbatim: "Deletes all scripts, recordings and settings, then closes the app. Open it again to start as a new user. System permissions stay.")
                     }
-                    Picker("Subscription Override", selection: $subscriptionManager.devSubscriptionOverride) {
-                        Text("Off (use RC)").tag("off")
-                        Text("Force Free").tag("free")
-                        Text("Force Subscribed").tag("subscribed")
+                    Picker(devLabel("Subscription Override"), selection: $subscriptionManager.devSubscriptionOverride) {
+                        Text(verbatim: "Off (use RC)").tag("off")
+                        Text(verbatim: "Force Free").tag("free")
+                        Text(verbatim: "Force Subscribed").tag("subscribed")
                     }
-                    Text("DEV only. Forces isSubscribed state for testing.")
+                    Text(verbatim: "DEV only. Forces isSubscribed state for testing.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button("Preview Paywall") {
+                    Button(devLabel("Preview Paywall")) {
                         paywallPresentation = PaywallPresentation(source: "settings_preview")
                     }
-                    Button("Reset Tips") {
+                    Button(devLabel("Reset Tips")) {
                         UserDefaults.standard.set(false, forKey: "hasSeenEditorTip")
                     }
-                    Button("Reset Rate Limits") {
+                    Button(devLabel("Reset Rate Limits")) {
                         UserDefaults.standard.removeObject(forKey: "apiCallsToday")
                         UserDefaults.standard.removeObject(forKey: "bulkImportsToday")
                         UserDefaults.standard.removeObject(forKey: "rateLimitDate")
                     }
-                    Button("Reset AI Optimize Day Limit") {
+                    Button(devLabel("Reset AI Optimize Day Limit")) {
                         UserDefaults.standard.removeObject(forKey: "lastAIOptimizeDate")
                         SubscriptionManager.shared.lastAIOptimizeDateInterval = 0
                     }
-                    Button("Reset Pro AI counter") {
+                    Button(devLabel("Reset Pro AI counter")) {
                         UserDefaults.standard.removeObject(forKey: "proOptimizationsCount")
                         UserDefaults.standard.removeObject(forKey: "proOptimizationsResetDate")
                         SubscriptionManager.shared.proOptimizationsCount = 0
                     }
-                    Button("Preview Satisfaction Prompt") {
+                    Button(devLabel("Preview Satisfaction Prompt")) {
                         devShowSatisfactionPrompt = true
                     }
                     // Remote Config is off in DEV, and its default keeps the
                     // prompt off: this stands in for review_prompt_v2_enabled=on.
-                    Toggle("Satisfaction prompt enabled (stands in for RC)", isOn: $devReviewPromptEnabled)
+                    Toggle(devLabel("Satisfaction prompt enabled (stands in for RC)"), isOn: $devReviewPromptEnabled)
                         .tint(Theme.accent)
-                    Button("Reset satisfaction prompt state") {
+                    Button(devLabel("Reset satisfaction prompt state")) {
                         UserDefaults.standard.removeObject(forKey: "satisfactionPromptAnsweredYes")
                         UserDefaults.standard.removeObject(forKey: "satisfactionPromptLastShownAt")
                         UserDefaults.standard.removeObject(forKey: "satisfactionExportedAt")
                     }
                     HStack {
-                        Text("AI optimize used today")
+                        Text(verbatim: "AI optimize used today")
                         Spacer()
-                        Text(SubscriptionManager.shared.canOptimizeToday ? "no" : "yes")
+                        Text(verbatim: SubscriptionManager.shared.canOptimizeToday ? "no" : "yes")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("API calls today")
+                        Text(verbatim: "API calls today")
                         Spacer()
-                        Text("\(UserDefaults.standard.integer(forKey: "apiCallsToday")) / 20")
+                        Text(verbatim: "\(UserDefaults.standard.integer(forKey: "apiCallsToday")) / 20")
                             .foregroundStyle(.secondary)
                     }
-                    NavigationLink("Camera Diagnostics") {
+                    NavigationLink(devLabel("Camera Diagnostics")) {
                         CameraDiagnosticsView()
                     }
-                    Text("Build: DEV")
+                    Text(verbatim: "Build: DEV")
                         .font(.caption)
                         .foregroundStyle(Theme.accent)
 
@@ -488,74 +506,74 @@ struct SettingsView: View {
                 }
                 .listRowSeparator(.hidden)
 
-                Section("Recordings (DEV)") {
+                Section(devLabel("Recordings (DEV)")) {
                     DevImportRecordingButton()
-                    Text("Adds a video from Photos to Recordings as a take, to see the library and the preview without a camera. Simulator: xcrun simctl addmedia booted <file> first.")
+                    Text(verbatim: "Adds a video from Photos to Recordings as a take, to see the library and the preview without a camera. Simulator: xcrun simctl addmedia booted <file> first.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .listRowSeparator(.hidden)
 
-                Section("Chromakey (DEV)") {
+                Section(devLabel("Chromakey (DEV)")) {
                     Toggle(isOn: $devChromakeyEnabled) {
-                        Text("Chromakey background (replace camera)")
+                        Text(verbatim: "Chromakey background (replace camera)")
                     }
                     .tint(Theme.accent)
-                    Text("Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
+                    Text(verbatim: "Replaces camera preview with #00B140 green for UI mockup videos. Skips camera permission and session start. Toggle changes take effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .listRowSeparator(.hidden)
 
-                Section("iPhone Duo (DEV)") {
+                Section(devLabel("iPhone Duo (DEV)")) {
                     Toggle(isOn: $devCropSidewaysToPortrait) {
-                        Text("Crop sideways takes to 9:16")
+                        Text(verbatim: "Crop sideways takes to 9:16")
                     }
                     .tint(Theme.accent)
-                    Text("Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open.")
+                    Text(verbatim: "Not used by any device, iPhone Duo included: a phone held sideways records a portrait frame with the scene turned. This switch instead records the level horizon's vertical middle 9:16. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle(isOn: $devDuoGeometryOverlay) {
-                        Text("Geometry overlay (chromakey)")
+                        Text(verbatim: "Geometry overlay (chromakey)")
                     }
                     .tint(Theme.accent)
-                    Text("Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
+                    Text(verbatim: "Draws the lens, crease, camera half and orientation over the chromakey background on iPhone Duo. Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle(isOn: $devDuoReportsAnyDevice) {
-                        Text("Send Duo reports from this phone")
+                        Text(verbatim: "Send Duo reports from this phone")
                     }
                     .tint(Theme.accent)
-                    Text("Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only.")
+                    Text(verbatim: "Runs the iPhone Duo diagnostics here: face orientation, capture events, camera and take reports to the backend and Telegram, marked dev_any_device. To check the pipeline before a Duo is in hand. Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle(isOn: $devDuoCalibrationTest) {
-                        Text("Camera self-correction test")
+                        Text(verbatim: "Camera self-correction test")
                     }
                     .tint(Theme.accent)
                     .onChange(of: devDuoCalibrationTest) { _, on in
                         if on { CameraManager.armDuoCalibrationTest() } else { CameraManager.resetDuoCalibration() }
                     }
-                    Text("Runs the front camera through the iPhone Duo camera path, starting upside down. With your face in the frame, the preview should turn upright within about two seconds and stay upright on the next open. Turning it on again restarts the test. Takes effect on next Recording open.")
+                    Text(verbatim: "Runs the front camera through the iPhone Duo camera path, starting upside down. With your face in the frame, the preview should turn upright within about two seconds and stay upright on the next open. Turning it on again restarts the test. Takes effect on next Recording open.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .listRowSeparator(.hidden)
 
-                Section("Gaze probe (DEV)") {
+                Section(devLabel("Gaze probe (DEV)")) {
                     Toggle(isOn: $devGazeProbe) {
-                        Text("Gaze readout on the camera")
+                        Text(verbatim: "Gaze readout on the camera")
                     }
                     .tint(Theme.accent)
-                    Text("Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only.")
+                    Text(verbatim: "Vision face landmarks on the recording's own frames: head pose plus pupil position, with a looking/away verdict. Look into the lens and tap Calibrate. Prototype, Debug builds only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .listRowSeparator(.hidden)
 
-                Section("Notifications (DEV)") {
+                Section(devLabel("Notifications (DEV)")) {
                     HStack {
-                        Text("Push status")
+                        Text(verbatim: "Push status")
                             .foregroundStyle(.secondary)
                         Spacer()
                         Text(devNotificationStatus)
@@ -563,51 +581,51 @@ struct SettingsView: View {
                             .foregroundStyle(.tint)
                     }
                     HStack {
-                        Text("Pending push count")
+                        Text(verbatim: "Pending push count")
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(devPendingCount)")
+                        Text(verbatim: "\(devPendingCount)")
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.tint)
                     }
-                    Button("Request push permission") {
+                    Button(devLabel("Request push permission")) {
                         Task {
                             await NotificationScheduler.shared.requestPermissionIfNeeded()
                             await refreshDevDiagnostics()
                         }
                     }
                     Divider()
-                    Button("Fire trial_started in 5s") {
+                    Button(devLabel("Fire trial_started in 5s")) {
                         Task {
                             await NotificationScheduler.shared.schedule(.trialStarted, in: 5)
                             await refreshDevDiagnostics()
                         }
                     }
-                    Button("Fire trial_day_5 in 5s") {
+                    Button(devLabel("Fire trial_day_5 in 5s")) {
                         Task {
                             await NotificationScheduler.shared.schedule(.trialDay5, in: 5)
                             await refreshDevDiagnostics()
                         }
                     }
-                    Button("Fire trial_ending_24h in 5s") {
+                    Button(devLabel("Fire trial_ending_24h in 5s")) {
                         Task {
                             await NotificationScheduler.shared.schedule(.trialEnding24h, in: 5)
                             await refreshDevDiagnostics()
                         }
                     }
-                    Button("Fire inactive_3_days in 5s") {
+                    Button(devLabel("Fire inactive_3_days in 5s")) {
                         Task {
                             await NotificationScheduler.shared.schedule(.inactive3Days, in: 5)
                             await refreshDevDiagnostics()
                         }
                     }
                     Divider()
-                    Button("Cancel all pending notifications") {
+                    Button(devLabel("Cancel all pending notifications")) {
                         NotificationScheduler.shared.cancelAll()
                         Task { await refreshDevDiagnostics() }
                     }
                     .foregroundStyle(.red)
-                    Button("Reset soft ask flag") {
+                    Button(devLabel("Reset soft ask flag")) {
                         // Legacy key from the prior post-paywall trigger;
                         // cleared for completeness so DEV resets are
                         // truly clean.
@@ -709,7 +727,7 @@ struct SettingsView: View {
             #if DEV
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Text("DEV")
+                    Text(verbatim: "DEV")
                         .font(.caption2.bold())
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6)

@@ -192,24 +192,21 @@ struct RecordingView: View {
     }
     /// Auto-pause shows the eye too: it is what explains a paused prompter.
     private var showsGazeIndicator: Bool { gazeIndicatorEnabled || gazeAutoPauseEnabled }
+    /// The eye-contact card over a take's preview (see `EyeContactToast`).
+    @AppStorage(EyeContactToast.enabledKey) private var takeEyeContactSheetEnabled = true
     /// Freeze the prompter while the user looks away from the lens.
     private var gazeAutoPauses: Bool { gazeAutoPauseEnabled }
-    /// The onboarding demo's coach over the record button.
+    /// The "tap record to start" coach over the record button.
     @State private var showFirstTakeCoach = false
-    /// The coach is guiding this screen until the first take starts recording.
-    @State private var firstTakeFlowActive = false
-    /// The coach is due: the sample before anything was ever recorded, or an
-    /// own script from the onboarding flow before its first take
-    /// (`ownTakeCoachPending` is set only by that flow, so existing users
-    /// never see it).
+    /// The coach is due: the user's own script from the onboarding flow,
+    /// before its first take (`ownTakeCoachPending` is set only by that flow,
+    /// so existing users never see it).
     private var needsGuidedTake: Bool {
         guard OnboardingFlow.isActive else { return false }
-        if script.isDemo { return !hasCompletedFirstRecording }
         return !script.isSample && UserDefaults.standard.bool(forKey: "ownTakeCoachPending")
     }
     /// "Skip the rest of the setup?", for closing the camera mid-run.
     @State private var showLeaveSetupAlert = false
-    @State private var coachAfterRehearsal = false
     /// Eye contact over the take that just ended, for its preview.
     @State private var lastTakeGaze: GazeAttention.TakeSummary?
     /// The preview on screen is of the user's very first take.
@@ -324,12 +321,6 @@ struct RecordingView: View {
         }
         .onChange(of: player.isPlaying) { _, playing in
             gazeAttention.isReading = playing
-            // A first-take rehearsal ran to the end: say what comes next.
-            if !playing, firstTakeFlowActive, !cameraManager.isRecording, player.progress >= 1 {
-                coachAfterRehearsal = true
-                withAnimation { showFirstTakeCoach = true }
-                AppAnalytics.log("first_take_coach_after_rehearsal_shown")
-            }
             if playing && player.currentChunkIndex < player.chunks.count {
                 animateProgressForChunk(at: player.currentChunkIndex)
             }
@@ -378,7 +369,6 @@ struct RecordingView: View {
                 withAnimation(.spring(duration: 0.25)) { showCameraSettings = false }
                 startFMVIfEnabled()
                 gazeAttention.beginTake()
-                firstTakeFlowActive = false
                 showFirstTakeCoach = false
                 showDragTip = false
             } else {
@@ -524,6 +514,9 @@ struct RecordingView: View {
             firstTakeResult: previewIsFirstTake
                 ? FirstTakeResult(duration: recording.duration, gaze: lastTakeGaze)
                 : nil,
+            takeResult: !previewIsFirstTake && showsGazeIndicator && takeEyeContactSheetEnabled && lastTakeGaze != nil
+                ? FirstTakeResult(duration: recording.duration, gaze: lastTakeGaze)
+                : nil,
             takeEyeContact: lastTakeGaze?.lookingFraction,
             onRecordOwnScript: {
                 // ScriptListView picks this up once the camera is gone:
@@ -579,19 +572,18 @@ struct RecordingView: View {
                 AppAnalytics.log("onboarding_flow_leave_cancelled", params: ["from": "camera"])
             }
             Button(LeaveSetupCopy.skip, role: .destructive) {
-                OnboardingFlow.abandon(reason: script.isDemo ? "left_sample_camera" : "left_own_camera")
+                OnboardingFlow.abandon(reason: "left_own_camera")
                 showFirstTakeCoach = false
                 close()
             }
         } message: {
-            Text(LeaveSetupCopy.message)
+            Text(LeaveSetupCopy.cameraMessage)
         }
         // The record button can be tapped straight through the coach's
         // spotlight: clear the coach as soon as the countdown starts.
         .onChange(of: isCountingDown) { _, counting in
             if counting, showFirstTakeCoach {
                 AppAnalytics.log("first_take_coach_record_tapped", params: ["via": "spotlight"])
-                firstTakeFlowActive = false
                 withAnimation { showFirstTakeCoach = false }
             }
         }
@@ -604,7 +596,6 @@ struct RecordingView: View {
             // camera early never loses it. Portrait only: the interface is
             // portrait-locked, so in landscape the card would read sideways.
             if cameraAuthStatus == .authorized, !isLandscape, needsGuidedTake {
-                firstTakeFlowActive = true
                 showFirstTakeCoach = true
                 AppAnalytics.log("first_take_coach_shown", params: [
                     "script_source": script.isDemo ? "demo" : "user"
@@ -805,22 +796,6 @@ struct RecordingView: View {
                 GeometryReader { proxy in
                     FirstTakeCoach(
                         spotlight: anchor.map { proxy[$0] },
-                        afterRehearsal: coachAfterRehearsal,
-                        // The sample taught it all; an own script needs one line.
-                        compact: !script.isDemo,
-                        onRecord: {
-                            AppAnalytics.log("first_take_coach_record_tapped", params: ["after_rehearsal": coachAfterRehearsal])
-                            firstTakeFlowActive = false
-                            withAnimation { showFirstTakeCoach = false }
-                            toggleRecording()
-                        },
-                        onRehearse: {
-                            AppAnalytics.log("first_take_coach_rehearse_tapped", params: ["after_rehearsal": coachAfterRehearsal])
-                            withAnimation { showFirstTakeCoach = false }
-                            // From the end of a rehearsal, start over.
-                            if player.progress >= 1 { resetDisplay() }
-                            togglePlay()
-                        },
                         onDismiss: {
                             AppAnalytics.log("first_take_coach_dismissed")
                             withAnimation { showFirstTakeCoach = false }
@@ -2197,9 +2172,9 @@ struct RecordingView: View {
                     "was_first": wasFirst,
                     "via": "auto_persist"
                 ])
-                // The result sheet and the own-script follow-up belong to the
-                // sample take; a first take of an own script skips them.
-                previewIsFirstTake = wasFirst && script.isDemo
+                // The result sheet: the guided first run's take of the user's
+                // own script. Read before the coach mark is cleared below.
+                previewIsFirstTake = needsGuidedTake
                 // The paywall waits for real value: a successful take of the
                 // user's own script, not the sample. Shown once the camera
                 // closes (see ScriptListView), once per install — the same
@@ -2219,13 +2194,6 @@ struct RecordingView: View {
                     }
                 }
                 if wasFirst {
-                    if script.isDemo {
-                        // After the sample take, whichever way the user leaves
-                        // the preview, the list offers to write an own script,
-                        // and the camera coaches that script's first take.
-                        UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
-                        UserDefaults.standard.set(true, forKey: "ownTakeCoachPending")
-                    }
                     hasCompletedFirstRecording = true
                     AppAnalytics.log("first_recording_completed", params: [
                         "duration_sec": Int(duration.rounded())

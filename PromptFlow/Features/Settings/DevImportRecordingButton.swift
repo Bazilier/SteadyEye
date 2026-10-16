@@ -18,7 +18,7 @@ struct DevImportRecordingButton: View {
 
     var body: some View {
         PhotosPicker(selection: $selection, matching: .videos) {
-            Text("Import video as a recording")
+            Text(verbatim: "Import video as a recording")
         }
         .onChange(of: selection) { _, item in
             guard let item else { return }

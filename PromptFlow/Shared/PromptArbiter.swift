@@ -66,7 +66,11 @@ final class PromptArbiter {
             log("deny \(kind) — another prompt is visible")
             return false
         }
-        if let last = lastPromptAt {
+        // The guided run's planned paywall follows the user's own tap out of
+        // their first take; the gap would only defer it to a moment that may
+        // never come (the ATT dialog at the end of onboarding starts the gap
+        // less than a minute before a short take ends).
+        if kind != .onboardingPaywall, let last = lastPromptAt {
             let elapsed = Date().timeIntervalSince(last)
             if elapsed < Self.minimumGap {
                 log("deny \(kind) — only \(Int(elapsed))s since the last prompt")

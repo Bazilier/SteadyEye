@@ -1,8 +1,9 @@
 import Foundation
 
-/// Whether a new user is still inside the guided first run: onboarding, the
-/// sample take, "What's your video about?" and the first take of their own
-/// script, which ends in the one paywall the flow plans for.
+/// Whether a new user is still inside the guided first run: onboarding
+/// (which now ends with the user's own script, written, drafted or the
+/// ready-made sample) and the first take of that script, which ends in the
+/// one paywall the flow plans for.
 ///
 /// While it is active, nothing automatic may interrupt it: `PromptArbiter`
 /// denies every automatic prompt except `.onboardingPaywall`, the record
@@ -44,6 +45,26 @@ enum OnboardingFlow {
 
     /// The own script the flow drafted and is waiting to see recorded.
     static let flowScriptIDKey = "onboardingFlowScriptID"
+    /// Onboarding just ended with camera and microphone allowed: the list
+    /// opens the camera on the flow's script as the onboarding cover goes.
+    static let pendingRecordingKey = "pendingFlowRecording"
+    /// The user went to Settings from the access-denied screen: when they
+    /// come back with camera and microphone on, the camera opens on the
+    /// flow's script without asking.
+    static let awaitingSettingsKey = "onboardingAwaitingSettings"
+
+    /// The script the flow is waiting to see recorded, if any.
+    static var flowScriptID: UUID? {
+        UserDefaults.standard.string(forKey: flowScriptIDKey).flatMap(UUID.init)
+    }
+
+    /// Onboarding saved the user's first script: its first take is the next
+    /// step, coached with the short "tap record" hint.
+    static func noteFlowScript(_ id: UUID) {
+        let defaults = UserDefaults.standard
+        defaults.set(id.uuidString, forKey: flowScriptIDKey)
+        defaults.set(true, forKey: "ownTakeCoachPending")
+    }
 
     /// The user chose to skip the rest: the run counts as done, and every
     /// mark that would continue it is cleared, so nothing comes back.
@@ -51,7 +72,8 @@ enum OnboardingFlow {
         finish(reason: reason)
         let defaults = UserDefaults.standard
         for key in ["pendingOwnScriptAfterFirstTake", "ownTakeCoachPending",
-                    "ownTakePaywallDue", flowScriptIDKey,
+                    "ownTakePaywallDue", flowScriptIDKey, awaitingSettingsKey,
+                    pendingRecordingKey,
                     OwnTakePaywall.scriptIDKey, OwnTakePaywall.eyeContactKey] {
             defaults.removeObject(forKey: key)
         }
@@ -61,23 +83,19 @@ enum OnboardingFlow {
     enum ResumeStep: Equatable {
         /// Only the planned paywall is left: shown without asking.
         case paywall
-        case sampleTake
         case draft
         case ownTake(scriptID: UUID)
     }
 
-    static func resumeStep(hasRecordedAnything: Bool) -> ResumeStep? {
+    static func resumeStep() -> ResumeStep? {
         guard isActive else { return nil }
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "ownTakePaywallDue") { return .paywall }
-        if !hasRecordedAnything { return .sampleTake }
-        if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") { return .draft }
         if defaults.bool(forKey: "ownTakeCoachPending") {
-            if let id = defaults.string(forKey: flowScriptIDKey).flatMap(UUID.init) {
-                return .ownTake(scriptID: id)
-            }
+            if let id = flowScriptID { return .ownTake(scriptID: id) }
             return .draft
         }
+        if defaults.bool(forKey: "pendingOwnScriptAfterFirstTake") { return .draft }
         return nil
     }
 
@@ -91,6 +109,10 @@ enum LeaveSetupCopy {
     }
     static var message: String {
         String(localized: "onboarding_flow.leave.message", defaultValue: "You can always record and write scripts from the main screen.", comment: "Alert message when the user tries to leave the guided first run.")
+    }
+    /// For the camera, where the script already exists.
+    static var cameraMessage: String {
+        String(localized: "onboarding_flow.leave.camera_message", defaultValue: "Your script stays in the list. Record it whenever you’re ready.", comment: "Alert message when the user closes the camera before the first take of their own script during the guided first run. The script is kept in the scripts list.")
     }
     static var skip: String {
         String(localized: "onboarding_flow.leave.skip", defaultValue: "Skip", comment: "Destructive button: leave the guided first run; it will not come back.")

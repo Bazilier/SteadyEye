@@ -48,8 +48,15 @@ final class GazeAttention: ObservableObject {
     /// The probe runs only while it plays or a take records (`updateProbe`):
     /// Vision face landmarks at ~10 Hz cost ~12% of a core on an iPhone 16,
     /// for nothing while the camera merely sits open.
+    /// A take counts eye contact only while it is set: once the script has
+    /// run out, the eyes go to the stop button, and that is not a look away.
     var isReading = false {
-        didSet { if oldValue != isReading { updateProbe() } }
+        willSet { if newValue != isReading { tick() } }
+        didSet {
+            guard oldValue != isReading else { return }
+            if !isReading { closeAwaySpan() }
+            updateProbe()
+        }
     }
     private var isProbing = false
 
@@ -58,15 +65,25 @@ final class GazeAttention: ObservableObject {
         /// Share of tracked time spent looking at the lens, 0...1. Time before
         /// the baseline exists (idle, calibrating) is not counted.
         var lookingFraction: Double
-        /// When each look-away began, seconds into the take.
-        var awayMoments: [TimeInterval]
+        /// Each look-away, as seconds into the take from start to end.
+        var awaySpans: [ClosedRange<TimeInterval>]
+        /// The measured stretch of the take, in seconds into it: from the end
+        /// of calibration to the last moment the script was running. The
+        /// share above covers only this.
+        var trackedFrom: TimeInterval
+        var trackedUntil: TimeInterval
     }
 
     private var takeStart: Date?
     private var lastTick: Date?
     private var lookingTime: TimeInterval = 0
     private var awayTime: TimeInterval = 0
-    private var awayMoments: [TimeInterval] = []
+    private var awaySpans: [ClosedRange<TimeInterval>] = []
+    /// Start of the look-away still in progress, seconds into the take.
+    private var openAwayStart: TimeInterval?
+    /// When the take's first and latest looking or away time was credited.
+    private var trackedFrom: TimeInterval?
+    private var trackedUntil: TimeInterval = 0
     /// Below this much tracked time a percentage would mean nothing.
     private static let minimumTrackedTime: TimeInterval = 3
 
@@ -115,6 +132,7 @@ final class GazeAttention: ObservableObject {
             probe.stop()
             recent.removeAll()
             awaySince = nil
+            closeAwaySpan()
             setState(.idle)
         }
     }
@@ -124,25 +142,37 @@ final class GazeAttention: ObservableObject {
         lastTick = takeStart
         lookingTime = 0
         awayTime = 0
-        awayMoments = []
+        awaySpans = []
+        openAwayStart = nil
+        trackedFrom = nil
+        trackedUntil = 0
         updateProbe()
     }
 
     /// Ends the take; nil when too little of it was tracked to summarise.
     func endTake() -> TakeSummary? {
         tick()
+        closeAwaySpan()
         defer { takeStart = nil; lastTick = nil; updateProbe() }
         let tracked = lookingTime + awayTime
         guard takeStart != nil, tracked >= Self.minimumTrackedTime else { return nil }
-        return TakeSummary(lookingFraction: lookingTime / tracked, awayMoments: awayMoments)
+        return TakeSummary(
+            lookingFraction: lookingTime / tracked,
+            awaySpans: awaySpans,
+            trackedFrom: trackedFrom ?? 0,
+            trackedUntil: trackedUntil
+        )
     }
 
     /// Credits the time since the last reading to the state it was spent in.
     private func tick() {
-        guard takeStart != nil, let last = lastTick else { return }
+        guard let takeStart, let last = lastTick else { return }
         let now = Date()
         let elapsed = now.timeIntervalSince(last)
         lastTick = now
+        guard isReading, state == .looking || state == .away else { return }
+        if trackedFrom == nil { trackedFrom = last.timeIntervalSince(takeStart) }
+        trackedUntil = now.timeIntervalSince(takeStart)
         switch state {
         case .looking: lookingTime += elapsed
         case .away: awayTime += elapsed
@@ -180,9 +210,12 @@ final class GazeAttention: ObservableObject {
         if recent.count > Self.smoothingCount { recent.removeFirst() }
         let opening = Self.median(recent)
 
-        // Not while away: that is exactly the look the baseline must not
-        // learn — and with auto-pause the prompter is still "playing" then.
-        if isReading, state != .away {
+        // Away readings are learned too. A real glance down is short, so it
+        // barely moves a high percentile of ~25 s; but a baseline set too high
+        // in the first seconds (wide eyes at the start of a take) would
+        // otherwise hold the user "away" for the rest of it, as the window
+        // could never relearn their normal reading look.
+        if isReading {
             baselineSamples.append(opening)
             if baselineSamples.count > Self.baselineCapacity { baselineSamples.removeFirst() }
         }
@@ -209,11 +242,11 @@ final class GazeAttention: ObservableObject {
             if state != .away, Date().timeIntervalSince(since) >= Self.awayDelay {
                 let onset = since.addingTimeInterval(-Self.pipelineLag)
                 awayOnset = onset
-                if let start = takeStart {
-                    awayMoments.append(max(0, onset.timeIntervalSince(start)))
+                if let start = takeStart, isReading {
+                    openAwayStart = max(0, onset.timeIntervalSince(start))
                 }
                 // Credit the confirmation delay to away, not looking.
-                if takeStart != nil {
+                if takeStart != nil, isReading {
                     let delay = Date().timeIntervalSince(onset)
                     let moved = min(delay, lookingTime)
                     lookingTime -= moved
@@ -223,8 +256,19 @@ final class GazeAttention: ObservableObject {
             }
         } else {
             awaySince = nil
-            if isRecovered || state != .away { setState(.looking) }
+            if isRecovered || state != .away {
+                if state == .away { closeAwaySpan() }
+                setState(.looking)
+            }
         }
+    }
+
+    /// Ends the look-away in progress, if any, at the current moment.
+    private func closeAwaySpan() {
+        guard let start = openAwayStart, let takeStart else { return }
+        openAwayStart = nil
+        let end = max(start, Date().timeIntervalSince(takeStart))
+        awaySpans.append(start...end)
     }
 
     private static func median(_ values: [Double]) -> Double {
