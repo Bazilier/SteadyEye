@@ -154,15 +154,19 @@ final class StudioSoundManager: ObservableObject {
 
     /// The take as it is played: cut down to its sections' last takes when
     /// the cut is on (`Recording.usesSectionCuts`), with the processed
-    /// soundtrack when Studio Sound is on.
+    /// soundtrack when Studio Sound is on, and its captions burnt in when
+    /// they are on.
     func fileForSaving(_ recording: Recording) async throws -> SaveFile {
         let studioURL = recording.usesStudioAudio ? recording.studioAudioURL : nil
-        if recording.usesSectionCuts, let keep = recording.sectionCuts {
+        let keep = recording.usesSectionCuts ? recording.sectionCuts : nil
+        let subtitles = recording.usesSubtitles ? recording.subtitlePhrases : []
+        if keep != nil || !subtitles.isEmpty {
             let url = try await SectionCutComposition.export(
                 videoURL: recording.fileURL,
                 studioAudioURL: studioURL,
                 keep: keep,
-                studioIsCut: studioURL != nil && recording.studioCutData != nil
+                studioIsCut: studioURL != nil && recording.studioCutData != nil,
+                subtitles: subtitles
             )
             return SaveFile(url: url, isTemporary: true)
         }

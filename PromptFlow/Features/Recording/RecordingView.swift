@@ -2456,6 +2456,8 @@ struct RecordingView: View {
             isProcessingRecording = false
             switch result {
             case .success(let recording):
+                recording.scriptText = script.content
+                try? modelContext.save()
                 if let sectionCuts {
                     recording.sectionCuts = sectionCuts
                     try? modelContext.save()

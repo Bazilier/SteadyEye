@@ -43,35 +43,43 @@ enum SectionCutComposition {
         return AVPlayerItem(asset: composition)
     }
 
-    /// The cut take as a temporary .mov for the Photos library, with the
-    /// processed soundtrack when `studioAudioURL` is given. Re-encoded:
-    /// a passthrough copy keeps the cuts only as an edit list, which some
-    /// editors ignore, bringing the gaps back. The caller deletes the file.
+    /// The take as a temporary .mov for the Photos library: cut to `keep`
+    /// when given, with the processed soundtrack when `studioAudioURL` is,
+    /// and `subtitles` burnt in. Re-encoded: a passthrough copy keeps the
+    /// cuts only as an edit list, which some editors ignore, bringing the
+    /// gaps back. The caller deletes the file.
     /// `studioIsCut`: the processed audio covers the cut only, on its
     /// timeline (`Recording.studioCutData`).
     static func export(
         videoURL: URL,
         studioAudioURL: URL?,
-        keep: [ClosedRange<Double>],
-        studioIsCut: Bool = false
+        keep: [ClosedRange<Double>]?,
+        studioIsCut: Bool = false,
+        subtitles: [SubtitlePhrase] = []
     ) async throws -> URL {
         let composition = AVMutableComposition()
         let audioStart = try await StudioSoundAudio.insertVideo(
             of: videoURL, into: composition, includeOriginalAudio: studioAudioURL == nil
         )
-        if let studioAudioURL, studioIsCut {
+        if let studioAudioURL, studioIsCut, let keep {
             removeGaps(keeping: keep, from: composition)
             _ = try await StudioSoundAudio.insertStudioAudio(studioAudioURL, into: composition, at: .zero)
         } else {
             if let studioAudioURL {
                 _ = try await StudioSoundAudio.insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
             }
-            removeGaps(keeping: keep, from: composition)
+            if let keep { removeGaps(keeping: keep, from: composition) }
         }
 
+        let videoComposition = subtitles.isEmpty
+            ? nil
+            : try await SubtitleBurnIn.videoComposition(for: composition, phrases: subtitles)
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cut-export-\(UUID().uuidString).mov")
-        try await StudioSoundAudio.export(composition, preset: AVAssetExportPresetHighestQuality, to: outputURL, as: .mov)
+        try await StudioSoundAudio.export(
+            composition, preset: AVAssetExportPresetHighestQuality, to: outputURL, as: .mov,
+            videoComposition: videoComposition
+        )
         return outputURL
     }
 }

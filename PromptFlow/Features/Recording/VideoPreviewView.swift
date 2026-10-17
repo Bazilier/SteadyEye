@@ -70,6 +70,9 @@ struct VideoPreviewView: View {
     /// whole — after the cut button; nil when hidden.
     @State private var cutChip: Bool?
     @State private var cutChipHideToken = UUID()
+    /// Captions for what plays, recomputed when the words or the cut change.
+    @State private var subtitlePhrases: [SubtitlePhrase] = []
+    @State private var isTranscribing = false
     @State private var showStudioSaveSheet = false
     @State private var showStudioPaywall = false
     @State private var showStudioWillSaveToast = false
@@ -201,6 +204,13 @@ struct VideoPreviewView: View {
                         } else {
                             if showsStudioButton, recording.sectionCuts != nil {
                                 SectionCutButton(isOn: recording.sectionCutsEnabled, action: handleCutTap)
+                            }
+                            if showsStudioButton, #available(iOS 26.0, *) {
+                                SubtitlesButton(
+                                    isOn: recording.usesSubtitles,
+                                    isWorking: isTranscribing,
+                                    action: handleSubtitlesTap
+                                )
                             }
                             if showsStudioButton {
                                 StudioSoundButton(
@@ -436,6 +446,7 @@ struct VideoPreviewView: View {
             try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
             prepareAudioForPlayback()
             setupPlayer()
+            refreshSubtitles()
             Task {
                 await studioSound.refreshQuota()
                 showStudioCoachIfDue()
@@ -530,6 +541,11 @@ struct VideoPreviewView: View {
             // whole frame fitted inside the stage.
             .frame(maxWidth: .infinity, maxHeight: showsWholeFrame ? .infinity : nil)
             .fixedSize(horizontal: false, vertical: !showsWholeFrame)
+            .overlay {
+                if recording.usesSubtitles {
+                    SubtitleOverlay(clock: playback.clock, phrases: subtitlePhrases)
+                }
+            }
             .overlay {
                 if playback.player != nil && !playback.isPlaying && !playback.isScrubbing {
                     Image(systemName: "play.fill")
@@ -704,6 +720,7 @@ struct VideoPreviewView: View {
         playback.teardown()
         studioItem = nil
         setupPlayer()
+        refreshSubtitles()
         withAnimation(.easeOut(duration: 0.2)) {
             studioChip = nil
             cutChip = isCut
@@ -713,6 +730,47 @@ struct VideoPreviewView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             guard token == cutChipHideToken else { return }
             withAnimation(.easeIn(duration: 0.3)) { cutChip = nil }
+        }
+    }
+
+    // MARK: - Subtitles
+
+    private func refreshSubtitles() {
+        subtitlePhrases = recording.subtitlePhrases
+    }
+
+    /// First tap: transcribe the take, then show its captions. After that
+    /// the button only switches them on and off.
+    private func handleSubtitlesTap() {
+        guard #available(iOS 26.0, *), !isTranscribing else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        if recording.subtitleWordsData != nil {
+            recording.subtitlesEnabled.toggle()
+            try? modelContext.save()
+            AppAnalytics.log("subtitles_toggled", params: ["enabled": recording.subtitlesEnabled])
+            refreshSubtitles()
+            return
+        }
+        isTranscribing = true
+        AppAnalytics.log("subtitles_started", params: ["has_script": recording.scriptText != nil])
+        let started = Date()
+        Task { @MainActor in
+            defer { isTranscribing = false }
+            do {
+                let heard = try await SubtitleTranscriber.transcribe(
+                    videoURL: recording.fileURL, script: recording.scriptText
+                )
+                recording.subtitleWords = heard
+                recording.subtitlesEnabled = true
+                try? modelContext.save()
+                refreshSubtitles()
+                AppAnalytics.log("subtitles_ready", params: [
+                    "words": heard.count,
+                    "seconds": Int(Date().timeIntervalSince(started).rounded())
+                ])
+            } catch {
+                AppAnalytics.log("subtitles_failed", params: ["error_reason": String(describing: error)])
+            }
         }
     }
 
@@ -878,7 +936,7 @@ struct VideoPreviewView: View {
         Task {
             var file = StudioSoundManager.SaveFile(url: recording.fileURL, isTemporary: false)
             // The original sound, when asked for, is still cut.
-            if recording.usesSectionCuts || (!forceOriginal && recording.usesStudioAudio) {
+            if recording.usesSectionCuts || recording.usesSubtitles || (!forceOriginal && recording.usesStudioAudio) {
                 // A failed export falls back to the original rather than
                 // failing the save.
                 do {
