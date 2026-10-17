@@ -7,6 +7,7 @@ final class SilenceTrimmerTests: XCTestCase {
     private let frame = SilenceTrimmer.frameSec
     private let margin = SilenceTrimmer.marginSec
     private let outer = SilenceTrimmer.outerMarginSec
+    private let opening = SilenceTrimmer.openingMarginSec
 
     /// Room at -60 dB with voice at -20 dB over `voice` (seconds).
     private func levels(total: Double, room: Float = -60, voice: [ClosedRange<Double>]) -> SilenceTrimmer.Levels {
@@ -26,10 +27,11 @@ final class SilenceTrimmerTests: XCTestCase {
 
     func testEdgesMoveToVoicePlusMargin() {
         // Kept 1...6 and 9...14; voice 1.6...5.2 and 9.5...13.4. The joint
-        // gets the tight margin, the video's start and end the outer one.
+        // gets the tight margin, the video's start the opening one (here as far
+        // as the kept edge), its end the outer one.
         let lv = levels(total: 15, voice: [1.6...5.2, 9.5...13.4])
         let trimmed = SilenceTrimmer.trim([1...6, 9...14], levels: lv)
-        assertRange(trimmed[0], 1.6 - outer, 5.2 + margin)
+        assertRange(trimmed[0], max(1, 1.6 - opening), 5.2 + margin)
         assertRange(trimmed[1], 9.5 - margin, 13.4 + outer)
     }
 
@@ -71,13 +73,13 @@ final class SilenceTrimmerTests: XCTestCase {
         // A 40 ms knock before the voice.
         let lv = levels(total: 8, voice: [1.2...1.24, 2...5])
         let trimmed = SilenceTrimmer.trim([1...6], levels: lv)
-        assertRange(trimmed[0], 2 - outer, 5 + outer)
+        assertRange(trimmed[0], 2 - opening, 5 + outer)
     }
 
     func testNoisyRoomStillFindsVoice() {
         let lv = levels(total: 10, room: -35, voice: [2...6])
         let trimmed = SilenceTrimmer.trim([1...7], levels: lv)
-        assertRange(trimmed[0], 2 - outer, 6 + outer)
+        assertRange(trimmed[0], 2 - opening, 6 + outer)
     }
 
     func testVoiceAsLoudAsRoomLeavesCutAlone() {

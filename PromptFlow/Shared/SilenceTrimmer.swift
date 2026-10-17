@@ -45,9 +45,13 @@ nonisolated enum SilenceTrimmer {
     /// Room left between an edge and the voice, for soft endings — "-s",
     /// "-f", a breath out — that sit under the threshold.
     static let marginSec: Double = 0.15
-    /// The same room at the very start and end of the video, which want a
-    /// little air rather than a hard cut.
+    /// The same room at the very end of the video, which wants a little
+    /// air rather than a hard cut.
     static let outerMarginSec: Double = 0.5
+    /// And at the very start, a quarter second more: the preview starts
+    /// playing while it is still opening. Easy to trim for anyone who
+    /// wants less.
+    static let openingMarginSec: Double = 0.75
     /// The furthest an edge moves.
     static let maxShiftSec: Double = 1.5
     /// A part is never trimmed shorter than this.
@@ -78,7 +82,7 @@ nonisolated enum SilenceTrimmer {
                 range,
                 voice: voice,
                 levels: levels,
-                startMargin: index == 0 ? outerMarginSec : marginSec,
+                startMargin: index == 0 ? openingMarginSec : marginSec,
                 endMargin: index == ranges.count - 1 ? outerMarginSec : marginSec
             )
             log.notice("event=trim_part index=\(index) kept=\(fmt(range), privacy: .public) trimmed=\(fmt(trimmed), privacy: .public) cut_start=\(fmt(trimmed.lowerBound - range.lowerBound), privacy: .public) cut_end=\(fmt(range.upperBound - trimmed.upperBound), privacy: .public)")
