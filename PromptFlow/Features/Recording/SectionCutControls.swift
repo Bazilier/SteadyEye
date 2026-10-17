@@ -49,3 +49,19 @@ struct SectionCutChip: View {
         .background(Color.black.opacity(0.55), in: Capsule())
     }
 }
+
+/// Over the preview video while it is held and plays fast.
+struct FastForwardChip: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "forward.fill")
+            Text(verbatim: "\(Int(PlaybackController.fastForwardRate))×")
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .frame(height: 32)
+        .background(Color.black.opacity(0.55), in: Capsule())
+        .accessibilityHidden(true)
+    }
+}

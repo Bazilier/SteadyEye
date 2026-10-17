@@ -535,6 +535,14 @@ struct VideoPreviewView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { playback.togglePlayPause() }
+            // Hold for double speed, Instagram style; let go for normal.
+            .onLongPressGesture(minimumDuration: 0.3) {
+                playback.beginFastForward()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                AppAnalytics.log("preview_fast_forward")
+            } onPressingChanged: { pressing in
+                if !pressing { playback.endFastForward() }
+            }
         }
     }
 
@@ -573,7 +581,10 @@ struct VideoPreviewView: View {
             ))
         }
         .overlay {
-            if let isStudio = studioChip {
+            if playback.isFastForwarding {
+                FastForwardChip()
+                    .transition(.opacity)
+            } else if let isStudio = studioChip {
                 StudioChip(isStudio: isStudio)
                     .transition(.opacity)
             } else if let isCut = cutChip {
