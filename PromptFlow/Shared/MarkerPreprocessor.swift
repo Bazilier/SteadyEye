@@ -101,19 +101,33 @@ enum MarkerPreprocessor {
         return (chunks, metadata)
     }
 
+    /// Splits a script at its `////` section breaks (four or more slashes,
+    /// full-width ones too, as CJK keyboards type them) into the sections'
+    /// texts, in order. Empty sections — a break at
+    /// either end, or two breaks in a row — are dropped. A script with no
+    /// break comes back as one section.
+    ///
+    /// Runs before any language strategy, so sections work in every script,
+    /// unlike the timing markers above.
+    static func splitSections(_ raw: String) -> [String] {
+        raw.split(separator: #/[\/／]{4,}/#)
+            .map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
     // MARK: - Internal pipeline
 
     /// Pre-tokenization pass: insert whitespace around `///` and `{N}`
     /// so the downstream whitespace tokenizer sees them as standalone
     /// regardless of whether the user wrote them flush against words.
-    /// `///(?!/)` (negative lookahead) prevents partial matches inside
-    /// 4+ slash runs — those are user typos that we leave as-is.
+    /// The lookarounds keep `///` from matching inside a run of 4+
+    /// slashes; such a run is a section break, split off before this.
     /// `//` (the existing short-pause marker) is intentionally NOT
     /// padded here; the strategy still finds it via its own
     /// whitespace-keyed detector.
     static func normalizeMarkers(_ raw: String) -> String {
         var out = raw
-        out = out.replacingOccurrences(of: "///(?!/)", with: " /// ", options: .regularExpression)
+        out = out.replacingOccurrences(of: "(?<!/)///(?!/)", with: " /// ", options: .regularExpression)
         out = out.replacingOccurrences(of: "(\\{\\d+(?:\\.\\d+)?\\})", with: " $1 ", options: .regularExpression)
         return out
     }
