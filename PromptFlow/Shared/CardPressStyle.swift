@@ -28,6 +28,26 @@ struct CardPressStyle: ButtonStyle {
     }
 }
 
+/// The cards' press shrink (`CardPressStyle`) for card rows that open a
+/// sheet rather than zoom in. A list holds back a quick tap's touch-down,
+/// so `isPressed` alone barely shows there: the caller keeps the card
+/// down with `isHeld` while it opens (see SettingsView's top cards).
+struct CardPressScaleStyle: ButtonStyle {
+    var isHeld = false
+    var pressedScale = CardPressStyle.pressedScale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        let isDown = !reduceMotion && (configuration.isPressed || isHeld)
+        configuration.label
+            .scaleEffect(isDown ? pressedScale : 1)
+            .animation(
+                .easeOut(duration: isDown ? CardPressStyle.pressDuration : CardPressStyle.releaseDuration),
+                value: isDown
+            )
+    }
+}
+
 /// Opens a pressed card's destination once its shrink has finished:
 /// `pressDuration` counted from touch-down, so a quick tap waits for the
 /// rest of it and a long press opens at once. One card at a time.

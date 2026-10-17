@@ -29,6 +29,9 @@ struct SettingsView: View {
     @AppStorage(EyeContactToast.enabledKey) private var takeEyeContactSheetEnabled: Bool = true
     @State private var paywallPresentation: PaywallPresentation?
     @State private var showUpgradePaywall = false
+    /// The top card held at the pressed size while what it opens comes up.
+    @State private var heldCard: TopCard?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isRestoring = false
     @State private var restoreSucceeded = false
     @State private var showRestoreAlert = false
@@ -99,6 +102,7 @@ struct SettingsView: View {
             .fill(Color(.secondarySystemGroupedBackground))
     }
 
+
     private var settings: AppSettings {
         if let existing = settingsArray.first { return existing }
         let new = AppSettings()
@@ -112,7 +116,7 @@ struct SettingsView: View {
                 if ExperimentManager.shared.isChatAvailable {
                     Section {
                         Button {
-                            showChat = true
+                            pressThenOpen(.chat) { showChat = true }
                         } label: {
                             HStack(spacing: 12) {
                                 FounderAvatar(size: 44)
@@ -144,17 +148,14 @@ struct SettingsView: View {
                                         .padding(.horizontal, 6)
                                         .background(Capsule().fill(Color.red))
                                 }
-
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary.opacity(0.6))
-                                    .font(.system(size: 14, weight: .semibold))
                             }
-                            .contentShape(Rectangle())
+                            .modifier(PressableCard(background: cardBackground))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(CardPressScaleStyle(isHeld: heldCard == .chat, pressedScale: Self.topCardPressedScale))
                     }
                     .listRowSeparator(.hidden)
-                    .listRowBackground(cardBackground)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                     .listSectionSpacing(10)
                 }
 
@@ -166,7 +167,7 @@ struct SettingsView: View {
                 if !subscriptionManager.isSubscribed {
                     Section {
                         Button(action: {
-                            showUpgradePaywall = true
+                            pressThenOpen(.upgrade) { showUpgradePaywall = true }
                         }) {
                             HStack {
                                 Image(systemName: "crown.fill")
@@ -192,24 +193,23 @@ struct SettingsView: View {
                                 }
 
                                 Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary.opacity(0.6))
-                                    .font(.system(size: 14, weight: .semibold))
                             }
-                            .contentShape(Rectangle())
+                            .modifier(PressableCard(background: cardBackground))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(CardPressScaleStyle(isHeld: heldCard == .upgrade, pressedScale: Self.topCardPressedScale))
                     }
                     .listRowSeparator(.hidden)
-                    .listRowBackground(cardBackground)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                     .listSectionSpacing(10)
                 }
 
                 Section {
                     Button {
-                        Task {
-                            await SubscriptionManager.shared.presentCodeRedemption()
+                        pressThenOpen(.redeem) {
+                            Task {
+                                await SubscriptionManager.shared.presentCodeRedemption()
+                            }
                         }
                     } label: {
                         HStack {
@@ -226,10 +226,13 @@ struct SettingsView: View {
                                 .foregroundColor(.primary)
                             Spacer()
                         }
+                        .modifier(PressableCard(background: cardBackground))
                     }
+                    .buttonStyle(CardPressScaleStyle(isHeld: heldCard == .redeem, pressedScale: Self.topCardPressedScale))
                 }
                 .listRowSeparator(.hidden)
-                .listRowBackground(cardBackground)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
 
                 Section {
                     Picker(selection: $videoResolution) {
@@ -865,4 +868,46 @@ struct SettingsView: View {
         await refreshDevPendingCount()
     }
     #endif
+}
+
+extension SettingsView {
+    enum TopCard {
+        case chat, upgrade, redeem
+    }
+
+    static let topCardPressedScale: CGFloat = 0.95
+
+    /// Shrinks the card, opens its destination once the shrink is done, and
+    /// lets the card ease back once that is coming up. A list delays a
+    /// quick tap's touch-down, so without the hold the shrink never shows.
+    func pressThenOpen(_ card: TopCard, perform: @escaping () -> Void) {
+        guard !reduceMotion else {
+            perform()
+            return
+        }
+        guard heldCard == nil else { return }
+        heldCard = card
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(CardPressStyle.pressDuration))
+            perform()
+            try? await Task.sleep(for: .seconds(0.3))
+            heldCard = nil
+        }
+    }
+}
+
+/// The Settings top cards' padding and background, inside the button so
+/// they shrink with it on press (`CardPressScaleStyle`), as the script
+/// cards do. The row itself has no insets or background.
+private struct PressableCard<Background: View>: ViewModifier {
+    let background: Background
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(background)
+            .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+    }
 }
