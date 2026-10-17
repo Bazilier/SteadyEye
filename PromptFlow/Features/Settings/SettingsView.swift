@@ -114,11 +114,8 @@ struct SettingsView: View {
                         Button {
                             showChat = true
                         } label: {
-                            HStack {
-                                Image(systemName: "message.fill")
-                                    .foregroundStyle(.tint)
-                                    .font(.system(size: 22))
-                                    .frame(width: 30, alignment: .center)
+                            HStack(spacing: 12) {
+                                FounderAvatar(size: 44)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(String(
