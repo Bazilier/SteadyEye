@@ -107,6 +107,8 @@ struct ScriptListView: View {
     /// chance under the better timing.
     @AppStorage("hasShownNotificationSoftAsk") private var hasShownNotificationSoftAsk: Bool = false
     @State private var showNotificationSoftAsk: Bool = false
+    /// Cold start that triggered the soft-ask, reported with `push_soft_ask_shown`.
+    @State private var softAskColdStartCount: Int?
     /// In-memory, per-process: `.onAppear` can re-fire when a cover above this
     /// view dismisses, and the soft-ask decision must run at most once a launch.
     private static var didCheckSoftAskThisLaunch = false
@@ -334,7 +336,7 @@ struct ScriptListView: View {
             Text(String(localized: "onboarding_flow.resume.message", defaultValue: "You were setting up your first video.", comment: "Message of the alert offering to resume the guided first run."))
         }
         .sheet(isPresented: $showNotificationSoftAsk) {
-            SoftAskNotificationView {
+            SoftAskNotificationView(coldStartCount: softAskColdStartCount) {
                 Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
             }
             .onAppear {
@@ -376,10 +378,8 @@ struct ScriptListView: View {
                     // No flag write here — `hasShownNotificationSoftAsk` is set
                     // in the sheet's onAppear, so a denial retries next launch.
                     guard PromptArbiter.shared.canPresent(.notificationSoftAsk) else { return }
+                    softAskColdStartCount = countAtTrigger
                     showNotificationSoftAsk = true
-                    AppAnalytics.log("soft_ask_shown", params: [
-                        "cold_start_count": countAtTrigger
-                    ])
                 }
             }
             // An unfinished guided run after a relaunch: offer to pick it up.

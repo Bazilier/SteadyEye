@@ -49,6 +49,7 @@ The table at the bottom is checked against the code by `scripts/analytics_events
 **F2. The push soft-ask "shown" event is sent twice.**
 - `soft_ask_shown` (ScriptListView, when the sheet is triggered) and `push_soft_ask_shown` (SoftAskNotificationView `onAppear`) fire for the same display.
 - Fix: keep `push_soft_ask_shown`, which matches its `_accepted` / `_dismissed` siblings, pass `cold_start_count` to it, and drop `soft_ask_shown`.
+- **Fixed** on `fix/analytics-audit`: `soft_ask_shown` removed; `push_soft_ask_shown` carries `cold_start_count`.
 
 **F3. Error params that are hard to group.**
 
@@ -191,8 +192,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `push_scheduled` | Push | ok | Local notification scheduled; `kind` | delay_sec, kind | NotificationScheduler |
 | `push_soft_ask_accepted` | Push | ok | Soft-ask accepted (system prompt follows) | — | SoftAskNotificationView |
 | `push_soft_ask_dismissed` | Push | ok | Soft-ask dismissed | — | SoftAskNotificationView |
-| `push_soft_ask_shown` | Push | ok | Push soft-ask sheet on screen | — | SoftAskNotificationView |
-| `soft_ask_shown` | Push | kill | Push soft-ask presented. Duplicates `push_soft_ask_shown` — see audit F2 | cold_start_count | ScriptListView |
+| `push_soft_ask_shown` | Push | ok | Push soft-ask sheet on screen; `cold_start_count` = launch that triggered it | cold_start_count | SoftAskNotificationView |
 | `drag_tip_dismissed` | Recording | ok | Drag tip dismissed | — | RecordingView |
 | `drag_tip_shown` | Recording | ok | Tip to drag the prompter shown | camera_open | RecordingView |
 | `first_recording_completed` | Recording | ok | First take ever saved. Also sent to AppsFlyer | duration_sec | RecordingView |
