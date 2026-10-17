@@ -90,6 +90,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 **F9. Firebase has no user ID.**
 - `Analytics.setUserID` is never called. Joining BigQuery to RevenueCat therefore goes through the `$firebaseAppInstanceId` attribute in RC.
 - Fix: call `Analytics.setUserID(Purchases.shared.appUserID)` (an anonymous RC id). That gives a direct join, and an RC alias change also follows the user.
+- **Fixed** on `fix/analytics-audit`: `Analytics.setUserID(Purchases.shared.appUserID)` right after `Purchases.configure` (SteadyEyeApp). Applies to events from the release that ships it; older events still join through `$firebaseAppInstanceId`.
 
 **Next, once the BigQuery export has data:**
 - Volume per event and app version over the last 30 days. Mark events that never fire as `kill` and very loud ones as `review`.
