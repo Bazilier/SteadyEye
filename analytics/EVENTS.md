@@ -213,7 +213,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `recording_saved` | Recording | ok | Take saved to the library; `via`, `was_first` | duration_sec, via, was_first | CameraManager, RecordingView |
 | `recording_started` | Recording | ok | Take started | display_mode, script_length_words | RecordingView |
 | `recording_stopped` | Recording | ok | Take stopped (fires on failures too) | display_mode, duration_sec | CameraManager |
-| `recording_view_closed` | Recording | new | Camera screen closed, once per open; `reason` = back / left_setup / first_take_done / settings / no_access / duo_unfold / app_inactive / app_background, with `seconds_open` and `takes` started | reason, script_source, seconds_open, takes | RecordingView |
+| `recording_view_closed` | Recording | new | Camera screen closed, once per open; `reason` = back / left_setup / first_take_done / settings / no_access / duo_unfold / app_inactive (Home, app switcher, Control Center, a call), with `seconds_open` and `takes` started | reason, script_source, seconds_open, takes | RecordingView |
 | `recording_view_opened` | Recording | ok | Teleprompter camera opened | display_mode, script_length_words, script_source | RecordingView |
 | `satisfaction_prompt_no` | Review | ok | No | trigger | SatisfactionPromptView |
 | `satisfaction_prompt_shown` | Review | ok | Do you like SteadyEye? prompt shown; `trigger` | eye_contact_pct, trigger | SatisfactionPromptView |

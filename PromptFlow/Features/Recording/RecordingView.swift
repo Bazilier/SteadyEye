@@ -422,7 +422,9 @@ struct RecordingView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background || newPhase == .inactive else { return }
-            logClose(reason: newPhase == .background ? "app_background" : "app_inactive")
+            // Inactive always comes first, so this covers leaving the app as
+            // well as Control Center, a notification or a call.
+            logClose(reason: "app_inactive")
             if cameraManager.isRecording {
                 cameraManager.saveDirectlyOnStop = true
                 cameraManager.stopRecording()
