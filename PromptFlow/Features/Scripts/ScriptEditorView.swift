@@ -38,6 +38,19 @@ struct ScriptEditorView: View {
     @State private var didLogOpen = false
     @AppStorage("hasSavedFirstScript") private var hasSavedFirstScript = false
     @FocusState private var contentFocused: Bool
+    /// Where a marker from the markers popover goes: a `TextSelection`,
+    /// which needs iOS 18; typed `Any` so the property exists on iOS 17.
+    @State private var contentSelection: Any?
+    @State private var showMarkers = false
+    /// The text's selection when the markers popover opened — presenting
+    /// it takes the focus away, and the selection with it.
+    @State private var selectionAtMarkersOpen: Any?
+    /// Where the cursor goes once the popover has closed: after the
+    /// inserted marker, or back where it was.
+    @State private var cursorAfterMarkers: Any?
+    /// Until the markers popover has been opened once, its button carries
+    /// a dot.
+    @AppStorage("hasOpenedMarkersPopover") private var hasOpenedMarkers = false
     @FocusState private var titleFocused: Bool
 
     private let maxChars = 5000
@@ -86,7 +99,7 @@ struct ScriptEditorView: View {
                 Divider()
 
                 // Content editor
-                TextEditor(text: $content)
+                contentEditor
                     .font(.body)
                     .padding(.horizontal, 12)
                     .focused($contentFocused)
@@ -153,13 +166,19 @@ struct ScriptEditorView: View {
                     .bold()
                     .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                ToolbarItem(placement: .keyboard) {
+                ToolbarItemGroup(placement: .keyboard) {
                     Button {
                         pasteFromClipboard()
                     } label: {
                         Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
                     }
                     .font(.caption)
+                    Spacer()
+                    if contentFocused {
+                        Button { openMarkers(from: "keyboard") } label: {
+                            markersButtonLabel
+                        }
+                    }
                 }
             }
             .alert(
@@ -226,6 +245,9 @@ struct ScriptEditorView: View {
         .preferredColorScheme(.dark)
         .onChange(of: title) { _, _ in keepDraft() }
         .onChange(of: content) { _, _ in keepDraft() }
+        .onChange(of: showMarkers) { _, open in
+            if !open { restoreCursorAfterMarkers() }
+        }
         .onAppear {
             if let script {
                 title = script.title
@@ -380,6 +402,21 @@ struct ScriptEditorView: View {
                 comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
             ))
                 .foregroundStyle(charCountColor)
+            Button { openMarkers(from: "stats_bar") } label: {
+                markersButtonLabel
+                    .font(.caption.weight(.semibold))
+                    .padding(.leading, 8)
+                    .padding(.trailing, 10)
+                    .frame(height: 28)
+                    .background(Theme.accentTint, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 4)
+            .popover(isPresented: $showMarkers, arrowEdge: .bottom) {
+                MarkersPopover(onInsert: insertMarker, onClose: { showMarkers = false })
+                    .presentationCompactAdaptation(.popover)
+            }
             Spacer()
             // The optimize allowance; beside the draft button it would read
             // as the draft's.
@@ -475,6 +512,85 @@ struct ScriptEditorView: View {
         .disabled(isOptimizing || content.count > maxChars || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
         .padding(.horizontal)
         .padding(.bottom, 12)
+    }
+
+    // MARK: - Markers
+
+    /// iOS 17 has no selection binding: markers go at the end there.
+    @ViewBuilder
+    private var contentEditor: some View {
+        if #available(iOS 18.0, *) {
+            TextEditor(text: $content, selection: Binding(
+                get: { contentSelection as? TextSelection },
+                set: { contentSelection = $0 }
+            ))
+        } else {
+            TextEditor(text: $content)
+        }
+    }
+
+    /// "//" and the word for the markers popover; the dot stays until the
+    /// popover has been opened once.
+    private var markersButtonLabel: some View {
+        HStack(spacing: 5) {
+            Text(verbatim: "//")
+                .font(.system(.callout, design: .monospaced).weight(.bold))
+                .foregroundStyle(Theme.accent)
+            Text("editor.markers.button", comment: "Button in the script editor (above the keyboard and next to the character count) that opens the popover explaining the // /// //// markers.")
+                .foregroundStyle(.white)
+            if !hasOpenedMarkers {
+                Circle()
+                    .fill(Theme.accent)
+                    .frame(width: 6, height: 6)
+            }
+        }
+    }
+
+    private func openMarkers(from source: String) {
+        AppAnalytics.log("markers_popover_opened", params: [
+            "source": source,
+            "first_time": !hasOpenedMarkers
+        ])
+        hasOpenedMarkers = true
+        selectionAtMarkersOpen = contentSelection
+        cursorAfterMarkers = contentFocused ? contentSelection : nil
+        showMarkers = true
+    }
+
+    /// Focus back in the text with the cursor where `cursorAfterMarkers`
+    /// says. The selection is in place before the focus returns, so the
+    /// cursor comes back there rather than where it was before the insert.
+    /// The focus waits out the popover's dismissal: taken while it is still
+    /// on screen it does not stick, and the editor puts the cursor at the
+    /// end. Set once more after, in case the editor moved it on focusing.
+    private func restoreCursorAfterMarkers() {
+        selectionAtMarkersOpen = nil
+        guard let cursor = cursorAfterMarkers else { return }
+        cursorAfterMarkers = nil
+        contentSelection = cursor
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            contentFocused = true
+            contentSelection = cursor
+        }
+    }
+
+    /// At the cursor, or over the selection; at the end when the text has
+    /// never been focused.
+    private func insertMarker(_ marker: ScriptMarker) {
+        var range = content.endIndex..<content.endIndex
+        if #available(iOS 18.0, *),
+           case .selection(let selected) = ((selectionAtMarkersOpen ?? contentSelection) as? TextSelection)?.indices,
+           selected.lowerBound >= content.startIndex, selected.upperBound <= content.endIndex {
+            range = selected
+        }
+        let result = MarkerInsertion.insert(marker, into: content, replacing: range)
+        content = result.text
+        if #available(iOS 18.0, *) {
+            cursorAfterMarkers = TextSelection(insertionPoint: result.cursor)
+        }
+        showMarkers = false
+        AppAnalytics.log("marker_inserted", params: ["marker": String(describing: marker)])
     }
 
     // MARK: - Actions
