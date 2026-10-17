@@ -70,6 +70,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 **F5. `chat_background_fetch_completed` is likely the noisiest event.**
 - It fires on every background fetch, mostly with `new_count = 0`.
 - Fix: log it only when `new_count > 0`, or drop it once volumes confirm the noise.
+- **Fixed** on `fix/analytics-audit`: logged only when `new_count > 0`. The fetch runs on every return to the foreground (`SteadyEyeApp` scene phase `.active`).
 
 **F6. Trial and conversion counts must come from RevenueCat, not Firebase.**
 - `trial_started` misses trials started through restore, offer codes, Ask to Buy, or the app dying during the StoreKit sheet. The code comments say this.
@@ -123,7 +124,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `bulk_import_opened` | Bulk import | ok | Bulk import screen opened; `demo` = guided demo run | entry_point, mode | BulkImportView |
 | `bulk_import_real_completed` | Bulk import | ok | Real split finished; `scripts_count` created | scripts_count | BulkImportView |
 | `bulk_import_real_started` | Bulk import | ok | Real AI split started | — | BulkImportView |
-| `chat_background_fetch_completed` | Chat | review | Background fetch ran. Fires on every fetch, mostly `new_count` = 0 — see audit F5 | new_count | ChatBackgroundFetcher |
+| `chat_background_fetch_completed` | Chat | ok | Chat fetch on return to the foreground brought founder replies; `new_count` > 0 only | new_count | ChatBackgroundFetcher |
 | `chat_background_fetch_failed` | Chat | ok | Background fetch failed; `error_reason` = domain/code (was free-text `error`) | error_reason | ChatBackgroundFetcher |
 | `chat_gated_unavailable` | Chat | ok | Chat hidden by the RC policy (once per process) | policy | ExperimentManager |
 | `chat_message_failed_displayed` | Chat | ok | Failed bubble shown to the user | text_length | ChatView |

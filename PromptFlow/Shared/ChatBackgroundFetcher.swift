@@ -16,7 +16,11 @@ enum ChatBackgroundFetcher {
             ChatStorage.save(merged)
             ChatBadgeState.shared.recalculate()
             let newCount = max(0, serverMessages.count - priorServerCount)
-            AppAnalytics.log("chat_background_fetch_completed", params: ["new_count": newCount])
+            // Only fetches that brought replies: this runs on every return to
+            // the foreground, and empty fetches would drown the event.
+            if newCount > 0 {
+                AppAnalytics.log("chat_background_fetch_completed", params: ["new_count": newCount])
+            }
         } catch {
             AppAnalytics.log("chat_background_fetch_failed", params: [
                 "error_reason": AppAnalytics.errorReason(error)
