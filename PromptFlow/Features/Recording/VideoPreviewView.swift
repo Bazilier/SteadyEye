@@ -430,6 +430,10 @@ struct VideoPreviewView: View {
         )
         .onAppear {
             isVisible = true
+            // Opened over the camera, whose audio session keeps recording:
+            // iOS mutes haptics then. Allowed while the preview is up only —
+            // during a take they would be picked up by the mic.
+            try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
             setupPlayer()
             Task {
                 await studioSound.refreshQuota()
@@ -472,6 +476,7 @@ struct VideoPreviewView: View {
         }
         .onDisappear {
             isVisible = false
+            try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(false)
             pendingPostSavePaywall = false
             successToastHideToken = UUID()
             teardownPlayer()
