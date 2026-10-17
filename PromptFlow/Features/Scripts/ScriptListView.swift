@@ -107,6 +107,8 @@ struct ScriptListView: View {
     /// chance under the better timing.
     @AppStorage("hasShownNotificationSoftAsk") private var hasShownNotificationSoftAsk: Bool = false
     @State private var showNotificationSoftAsk: Bool = false
+    /// Cold start that triggered the soft-ask, reported with `push_soft_ask_shown`.
+    @State private var softAskColdStartCount: Int?
     /// In-memory, per-process: `.onAppear` can re-fire when a cover above this
     /// view dismisses, and the soft-ask decision must run at most once a launch.
     private static var didCheckSoftAskThisLaunch = false
@@ -334,7 +336,7 @@ struct ScriptListView: View {
             Text(String(localized: "onboarding_flow.resume.message", defaultValue: "You were setting up your first video.", comment: "Message of the alert offering to resume the guided first run."))
         }
         .sheet(isPresented: $showNotificationSoftAsk) {
-            SoftAskNotificationView {
+            SoftAskNotificationView(coldStartCount: softAskColdStartCount) {
                 Task { await NotificationScheduler.shared.requestPermissionIfNeeded() }
             }
             .onAppear {
@@ -376,10 +378,8 @@ struct ScriptListView: View {
                     // No flag write here — `hasShownNotificationSoftAsk` is set
                     // in the sheet's onAppear, so a denial retries next launch.
                     guard PromptArbiter.shared.canPresent(.notificationSoftAsk) else { return }
+                    softAskColdStartCount = countAtTrigger
                     showNotificationSoftAsk = true
-                    AppAnalytics.log("soft_ask_shown", params: [
-                        "cold_start_count": countAtTrigger
-                    ])
                 }
             }
             // An unfinished guided run after a relaunch: offer to pick it up.
@@ -397,6 +397,7 @@ struct ScriptListView: View {
             // `.onChange(of: hasSeenOnboarding)` handler below. This block
             // covers the cold-launch edge case where the flag persisted
             // across a kill mid-flow (rare but possible).
+            if pendingFlowRecording { logOnboardingHandoff() }
             openFlowScriptAfterOnboarding()
             openFlowScriptIfBackFromSettings()
         }
@@ -408,7 +409,10 @@ struct ScriptListView: View {
             // with the inner cover's present animation, so by the time
             // the user sees ScriptsList revealed, RecordingView is already
             // sliding up on top of it.
-            if newValue { openFlowScriptAfterOnboarding() }
+            if newValue {
+                logOnboardingHandoff()
+                openFlowScriptAfterOnboarding()
+            }
             // Mark the onboarding session itself as cold-start "1" so
             // the next true cold start observed by SteadyEyeApp.init()
             // bumps to 2 and trips the notification soft-ask. Idempotent:
@@ -670,6 +674,32 @@ struct ScriptListView: View {
         }
     }
 
+    private static let handoffLoggedKey = "onboardingHandoffLogged"
+
+    /// Where onboarding left the user, once per install: on the camera with
+    /// their script, or on this list and why. Read before
+    /// `openFlowScriptAfterOnboarding` consumes the pending mark.
+    private func logOnboardingHandoff() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: Self.handoffLoggedKey) else { return }
+        defaults.set(true, forKey: Self.handoffLoggedKey)
+        let result: String
+        if pendingFlowRecording {
+            if let id = OnboardingFlow.flowScriptID, scripts.contains(where: { $0.id == id }) {
+                result = isDuoUnfolded ? "duo_unfolded" : "camera"
+            } else {
+                result = "script_missing"
+            }
+        } else if OnboardingFlow.flowScriptID == nil {
+            result = "no_script"
+        } else if defaults.bool(forKey: OnboardingFlow.awaitingSettingsKey) {
+            result = "settings"
+        } else {
+            result = "no_access"
+        }
+        AppAnalytics.log("onboarding_handoff", params: ["result": result])
+    }
+
     /// Onboarding ended with access granted: the camera opens on the script
     /// it saved, for the first take.
     private func openFlowScriptAfterOnboarding() {
@@ -702,7 +732,7 @@ struct ScriptListView: View {
               scriptToRecord == nil, editorMode == nil, paywallPresentation == nil
         else { return }
         defaults.removeObject(forKey: OnboardingFlow.awaitingSettingsKey)
-        AppAnalytics.log("onboarding_back_from_settings_camera_opened")
+        AppAnalytics.log("onboarding_settings_return_opened")
         UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
         scriptToRecord = script
     }

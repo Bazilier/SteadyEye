@@ -419,7 +419,7 @@ struct RecordingsView: View {
                         "duration_sec": Int(recording.duration.rounded()),
                         "had_watermark": recording.hasWatermark,
                         "via": "context_menu",
-                        "error_reason": error?.localizedDescription ?? "unknown"
+                        "error_reason": AppAnalytics.errorReason(error)
                     ])
                 }
             }

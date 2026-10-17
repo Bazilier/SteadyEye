@@ -371,7 +371,7 @@ struct OnboardingScriptView: View {
                     comment: "Error on the draft-a-script screen when the AI declines the topic."
                 )
             } catch {
-                AppAnalytics.log("draft_script_failed", params: ["reason": String(describing: error).prefix(80).description])
+                AppAnalytics.log("draft_script_failed", params: ["reason": AppAnalytics.errorReason(error)])
                 errorMessage = String(
                     localized: "draft.error.generic",
                     defaultValue: "Couldn’t write a draft right now. Try again, or write it yourself.",

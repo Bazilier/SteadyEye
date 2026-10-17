@@ -312,7 +312,7 @@ struct DraftScriptView: View {
                     )
                 }
             } catch {
-                AppAnalytics.log("draft_script_failed", params: ["reason": String(describing: error).prefix(80).description])
+                AppAnalytics.log("draft_script_failed", params: ["reason": AppAnalytics.errorReason(error)])
                 withAnimation {
                     draft = nil
                     errorMessage = String(

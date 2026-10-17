@@ -647,7 +647,7 @@ struct VideoPreviewView: View {
             )
         } catch {
             AppAnalytics.log("studio_sound_playback_failed", params: [
-                "error_reason": (error as NSError).code
+                "error_reason": AppAnalytics.errorReason(error)
             ])
             return
         }
@@ -798,7 +798,7 @@ struct VideoPreviewView: View {
                     file = try await StudioSoundManager.shared.fileForSaving(recording)
                 } catch {
                     AppAnalytics.log("studio_sound_export_failed", params: [
-                        "error_reason": (error as NSError).code
+                        "error_reason": AppAnalytics.errorReason(error)
                     ])
                 }
             }
@@ -865,7 +865,7 @@ struct VideoPreviewView: View {
                         "duration_sec": Int(recording.duration.rounded()),
                         "had_watermark": recording.hasWatermark,
                         "via": "preview",
-                        "error_reason": error?.localizedDescription ?? "unknown"
+                        "error_reason": AppAnalytics.errorReason(error)
                     ])
                     #if !DEV
                     if let error {

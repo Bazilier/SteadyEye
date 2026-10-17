@@ -39,10 +39,22 @@ enum ATTManager {
     static func requestIfNeeded() async {
         guard isEnabled, canRequestAuthorization else { return }
         await settleBeforePrompt()
-        _ = await ATTrackingManager.requestTrackingAuthorization()
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        // `not_determined` means iOS dropped the prompt without showing it.
+        AppAnalytics.log("att_answered", params: ["status": statusName(status)])
         // Counts toward the arbiter's gap so nothing automatic lands on top of
         // the ATT dialog's dismissal.
         PromptArbiter.shared.noteExternalPresentation(isPaywall: false)
+    }
+
+    private static func statusName(_ status: ATTrackingManager.AuthorizationStatus) -> String {
+        switch status {
+        case .authorized: return "authorized"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        case .notDetermined: return "not_determined"
+        @unknown default: return "unknown"
+        }
     }
 
     /// Ensure `.active` (up to ~2s) then a short settle for the prior system

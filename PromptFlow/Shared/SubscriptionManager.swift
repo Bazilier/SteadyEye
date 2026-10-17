@@ -690,7 +690,7 @@ final class SubscriptionManager: ObservableObject {
             return isSubscribedReal
         } catch {
             AppAnalytics.log("restore_failed", params: [
-                "error_reason": error.localizedDescription
+                "error_reason": AppAnalytics.errorReason(error)
             ])
             return false
         }

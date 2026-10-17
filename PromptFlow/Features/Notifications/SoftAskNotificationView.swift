@@ -8,6 +8,8 @@ struct SoftAskNotificationView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Cold start that triggered the ask, for analytics. `nil` in previews.
+    var coldStartCount: Int? = nil
     let onAllow: () -> Void
 
     /// Drives the one-shot ring of the badge bell. Never animates under
@@ -80,7 +82,7 @@ struct SoftAskNotificationView: View {
         .presentationDetents([.height(detentHeight)])
         .presentationDragIndicator(.visible)
         .onAppear {
-            AppAnalytics.log("push_soft_ask_shown")
+            AppAnalytics.log("push_soft_ask_shown", params: coldStartCount.map { ["cold_start_count": $0] as [String: Any] })
             ringBellOnce()
         }
     }

@@ -61,6 +61,10 @@ struct SteadyEyeApp: App {
             if let firebaseAppInstanceID = Analytics.appInstanceID() {
                 Purchases.shared.attribution.setFirebaseAppInstanceID(firebaseAppInstanceID)
             }
+            // Same ID on both sides, so Firebase events (BigQuery `user_id`)
+            // join RevenueCat subscribers directly. The app never calls
+            // logIn, so this is the anonymous RC ID and stays stable.
+            Analytics.setUserID(Purchases.shared.appUserID)
 
             // Bridge ASA attribution from RevenueCat into Firebase user
             // properties. The sleep gives RC's SDK time to round-trip
