@@ -878,25 +878,24 @@ struct StudioCardOverlay: View {
         }
     }
 
-    /// Studio whenever the take has processed audio, whether or not it is
-    /// switched on (or the error, when it failed), and the scissors beside
-    /// it whenever the take has a cut — accent while the cut plays, white
-    /// while the whole take does. Two badges, set tight together and kept
-    /// small so they stay clear of the duration on the right.
+    /// Studio's sparkles whenever the take has processed audio, whether or
+    /// not it is switched on (or the error, when it failed), and the
+    /// scissors beside them whenever the take has a cut — accent while the
+    /// cut plays, white while the whole take does. Icon-only badges, set
+    /// tight together, so they stay clear of the duration on the right.
     @ViewBuilder
     private var leadingBadge: some View {
         let hasStudio = recording.studioStatus == .ready && recording.studioAudioURL != nil
         let failed = recording.studioStatus == .failed
         HStack(spacing: 4) {
             if hasStudio {
-                capsule(horizontalPadding: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(Theme.accent)
-                        Text(verbatim: "Studio")
-                            .foregroundStyle(.white)
-                    }
+                // Icon only, like the scissors: room for more badges beside.
+                capsule(horizontalPadding: 6) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Theme.accent)
                 }
+                .accessibilityElement()
+                .accessibilityLabel(Text(verbatim: "Studio Sound"))
             } else if failed {
                 capsule(horizontalPadding: 8) {
                     HStack(spacing: 4) {
