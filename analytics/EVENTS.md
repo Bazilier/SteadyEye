@@ -95,6 +95,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 **Next, once the BigQuery export has data:**
 - Volume per event and app version over the last 30 days. Mark events that never fire as `kill` and very loud ones as `review`.
 - Rebuild the main funnel from these events: `onboarding_started` → `onboarding_script_saved` → `recording_saved` (`was_first`) → `paywall_shown` → `trial_started` → RC conversion.
+- Onboarding → camera drop-off: `onboarding_completed` (`path`) → `onboarding_handoff` (`result`) → `recording_view_opened` → `recording_started` / `recording_view_closed` (`reason`, `takes`). To slice these in GA4 itself, register `path`, `result`, `reason` and `status` as event-scoped custom dimensions (they count from registration on); BigQuery has them regardless.
 
 ## Registry
 
@@ -117,6 +118,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `editor_draft_tapped` | AI | ok | Draft with AI tapped in the editor | — | ScriptEditorView |
 | `optimize_tip_optimize_tapped` | AI | ok | Optimize tapped from the tip | — | ScriptEditorView |
 | `optimize_tip_shown` | AI | ok | Coach tip pointing at Optimize shown in the editor | has_example | ScriptEditorView |
+| `att_answered` | Attribution | new | Answer to the ATT prompt at the end of onboarding; `status` = authorized / denied / restricted / not_determined (iOS dropped the prompt) | status | ATTManager |
 | `attribution_sync_failed` | Attribution | ok | Attribution fetch failed; retried next cold start | error_kind | AppAttributionService |
 | `attribution_synced` | Attribution | ok | Server attribution resolved and written to user properties (once per install) | has_campaign, has_keyword, traffic_source | AppAttributionService |
 | `bulk_import_demo_cancelled` | Bulk import | ok | Demo import left before it finished | — | BulkImportView |
@@ -156,6 +158,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `onboarding_flow_resume_declined` | Onboarding | ok | Resume declined | — | ScriptListView |
 | `onboarding_flow_resume_offered` | Onboarding | ok | Offer to resume the unfinished flow shown | — | ScriptListView |
 | `onboarding_flow_resumed` | Onboarding | ok | Flow resumed | — | ScriptListView |
+| `onboarding_handoff` | Onboarding | new | Where onboarding left a new user, once per install; `result` = camera / no_script (skipped the script step) / no_access / settings / script_missing / duo_unfolded | result | ScriptListView |
 | `onboarding_permission_explainer_shown` | Onboarding | ok | Explainer before the system prompts | — | OnboardingView |
 | `onboarding_script_paste_tapped` | Onboarding | ok | Paste chosen on the first-script step | — | OnboardingScriptView |
 | `onboarding_script_retry_tapped` | Onboarding | ok | Regenerate on the first-script step | — | OnboardingScriptView |
@@ -210,6 +213,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `recording_saved` | Recording | ok | Take saved to the library; `via`, `was_first` | duration_sec, via, was_first | CameraManager, RecordingView |
 | `recording_started` | Recording | ok | Take started | display_mode, script_length_words | RecordingView |
 | `recording_stopped` | Recording | ok | Take stopped (fires on failures too) | display_mode, duration_sec | CameraManager |
+| `recording_view_closed` | Recording | new | Camera screen closed, once per open; `reason` = back / left_setup / first_take_done / settings / no_access / duo_unfold / app_inactive / app_background, with `seconds_open` and `takes` started | reason, script_source, seconds_open, takes | RecordingView |
 | `recording_view_opened` | Recording | ok | Teleprompter camera opened | display_mode, script_length_words, script_source | RecordingView |
 | `satisfaction_prompt_no` | Review | ok | No | trigger | SatisfactionPromptView |
 | `satisfaction_prompt_shown` | Review | ok | Do you like SteadyEye? prompt shown; `trigger` | eye_contact_pct, trigger | SatisfactionPromptView |
