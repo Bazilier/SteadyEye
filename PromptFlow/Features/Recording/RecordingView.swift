@@ -269,6 +269,10 @@ struct RecordingView: View {
     /// The take's `////` section takes, for cutting the file down to the
     /// last take of each.
     @State private var takeLog = SectionTakeLog()
+    /// Set when a take starts with auto-start on: the prompter waits for
+    /// the camera's first written frame, so no word is read before the file
+    /// begins. Cleared once it starts, or the take ends first.
+    @State private var promptingStartPending: Date?
     /// Settings → Countdown: 0 (Off), 3, 5 or 10 seconds.
     private var countdownSeconds: Int {
         max(0, settingsArray.first?.countdownDuration ?? 3)
@@ -387,7 +391,11 @@ struct RecordingView: View {
                 stopFMV()
                 lastTakeGaze = gazeAttention.endTake()
                 takeLog.end(at: cameraManager.captureClockNow())
+                promptingStartPending = nil
             }
+        }
+        .onChange(of: cameraManager.isWritingFrames) { _, writing in
+            if writing { startPendingPrompting(timedOut: false) }
         }
         .onChange(of: player.heldSection) { _, held in
             if held != nil, cameraManager.isRecording {
@@ -2331,8 +2339,38 @@ struct RecordingView: View {
             "script_length_words": script.content.split(separator: " ").count
         ])
         if autoStartPrompting {
-            startReading()
+            // Already writing when nothing is to come (chromakey).
+            guard !cameraManager.isWritingFrames else {
+                startReading()
+                return
+            }
+            let pendingSince = Date()
+            promptingStartPending = pendingSince
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(Self.firstFrameWaitCap * 1_000_000_000))
+                // This take's cap only, not a later take's.
+                guard promptingStartPending == pendingSince else { return }
+                startPendingPrompting(timedOut: true)
+            }
         }
+    }
+
+    /// The longest the prompter waits for the camera before it starts
+    /// anyway: never stuck on a camera that does not report.
+    private static let firstFrameWaitCap: TimeInterval = 3
+
+    /// Starts the prompter for the take that is waiting for its first frame,
+    /// once: whichever of the frame and the cap comes first.
+    private func startPendingPrompting(timedOut: Bool) {
+        guard let pendingSince = promptingStartPending, cameraManager.isRecording else { return }
+        promptingStartPending = nil
+        let waitMs = Int(Date().timeIntervalSince(pendingSince) * 1000)
+        Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye", category: "CameraDiagnostic")
+            .notice("event=prompter_start wait_ms=\(waitMs) timed_out=\(timedOut)")
+        if timedOut {
+            AppAnalytics.log("prompter_start_timed_out", params: ["wait_ms": waitMs])
+        }
+        startReading()
     }
 
     // MARK: - Auto-save flow

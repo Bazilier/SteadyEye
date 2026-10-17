@@ -839,7 +839,8 @@ struct StudioBanner: View {
     }
 }
 
-/// Studio Sound state on a recording's card thumbnail.
+/// Studio Sound state on a recording's card thumbnail, and scissors when the
+/// take has a section cut.
 struct StudioCardOverlay: View {
     let recording: Recording
 
@@ -870,7 +871,20 @@ struct StudioCardOverlay: View {
                     .foregroundStyle(.white)
                 }
             }
-        case .ready where recording.studioEnabled:
+        default:
+            HStack(spacing: 6) {
+                studioBadge
+                if recording.sectionCuts != nil { cutBadge }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        }
+    }
+
+    @ViewBuilder
+    private var studioBadge: some View {
+        switch recording.studioStatus {
+        case .ready where recording.usesStudioAudio:
             badge(icon: "sparkles", tint: Theme.accent, text: "Studio", textColor: .white)
         case .failed:
             badge(
@@ -888,6 +902,19 @@ struct StudioCardOverlay: View {
         }
     }
 
+    /// Icon only, beside Studio's badge and the duration: accent while the
+    /// cut plays, white while the whole take does.
+    private var cutBadge: some View {
+        Image(systemName: "scissors")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(recording.sectionCutsEnabled ? Theme.accent : .white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(0.6), in: Capsule())
+            .accessibilityElement()
+            .accessibilityLabel(SectionCutChip.label(isCut: recording.sectionCutsEnabled))
+    }
+
     private func badge(icon: String, tint: Color, text: String, textColor: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
@@ -899,7 +926,5 @@ struct StudioCardOverlay: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color.black.opacity(0.6), in: Capsule())
-        .padding(8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 }
