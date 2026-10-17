@@ -1665,7 +1665,7 @@ struct RecordingView: View {
                     self.fmvService = nil
                     self.fmvBaselineSlider = nil
                     AppAnalytics.log("follow_my_voice_v2_unavailable", params: [
-                        "reason": String(describing: error)
+                        "reason": AppAnalytics.errorReason(error)
                     ])
                 }
             }

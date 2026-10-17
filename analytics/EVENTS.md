@@ -25,7 +25,7 @@ The table at the bottom is checked against the code by `scripts/analytics_events
 
 - Event and param names: `snake_case`, at most **40 chars**. Firebase drops a longer event, and in Release nothing tells you.
 - At most 25 params per event. String values are cut at 100 chars.
-- `error_reason` is a stable code (`"NSCocoaErrorDomain/4"`, `"not_configured"`), never `localizedDescription` (we ship 4 locales) and never `String(describing: error)` (free text, unbounded variety).
+- `error_reason` is a stable code: `AppAnalytics.errorReason(error)` (`"NSCocoaErrorDomain/4"`) or a fixed string (`"not_configured"`), never `localizedDescription` (we ship 4 locales) and never `String(describing: error)` (free text, unbounded variety).
 - Booleans: pass a Swift `Bool`. BigQuery stores it as `int_value` 1/0.
 - `AppAnalytics.log` is compiled out of DEV builds. The direct `Analytics.logEvent` calls in `AppAttributionService` are inside `#if !DEV` too.
 
@@ -60,6 +60,7 @@ The table at the bottom is checked against the code by `scripts/analytics_events
 | Bare `Int` code without its domain (a different type from every other `error_reason`) | `studio_sound_playback_failed`, `studio_sound_export_failed` (VideoPreviewView) |
 
 Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` already does.
+- **Fixed** on `fix/analytics-audit`: all nine sites use `AppAnalytics.errorReason(_:)` (`domain/code`); `chat_background_fetch_failed` now sends it as `error_reason` instead of `error`.
 
 **F4. Permission events lack `source` when they come from onboarding.**
 - `MediaAccess` sends `source: "before_recording"`. `OnboardingView` sends no `source`, so onboarding shows up as an empty value.
@@ -100,7 +101,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `ai_optimize_succeeded` | AI | ok | Optimize returned a rewritten script | duration_ms | ScriptEditorView |
 | `ai_optimize_tapped` | AI | ok | Optimize for reading tapped in the editor | is_subscribed | ScriptEditorView |
 | `draft_script_closed` | AI | ok | Draft sheet closed; `had_draft` says if anything was generated | had_draft | DraftScriptView |
-| `draft_script_failed` | AI | fix | Draft failed. One branch sends `String(describing: error)` — free text, see audit F3 | reason | DraftScriptView, OnboardingScriptView |
+| `draft_script_failed` | AI | ok | Draft failed; `reason` = quota / cannot_draft / error domain/code | reason | DraftScriptView, OnboardingScriptView |
 | `draft_script_record_tapped` | AI | ok | Record straight from the draft | — | DraftScriptView |
 | `draft_script_requested` | AI | ok | Draft generation requested (editor or onboarding) | kind, length_sec, purpose | DraftScriptView, OnboardingScriptView |
 | `draft_script_retry_tapped` | AI | ok | Retry on a generated draft | — | DraftScriptView |
@@ -122,7 +123,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `bulk_import_real_completed` | Bulk import | ok | Real split finished; `scripts_count` created | scripts_count | BulkImportView |
 | `bulk_import_real_started` | Bulk import | ok | Real AI split started | — | BulkImportView |
 | `chat_background_fetch_completed` | Chat | review | Background fetch ran. Fires on every fetch, mostly `new_count` = 0 — see audit F5 | new_count | ChatBackgroundFetcher |
-| `chat_background_fetch_failed` | Chat | fix | Background fetch failed; `error` is `String(describing:)` — see audit F3 | error | ChatBackgroundFetcher |
+| `chat_background_fetch_failed` | Chat | ok | Background fetch failed; `error_reason` = domain/code (was free-text `error`) | error_reason | ChatBackgroundFetcher |
 | `chat_gated_unavailable` | Chat | ok | Chat hidden by the RC policy (once per process) | policy | ExperimentManager |
 | `chat_message_failed_displayed` | Chat | ok | Failed bubble shown to the user | text_length | ChatView |
 | `chat_message_retry_failed` | Chat | ok | Retry failed again | error_reason | ChatView |
@@ -140,7 +141,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `duo_record_blocked_unfolded` | Duo | ok | Record blocked because the device is unfolded | script_source | ScriptListView |
 | `recording_stopped_by_fold` | Duo | ok | Take stopped by a fold change | — | RecordingView |
 | `recording_deleted` | Export | ok | Take deleted from the preview | duration_sec, had_watermark | VideoPreviewView |
-| `recording_export_failed` | Export | fix | Save to Photos failed; `error_reason` is `localizedDescription` — see audit F3 | duration_sec, error_reason, had_watermark, via | RecordingsView, VideoPreviewView |
+| `recording_export_failed` | Export | ok | Save to Photos failed; `error_reason` = domain/code | duration_sec, error_reason, had_watermark, via | RecordingsView, VideoPreviewView |
 | `recording_exported_to_camera_roll` | Export | ok | Video saved to Photos; `via` = preview / list / background / studio_when_ready | duration_sec, had_watermark, studio_sound, via | RecordingsView, StudioSoundManager, VideoPreviewView |
 | `onboarding_access_allow_tapped` | Onboarding | ok | Allow tapped on the access step | — | OnboardingView |
 | `onboarding_access_shown` | Onboarding | ok | Camera/mic access step shown | — | OnboardingView |
@@ -173,7 +174,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `purchase_succeeded` | Paywall | ok | Store purchase finished; `was_trial` | plan, source, was_trial | PaywallView |
 | `purchase_unavailable` | Paywall | ok | Buy tapped before offerings loaded (no store call) | plan, source | PaywallView |
 | `restore_attempted` | Paywall | ok | Restore purchases tapped | — | SubscriptionManager |
-| `restore_failed` | Paywall | fix | Restore failed; one branch sends `localizedDescription` — see audit F3 | error_reason | SubscriptionManager |
+| `restore_failed` | Paywall | ok | Restore failed; `error_reason` = not_configured or domain/code | error_reason | SubscriptionManager |
 | `restore_succeeded` | Paywall | ok | Restore finished; `had_active_entitlement` | had_active_entitlement | SubscriptionManager |
 | `trial_converted` | Paywall | review | Trial → paid, seen only when the app is next opened. Funnel hint, not a count — use RC webhooks (audit F6) | plan, product_id | SubscriptionManager |
 | `trial_started` | Paywall | ok | Free trial started from the paywall (= `purchase_succeeded` with `was_trial`). Client-side only; RC sees more trials | plan, source | PaywallView |
@@ -200,7 +201,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `first_take_coach_record_tapped` | Recording | ok | Record tapped while the coach mark is up | via | RecordingView |
 | `first_take_coach_shown` | Recording | ok | First-take coach mark shown | script_source | RecordingView |
 | `follow_my_voice_v2_started` | Recording | ok | Follow My Voice started | — | RecordingView |
-| `follow_my_voice_v2_unavailable` | Recording | fix | Follow My Voice failed to start; `reason` is `String(describing:)` — see audit F3 | reason | RecordingView |
+| `follow_my_voice_v2_unavailable` | Recording | ok | Follow My Voice failed to start; `reason` = domain/code | reason | RecordingView |
 | `recording_failed` | Recording | review | Take lost. Two stages (writer, persist) share the name — see audit F7 | display_mode, duration_sec, error_reason | CameraManager, RecordingView |
 | `recording_saved` | Recording | ok | Take saved to the library; `via`, `was_first` | duration_sec, via, was_first | CameraManager, RecordingView |
 | `recording_started` | Recording | ok | Take started | display_mode, script_length_words | RecordingView |
@@ -216,12 +217,12 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `script_tapped` | Scripts | ok | Script tapped in the list (opens recording) | script_length_words, script_source | ScriptListView |
 | `scripts_empty_paste_tapped` | Scripts | ok | Paste tapped on the empty list | — | ScriptListView |
 | `scripts_empty_write_tapped` | Scripts | ok | Write tapped on the empty list | — | ScriptListView |
-| `studio_sound_export_failed` | Studio Sound | fix | Export with processed audio failed; bare Int `error_reason` | error_reason | VideoPreviewView |
+| `studio_sound_export_failed` | Studio Sound | ok | Export with processed audio failed (falls back to original); `error_reason` = domain/code | error_reason | VideoPreviewView |
 | `studio_sound_failed` | Studio Sound | ok | Processing failed; `reason` is a code | reason | StudioSoundManager |
 | `studio_sound_intro_accepted` | Studio Sound | ok | Studio Sound intro accepted; `tier` | tier | VideoPreviewView |
 | `studio_sound_length_mismatch` | Studio Sound | ok | Processed audio length differs from the video | original_ms, processed_ms | StudioSoundManager |
 | `studio_sound_limit_tapped` | Studio Sound | ok | Tapped while over the quota | tier | VideoPreviewView |
-| `studio_sound_playback_failed` | Studio Sound | fix | Processed audio could not be attached; `error_reason` is a bare Int — see audit F3 | error_reason | VideoPreviewView |
+| `studio_sound_playback_failed` | Studio Sound | ok | Processed audio could not be attached; `error_reason` = domain/code | error_reason | VideoPreviewView |
 | `studio_sound_ready` | Studio Sound | ok | Processing done; `processing_sec` | duration_sec, processing_sec | StudioSoundManager |
 | `studio_sound_save_when_ready` | Studio Sound | ok | Save when ready chosen | — | VideoPreviewView |
 | `studio_sound_started` | Studio Sound | ok | Processing started | duration_sec, is_retry | StudioSoundManager |

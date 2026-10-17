@@ -19,7 +19,7 @@ enum ChatBackgroundFetcher {
             AppAnalytics.log("chat_background_fetch_completed", params: ["new_count": newCount])
         } catch {
             AppAnalytics.log("chat_background_fetch_failed", params: [
-                "error": String(describing: error)
+                "error_reason": AppAnalytics.errorReason(error)
             ])
         }
     }
