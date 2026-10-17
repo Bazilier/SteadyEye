@@ -34,6 +34,9 @@ final class AssetWriterRecorder {
     /// The first frame's presentation time, on the capture clock: time zero
     /// of the file. Set once, on the first appended frame.
     private(set) var sessionStartedAtPTS: CMTime?
+    /// Called once, on the appending queue, when the first frame is in the
+    /// file. Set before the recorder receives frames.
+    var onFirstFrame: (@Sendable () -> Void)?
 
     private let camLog = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye",
@@ -90,6 +93,66 @@ final class AssetWriterRecorder {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         writer.shouldOptimizeForNetworkUse = false
 
+        let (videoSettings, useHEVC, targetBitrate) = Self.videoSettings(videoSize: videoSize, fps: fps)
+
+        // Diagnostic: encoder configuration at recording start.
+        let codecName = useHEVC ? "hevc" : "h264"
+        let bitrateMbps = targetBitrate / 1_000_000
+        camLog.notice(
+            "event=encoder_config codec=\(codecName, privacy: .public) bitrate_mbps=\(bitrateMbps) keyframe_interval=\(fps) fps=\(fps) videoSize=\(Int(videoSize.width))x\(Int(videoSize.height))"
+        )
+
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        videoInput.expectsMediaDataInRealTime = true
+
+        // Source pixel format for the adaptor. BGRA matches what
+        // CIContext.render writes; the encoder accepts BGRA via the
+        // adaptor's automatic format conversion. IOSurface backing keeps
+        // the buffer GPU-resident from composer through encoder.
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: Self.sourcePixelBufferAttributes(videoSize: videoSize)
+        )
+
+        guard writer.canAdd(videoInput) else {
+            throw NSError(domain: "AssetWriterRecorder", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Cannot add video input to writer"
+            ])
+        }
+        writer.add(videoInput)
+
+        // Audio input — PCM in (from capture session), AAC out. Mono
+        // 44.1kHz to match the prior pipeline's defaults.
+        let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: Self.audioSettings)
+        audioInput.expectsMediaDataInRealTime = true
+
+        guard writer.canAdd(audioInput) else {
+            throw NSError(domain: "AssetWriterRecorder", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: "Cannot add audio input to writer"
+            ])
+        }
+        writer.add(audioInput)
+
+        guard writer.startWriting() else {
+            throw writer.error ?? NSError(domain: "AssetWriterRecorder", code: -3, userInfo: [
+                NSLocalizedDescriptionKey: "startWriting failed"
+            ])
+        }
+
+        self.writer = writer
+        self.videoInput = videoInput
+        self.audioInput = audioInput
+        self.pixelBufferAdaptor = adaptor
+        self.outputURL = url
+        self.configuredVideoSize = videoSize
+        self.composerPath = composerPath
+        self.state = .recording
+    }
+
+    // MARK: - Settings
+
+    /// The video encoder settings for a take: codec, size, bitrate.
+    nonisolated static func videoSettings(videoSize: CGSize, fps: Int) -> (settings: [String: Any], useHEVC: Bool, bitrate: Int) {
         // Video input — BGRA in (from composer), HEVC out where supported.
         //
         // Codec: prefer HEVC when the device has a HEVC hardware codec. We gate
@@ -142,70 +205,92 @@ final class AssetWriterRecorder {
             AVVideoCompressionPropertiesKey: compression
         ]
 
-        // Diagnostic: encoder configuration at recording start.
-        let codecName = useHEVC ? "hevc" : "h264"
-        let bitrateMbps = targetBitrate / 1_000_000
-        camLog.notice(
-            "event=encoder_config codec=\(codecName, privacy: .public) bitrate_mbps=\(bitrateMbps) keyframe_interval=\(fps) fps=\(fps) videoSize=\(Int(videoSize.width))x\(Int(videoSize.height))"
-        )
+        return (videoSettings, useHEVC, targetBitrate)
+    }
 
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-        videoInput.expectsMediaDataInRealTime = true
+    /// AAC mono 44.1 kHz, matching the prior pipeline's defaults.
+    nonisolated(unsafe) static let audioSettings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVNumberOfChannelsKey: 1,
+        AVSampleRateKey: 44100,
+        AVEncoderBitRateKey: 128_000
+    ]
 
-        // Source pixel format for the adaptor. BGRA matches what
-        // CIContext.render writes; the encoder accepts BGRA via the
-        // adaptor's automatic format conversion. IOSurface backing keeps
-        // the buffer GPU-resident from composer through encoder.
-        let sourceAttrs: [String: Any] = [
+    nonisolated static func sourcePixelBufferAttributes(videoSize: CGSize) -> [String: Any] {
+        [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: Int(videoSize.width),
             kCVPixelBufferHeightKey as String: Int(videoSize.height),
             kCVPixelBufferIOSurfacePropertiesKey as String: [:]
         ]
+    }
+
+    // MARK: - Warm-up
+
+    nonisolated private static let warmUpQueue = DispatchQueue(label: "AssetWriterRecorder.warmUp", qos: .utility)
+    /// Read and written on `warmUpQueue` only.
+    nonisolated(unsafe) private static var didWarmUp = false
+
+    /// Once per launch: a throwaway writer with a take's settings encodes a
+    /// couple of black frames and is cancelled. The first encoder of a
+    /// process takes a couple of seconds to come up (codec load, hardware
+    /// session); paid here, while the camera screen is open, the real take
+    /// starts writing at once. Touches nothing of a real take.
+    nonisolated static func warmUpOnce(videoSize: CGSize, fps: Int) {
+        warmUpQueue.async {
+            guard !didWarmUp else { return }
+            didWarmUp = true
+            let started = Date()
+            let ok = warmUp(videoSize: videoSize, fps: fps)
+            Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye", category: "CameraDiagnostic")
+                .notice("event=encoder_warmup ok=\(ok) ms=\(Int(Date().timeIntervalSince(started) * 1000)) size=\(Int(videoSize.width))x\(Int(videoSize.height))")
+        }
+    }
+
+    nonisolated private static func warmUp(videoSize: CGSize, fps: Int) -> Bool {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("encoder-warmup-\(UUID().uuidString).mov")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return false }
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings(videoSize: videoSize, fps: fps).settings)
+        videoInput.expectsMediaDataInRealTime = true
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: sourceAttrs
+            sourcePixelBufferAttributes: sourcePixelBufferAttributes(videoSize: videoSize)
         )
-
-        guard writer.canAdd(videoInput) else {
-            throw NSError(domain: "AssetWriterRecorder", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Cannot add video input to writer"
-            ])
-        }
-        writer.add(videoInput)
-
-        // Audio input — PCM in (from capture session), AAC out. Mono
-        // 44.1kHz to match the prior pipeline's defaults.
-        let audioSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVNumberOfChannelsKey: 1,
-            AVSampleRateKey: 44100,
-            AVEncoderBitRateKey: 128_000
-        ]
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInput.expectsMediaDataInRealTime = true
-
-        guard writer.canAdd(audioInput) else {
-            throw NSError(domain: "AssetWriterRecorder", code: -2, userInfo: [
-                NSLocalizedDescriptionKey: "Cannot add audio input to writer"
-            ])
-        }
+        guard writer.canAdd(videoInput), writer.canAdd(audioInput) else { return false }
+        writer.add(videoInput)
         writer.add(audioInput)
+        guard writer.startWriting() else { return false }
+        defer { writer.cancelWriting() }
+        writer.startSession(atSourceTime: .zero)
 
-        guard writer.startWriting() else {
-            throw writer.error ?? NSError(domain: "AssetWriterRecorder", code: -3, userInfo: [
-                NSLocalizedDescriptionKey: "startWriting failed"
-            ])
+        var buffer: CVPixelBuffer?
+        guard let pool = adaptor.pixelBufferPool,
+              CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess,
+              let buffer else { return false }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        if let base = CVPixelBufferGetBaseAddress(buffer) {
+            memset(base, 0, CVPixelBufferGetDataSize(buffer))
         }
+        CVPixelBufferUnlockBaseAddress(buffer, [])
 
-        self.writer = writer
-        self.videoInput = videoInput
-        self.audioInput = audioInput
-        self.pixelBufferAdaptor = adaptor
-        self.outputURL = url
-        self.configuredVideoSize = videoSize
-        self.composerPath = composerPath
-        self.state = .recording
+        var appended = 0
+        for frame in 0..<3 {
+            // The input takes a moment to become ready; give up after a second.
+            var waited = 0
+            while !videoInput.isReadyForMoreMediaData, waited < 100 {
+                Thread.sleep(forTimeInterval: 0.01)
+                waited += 1
+            }
+            guard videoInput.isReadyForMoreMediaData else { break }
+            if adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(fps))) {
+                appended += 1
+            }
+        }
+        return appended > 0
     }
 
     /// Appends a video frame. Lazily starts the writer's session on the
@@ -221,6 +306,8 @@ final class AssetWriterRecorder {
         if sessionStartedAtPTS == nil {
             writer.startSession(atSourceTime: pts)
             sessionStartedAtPTS = pts
+            onFirstFrame?()
+            onFirstFrame = nil
         }
 
         // Multi-frame dimension sampling (logging only — never auto-corrects or

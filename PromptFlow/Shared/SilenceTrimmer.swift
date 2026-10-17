@@ -9,7 +9,7 @@ import os
 /// Edges only ever move inward, and never by more than `maxShiftSec`. A part
 /// with no voice found in it is left as it is: the threshold is not to be
 /// trusted there.
-enum SilenceTrimmer {
+nonisolated enum SilenceTrimmer {
 
     /// Loudness of a recording's audio, one value per `frameSec`, in dBFS.
     struct Levels {

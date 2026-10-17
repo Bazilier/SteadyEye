@@ -23,6 +23,10 @@ final class CameraManager: NSObject, ObservableObject {
     /// clock (`captureClockNow()`): time zero of that file. Set just before
     /// the URL. Nil when the writer never saw a frame.
     var lastRecordedFirstFramePTS: CMTime?
+    /// The take in progress has its first frame in the file: what is said
+    /// from now on is recorded. False from `startRecording` until then —
+    /// a cold encoder can take a couple of seconds — and after the take.
+    @Published private(set) var isWritingFrames = false
     @Published var saveDirectlyOnStop = false
     @Published var isSessionReady = false
     @Published var isAudioReady = false
@@ -1355,8 +1359,12 @@ final class CameraManager: NSObject, ObservableObject {
                 self.recordingDuration = Date().timeIntervalSince(start)
             }
             isRecording = true
+            // No frames ever come: nothing to wait for.
+            isWritingFrames = true
             return
         }
+
+        isWritingFrames = false
 
         #if !targetEnvironment(simulator)
         let outputURL = FileManager.default.temporaryDirectory
@@ -1498,6 +1506,14 @@ final class CameraManager: NSObject, ObservableObject {
         // instead on that queue, the first time it sees a new recorder.
 
         self.watermarkComposer = composer
+        // A finished recorder appends nothing, so this fires for the take
+        // being recorded only.
+        recorder.onFirstFrame = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.isRecording else { return }
+                self.isWritingFrames = true
+            }
+        }
         self.assetWriterRecorder = recorder
     }
     #endif
@@ -1523,6 +1539,7 @@ final class CameraManager: NSObject, ObservableObject {
         isRecording = false
         recordingDuration = 0
         recordingStartTime = nil
+        isWritingFrames = false
 
         // Recording is no longer active — unfreeze rotation and apply any
         // angle change that arrived (and was suppressed) mid-take.
@@ -1743,6 +1760,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             }
             if let change, change.previous == nil {
                 logFirstBuffer(change.observation)
+                // The camera is up: bring the encoder up too, off this queue,
+                // so the first take does not wait for it.
+                AssetWriterRecorder.warmUpOnce(
+                    videoSize: CGSize(width: change.observation.width, height: change.observation.height),
+                    fps: (UserDefaults.standard.object(forKey: "videoFPS") as? Int) ?? 30
+                )
                 // The residue is now known, so landscape-left is derivable.
                 // Pin it once, on main where the angle state lives.
                 Task { @MainActor [weak self] in
