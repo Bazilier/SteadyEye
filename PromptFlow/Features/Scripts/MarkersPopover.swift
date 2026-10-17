@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Explains the three slash markers and inserts the one tapped. Shown from
-/// the editor's "//" buttons. A grouped list, as in Settings: each row is
-/// the marker as it is typed, what it does, and a plus.
+/// Explains the three slash markers, from the "i" at the end of the
+/// editor's markers row (which inserts them). A grouped list, as in
+/// Settings: each row is the marker as it is typed and what it does.
 struct MarkersPopover: View {
-    let onInsert: (ScriptMarker) -> Void
     let onClose: () -> Void
 
     /// The popover's own surface, as the app's sheets (`CoachSheet`).
@@ -16,16 +15,13 @@ struct MarkersPopover: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             rows
-            Text("editor.markers.hint", comment: "Footer of the markers popover: the slashes stay in the script text only (the audience never sees them), and tapping a row inserts that marker at the cursor.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 6)
         }
         .padding(.horizontal, 14)
         .padding(.top, 18)
         .padding(.bottom, 16)
         .frame(width: 352)
+        // Its whole height, or the system squeezes it and text spills out.
+        .fixedSize(horizontal: false, vertical: true)
         .presentationBackground(Self.background)
         .preferredColorScheme(.dark)
     }
@@ -47,6 +43,7 @@ struct MarkersPopover: View {
                     .frame(width: 30, height: 30)
                     .background(Color(white: 0.17), in: Circle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(Text("common.close", comment: "Close button of the markers popover in the script editor"))
         }
         .padding(.horizontal, 4)
@@ -69,39 +66,40 @@ struct MarkersPopover: View {
     }
 
     private func row(_ marker: ScriptMarker) -> some View {
-        Button { onInsert(marker) } label: {
-            HStack(spacing: 12) {
-                // The marker as it is typed, on the prompter's black.
-                Text(verbatim: marker.rawValue)
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
-                    .kerning(-1)
-                    .foregroundStyle(Theme.accent)
-                    .frame(minWidth: 54, minHeight: 32)
-                    .padding(.horizontal, 2)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    title(marker)
-                        .font(.body.weight(.medium))
-                    summary(marker)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 22))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Theme.onAccent, Theme.accent)
+        HStack(spacing: 12) {
+            // The marker as it is typed, on the prompter's black.
+            Text(verbatim: marker.rawValue)
+                .font(.system(size: 15, weight: .bold, design: .monospaced))
+                .kerning(-1)
+                .foregroundStyle(Theme.accent)
+                .frame(minWidth: 54, minHeight: 32)
+                .padding(.horizontal, 2)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Self.title(marker)
+                    .font(.body.weight(.medium))
+                summary(marker)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
     }
 
-    private func title(_ marker: ScriptMarker) -> Text {
+    /// The marker's name on its button in the editor's markers row.
+    static func buttonLabel(_ marker: ScriptMarker) -> Text {
+        switch marker {
+        case .shortPause: Text("editor.markers.short.button", comment: "Button in the script editor's markers row that inserts //. Short: it sits beside two others under the text.")
+        case .longPause: Text("editor.markers.long.button", comment: "Button in the script editor's markers row that inserts ///. Short: it sits beside two others under the text.")
+        case .section: Text("editor.markers.section.button", comment: "Button in the script editor's markers row that inserts ////, a section break. Short: it sits beside two others under the text.")
+        }
+    }
+
+    static func title(_ marker: ScriptMarker) -> Text {
         switch marker {
         case .shortPause: Text("editor.markers.short.title", comment: "Markers popover: name of the // marker.")
         case .longPause: Text("editor.markers.long.title", comment: "Markers popover: name of the /// marker.")

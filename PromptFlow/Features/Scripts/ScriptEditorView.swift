@@ -38,19 +38,13 @@ struct ScriptEditorView: View {
     @State private var didLogOpen = false
     @AppStorage("hasSavedFirstScript") private var hasSavedFirstScript = false
     @FocusState private var contentFocused: Bool
-    /// Where a marker from the markers popover goes: a `TextSelection`,
-    /// which needs iOS 18; typed `Any` so the property exists on iOS 17.
+    /// Where a marker from the markers row goes: a `TextSelection`, which
+    /// needs iOS 18; typed `Any` so the property exists on iOS 17.
     @State private var contentSelection: Any?
-    @State private var showMarkers = false
-    /// The text's selection when the markers popover opened — presenting
-    /// it takes the focus away, and the selection with it.
-    @State private var selectionAtMarkersOpen: Any?
-    /// Where the cursor goes once the popover has closed: after the
-    /// inserted marker, or back where it was.
-    @State private var cursorAfterMarkers: Any?
-    /// Until the markers popover has been opened once, its button carries
-    /// a dot.
-    @AppStorage("hasOpenedMarkersPopover") private var hasOpenedMarkers = false
+    @State private var showMarkersInfo = false
+    /// The cursor to come back to once the info popover closes, if the text
+    /// was being edited when it opened.
+    @State private var selectionBeforeInfo: Any?
     @FocusState private var titleFocused: Bool
 
     private let maxChars = 5000
@@ -106,6 +100,8 @@ struct ScriptEditorView: View {
                     .onChange(of: content) { _, text in scheduleOptimizeTip(for: text) }
 
                 Divider()
+
+                markersRow
 
                 // Stats bar
                 statsBar
@@ -165,20 +161,6 @@ struct ScriptEditorView: View {
                     }
                     .bold()
                     .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Button {
-                        pasteFromClipboard()
-                    } label: {
-                        Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard")
-                    }
-                    .font(.caption)
-                    Spacer()
-                    if contentFocused {
-                        Button { openMarkers(from: "keyboard") } label: {
-                            markersButtonLabel
-                        }
-                    }
                 }
             }
             .alert(
@@ -245,8 +227,8 @@ struct ScriptEditorView: View {
         .preferredColorScheme(.dark)
         .onChange(of: title) { _, _ in keepDraft() }
         .onChange(of: content) { _, _ in keepDraft() }
-        .onChange(of: showMarkers) { _, open in
-            if !open { restoreCursorAfterMarkers() }
+        .onChange(of: showMarkersInfo) { _, open in
+            if !open { restoreCursorAfterInfo() }
         }
         .onAppear {
             if let script {
@@ -402,21 +384,20 @@ struct ScriptEditorView: View {
                 comment: "Character count display in the editor stats bar. %1$@ is the current count, %2$@ is the limit (5000), both pre-formatted via Int.formatted() for locale-appropriate digit grouping."
             ))
                 .foregroundStyle(charCountColor)
-            Button { openMarkers(from: "stats_bar") } label: {
-                markersButtonLabel
-                    .font(.caption.weight(.semibold))
-                    .padding(.leading, 8)
-                    .padding(.trailing, 10)
-                    .frame(height: 28)
-                    .background(Theme.accentTint, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1))
+            Button(action: pasteFromClipboard) {
+                Label {
+                    Text("editor.paste", comment: "Small button beside the character count in the script editor: pastes the clipboard's text into the script. Short.")
+                } icon: {
+                    Image(systemName: "doc.on.clipboard")
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.accent)
+                .padding(.leading, 6)
+                .frame(minHeight: 28)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.leading, 4)
-            .popover(isPresented: $showMarkers, arrowEdge: .bottom) {
-                MarkersPopover(onInsert: insertMarker, onClose: { showMarkers = false })
-                    .presentationCompactAdaptation(.popover)
-            }
+            .accessibilityLabel(Text("common.pasteFromClipboard", comment: "Keyboard accessory: paste from clipboard"))
             Spacer()
             // The optimize allowance; beside the draft button it would read
             // as the draft's.
@@ -529,44 +510,89 @@ struct ScriptEditorView: View {
         }
     }
 
-    /// "//" and the word for the markers popover; the dot stays until the
-    /// popover has been opened once.
-    private var markersButtonLabel: some View {
-        HStack(spacing: 5) {
-            Text(verbatim: "//")
-                .font(.system(.callout, design: .monospaced).weight(.bold))
-                .foregroundStyle(Theme.accent)
-            Text("editor.markers.button", comment: "Button in the script editor (above the keyboard and next to the character count) that opens the popover explaining the // /// //// markers.")
-                .foregroundStyle(.white)
-            if !hasOpenedMarkers {
-                Circle()
-                    .fill(Theme.accent)
-                    .frame(width: 6, height: 6)
+    /// One tap per marker, inserted where the cursor is; the keyboard stays
+    /// up. "i" explains the three. Tightens before it scrolls: the labels
+    /// fit English on a 390 pt iPhone at full size, longer languages and
+    /// narrower phones get the compact chips, and only then a scroll.
+    private var markersRow: some View {
+        HStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                markerChips(compact: false)
+                markerChips(compact: true)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    markerChips(compact: true)
+                }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            }
+            .padding(.leading, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button { openMarkersInfo() } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("editor.markers.info", comment: "VoiceOver label of the info button at the end of the markers row in the script editor: explains the // /// //// markers."))
+            .popover(isPresented: $showMarkersInfo, arrowEdge: .bottom) {
+                MarkersPopover(onClose: { showMarkersInfo = false })
+                    .presentationCompactAdaptation(.popover)
+            }
+            .padding(.trailing, 12)
+        }
+        .padding(.top, 8)
+    }
+
+    private func markerChips(compact: Bool) -> some View {
+        HStack(spacing: compact ? 4 : 6) {
+            ForEach(ScriptMarker.allCases) { marker in
+                Button { insertMarker(marker) } label: {
+                    HStack(spacing: compact ? 4 : 6) {
+                        Text(verbatim: marker.rawValue)
+                            .font(.system(size: compact ? 12 : 13, weight: .bold, design: .monospaced))
+                            .kerning(-0.5)
+                            .foregroundStyle(Theme.accent)
+                        MarkersPopover.buttonLabel(marker)
+                            .font(compact ? .caption.weight(.semibold) : .footnote.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, compact ? 9 : 12)
+                    .frame(height: 32)
+                    .background(Color(white: 0.17), in: Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private func openMarkers(from source: String) {
-        AppAnalytics.log("markers_popover_opened", params: [
-            "source": source,
-            "first_time": !hasOpenedMarkers
-        ])
-        hasOpenedMarkers = true
-        selectionAtMarkersOpen = contentSelection
-        cursorAfterMarkers = contentFocused ? contentSelection : nil
-        showMarkers = true
+    /// The keyboard goes down first: with it up there is no room above the
+    /// row for the popover.
+    private func openMarkersInfo() {
+        AppAnalytics.log("markers_info_opened", params: ["was_editing": contentFocused])
+        guard contentFocused else {
+            selectionBeforeInfo = nil
+            showMarkersInfo = true
+            return
+        }
+        selectionBeforeInfo = contentSelection
+        contentFocused = false
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            showMarkersInfo = true
+        }
     }
 
-    /// Focus back in the text with the cursor where `cursorAfterMarkers`
-    /// says. The selection is in place before the focus returns, so the
-    /// cursor comes back there rather than where it was before the insert.
-    /// The focus waits out the popover's dismissal: taken while it is still
-    /// on screen it does not stick, and the editor puts the cursor at the
-    /// end. Set once more after, in case the editor moved it on focusing.
-    private func restoreCursorAfterMarkers() {
-        selectionAtMarkersOpen = nil
-        guard let cursor = cursorAfterMarkers else { return }
-        cursorAfterMarkers = nil
+    /// Back to editing where it was, if it was being edited. The focus waits
+    /// out the popover's dismissal: taken while it is still on screen it
+    /// does not stick.
+    private func restoreCursorAfterInfo() {
+        guard let cursor = selectionBeforeInfo else { return }
+        selectionBeforeInfo = nil
         contentSelection = cursor
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 350_000_000)
@@ -576,21 +602,23 @@ struct ScriptEditorView: View {
     }
 
     /// At the cursor, or over the selection; at the end when the text has
-    /// never been focused.
+    /// no cursor. The cursor lands right after the marker.
     private func insertMarker(_ marker: ScriptMarker) {
         var range = content.endIndex..<content.endIndex
         if #available(iOS 18.0, *),
-           case .selection(let selected) = ((selectionAtMarkersOpen ?? contentSelection) as? TextSelection)?.indices,
+           case .selection(let selected) = (contentSelection as? TextSelection)?.indices,
            selected.lowerBound >= content.startIndex, selected.upperBound <= content.endIndex {
             range = selected
         }
         let result = MarkerInsertion.insert(marker, into: content, replacing: range)
         content = result.text
         if #available(iOS 18.0, *) {
-            cursorAfterMarkers = TextSelection(insertionPoint: result.cursor)
+            contentSelection = TextSelection(insertionPoint: result.cursor)
         }
-        showMarkers = false
-        AppAnalytics.log("marker_inserted", params: ["marker": String(describing: marker)])
+        AppAnalytics.log("marker_inserted", params: [
+            "marker": String(describing: marker),
+            "was_editing": contentFocused
+        ])
     }
 
     // MARK: - Actions

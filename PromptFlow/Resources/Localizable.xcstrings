@@ -1870,62 +1870,32 @@
         }
       }
     },
-    "editor.markers.button" : {
-      "comment" : "Button in the script editor (above the keyboard and next to the character count) that opens the popover explaining the // /// //// markers.",
+    "editor.markers.info" : {
+      "comment" : "VoiceOver label of the info button at the end of the markers row in the script editor: explains the // /// //// markers.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pauses"
+            "value" : "About pauses and sections"
           }
         },
         "es-419" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pausas"
+            "value" : "Acerca de pausas y secciones"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pausas"
+            "value" : "Sobre pausas e seções"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Паузы"
-          }
-        }
-      }
-    },
-    "editor.markers.hint" : {
-      "comment" : "Footer of the markers popover: the slashes stay in the script text only (the audience never sees them), and tapping a row inserts that marker at the cursor.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Only you see the slashes — your audience won’t. Tap a row to insert it at the cursor."
-          }
-        },
-        "es-419" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo tú ves las barras; tu audiencia no. Toca una fila para insertarla donde está el cursor."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Só você vê as barras; seu público não. Toque numa linha para inserir onde está o cursor."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Слеши видишь только ты — зрители их не увидят. Нажми строку, чтобы вставить её на место курсора."
+            "value" : "О паузах и секциях"
           }
         }
       }
@@ -1956,6 +1926,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Секунда тишины для акцента"
+          }
+        }
+      }
+    },
+    "editor.markers.long.button" : {
+      "comment" : "Button in the script editor's markers row that inserts ///. Short: it sits beside two others under the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long pause"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa larga"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa longa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длинная пауза"
           }
         }
       }
@@ -2020,6 +2020,36 @@
         }
       }
     },
+    "editor.markers.section.button" : {
+      "comment" : "Button in the script editor's markers row that inserts ////, a section break. Short: it sits beside two others under the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sección"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Секция"
+          }
+        }
+      }
+    },
     "editor.markers.section.title" : {
       "comment" : "Markers popover: name of the //// marker, which splits the script into sections the prompter stops after.",
       "extractionState" : "manual",
@@ -2076,6 +2106,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Вдох между фразами"
+          }
+        }
+      }
+    },
+    "editor.markers.short.button" : {
+      "comment" : "Button in the script editor's markers row that inserts //. Short: it sits beside two others under the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пауза"
           }
         }
       }
@@ -2256,6 +2316,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Чтобы легко читалось вслух"
+          }
+        }
+      }
+    },
+    "editor.paste" : {
+      "comment" : "Small button beside the character count in the script editor: pastes the clipboard's text into the script. Short.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pegar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставить"
           }
         }
       }
