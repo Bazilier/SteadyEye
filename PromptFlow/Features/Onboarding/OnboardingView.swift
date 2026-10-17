@@ -660,7 +660,7 @@ struct OnboardingView: View {
             }
             AppAnalytics.log(
                 cameraResult ? "permissions_camera_granted" : "permissions_camera_denied",
-                params: ["was_prompt": cameraWasPrompt]
+                params: ["was_prompt": cameraWasPrompt, "source": "onboarding"]
             )
         @unknown default:
             cameraResult = false
@@ -697,7 +697,7 @@ struct OnboardingView: View {
             }
             AppAnalytics.log(
                 micResult ? "permissions_mic_granted" : "permissions_mic_denied",
-                params: ["was_prompt": micWasPrompt]
+                params: ["was_prompt": micWasPrompt, "source": "onboarding"]
             )
         @unknown default:
             micResult = false
@@ -728,7 +728,7 @@ struct OnboardingView: View {
             photosResult = (phStatus == .authorized || phStatus == .limited)
             AppAnalytics.log(
                 photosResult ? "permissions_photos_granted" : "permissions_photos_denied",
-                params: ["was_prompt": true]
+                params: ["was_prompt": true, "source": "onboarding"]
             )
         @unknown default:
             photosResult = false

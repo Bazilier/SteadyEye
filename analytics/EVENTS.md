@@ -65,6 +65,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 **F4. Permission events lack `source` when they come from onboarding.**
 - `MediaAccess` sends `source: "before_recording"`. `OnboardingView` sends no `source`, so onboarding shows up as an empty value.
 - Fix: add `source: "onboarding"`.
+- **Fixed** on `fix/analytics-audit`: onboarding sends `source: "onboarding"`.
 
 **F5. `chat_background_fetch_completed` is likely the noisiest event.**
 - It fires on every background fetch, mostly with `new_count = 0`.
@@ -178,12 +179,12 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `restore_succeeded` | Paywall | ok | Restore finished; `had_active_entitlement` | had_active_entitlement | SubscriptionManager |
 | `trial_converted` | Paywall | review | Trial → paid, seen only when the app is next opened. Funnel hint, not a count — use RC webhooks (audit F6) | plan, product_id | SubscriptionManager |
 | `trial_started` | Paywall | ok | Free trial started from the paywall (= `purchase_succeeded` with `was_trial`). Client-side only; RC sees more trials | plan, source | PaywallView |
-| `permissions_camera_denied` | Permissions | fix | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
-| `permissions_camera_granted` | Permissions | fix | Camera prompt answered. Onboarding sends no `source` — see audit F4 | source, was_prompt | MediaAccess, OnboardingView |
-| `permissions_mic_denied` | Permissions | fix | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
-| `permissions_mic_granted` | Permissions | fix | Mic prompt answered. Onboarding sends no `source` | source, was_prompt | MediaAccess, OnboardingView |
-| `permissions_photos_denied` | Permissions | fix | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
-| `permissions_photos_granted` | Permissions | fix | Photos add-only prompt answered. Onboarding sends no `source` | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_camera_denied` | Permissions | ok | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_camera_granted` | Permissions | ok | Camera prompt answered, granted; `source` = onboarding / before_recording | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_mic_denied` | Permissions | ok | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_mic_granted` | Permissions | ok | Mic prompt answered, granted; `source` = onboarding / before_recording | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_photos_denied` | Permissions | ok | Same, denied | source, was_prompt | MediaAccess, OnboardingView |
+| `permissions_photos_granted` | Permissions | ok | Photos add-only prompt answered, granted; `source` = onboarding / before_recording | source, was_prompt | MediaAccess, OnboardingView |
 | `push_opened` | Push | ok | Notification tapped | kind | SteadyEyeApp |
 | `push_permission_denied` | Push | ok | Push denied, or the request threw (`error_reason`) | error_reason | NotificationScheduler |
 | `push_permission_granted` | Push | ok | Push allowed | — | NotificationScheduler |
