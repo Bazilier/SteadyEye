@@ -53,6 +53,18 @@ final class Recording: Identifiable {
     /// when it covers the whole take.
     var studioCutData: Data?
 
+    // Subtitles (`SubtitleTranscriber`, `SubtitlePhrases`). Optional or
+    // defaulted, for the same in-place migration.
+    /// The script as it was when the take was recorded, for the subtitles'
+    /// spelling. Nil for takes recorded before subtitles.
+    var scriptText: String?
+    /// The words as heard, in seconds of the file: JSON `[TimedWord]`.
+    /// Matched to the script only when shown, so a better matching applies
+    /// to takes transcribed before it.
+    var subtitleWordsData: Data?
+    /// The toggle: play and save with captions.
+    var subtitlesEnabled: Bool = false
+
     init(
         fileName: String,
         thumbnailFileName: String? = nil,
@@ -88,6 +100,25 @@ final class Recording: Identifiable {
         set {
             sectionCutsData = newValue.flatMap { try? JSONEncoder().encode($0.map { [$0.lowerBound, $0.upperBound] }) }
         }
+    }
+
+    var subtitleWords: [TimedWord]? {
+        get { subtitleWordsData.flatMap { try? JSONDecoder().decode([TimedWord].self, from: $0) } }
+        set { subtitleWordsData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+    }
+
+    var usesSubtitles: Bool {
+        subtitlesEnabled && subtitleWordsData != nil
+    }
+
+    /// Captions on the timeline that plays: the cut's while the cut is on,
+    /// spelt as the script spells them.
+    var subtitlePhrases: [SubtitlePhrase] {
+        guard let heard = subtitleWords else { return [] }
+        let words = scriptText.map {
+            SubtitleAligner.align(heard: heard, script: SubtitleAligner.scriptWords($0))
+        } ?? heard
+        return SubtitlePhrases.phrases(words: words, keep: usesSectionCuts ? sectionCuts : nil)
     }
 
     /// Kept ranges from `sectionCutsData`-shaped JSON.

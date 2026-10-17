@@ -7254,6 +7254,36 @@
         }
       }
     },
+    "preview.subtitles" : {
+      "comment" : "VoiceOver label of the captions toggle in the recording preview.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitles"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtítulos"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legendas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Субтитры"
+          }
+        }
+      }
+    },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
       "extractionState" : "manual",

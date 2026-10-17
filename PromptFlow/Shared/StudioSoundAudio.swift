@@ -219,12 +219,14 @@ enum StudioSoundAudio {
         _ asset: AVAsset,
         preset: String,
         to outputURL: URL,
-        as fileType: AVFileType
+        as fileType: AVFileType,
+        videoComposition: AVVideoComposition? = nil
     ) async throws {
         try? FileManager.default.removeItem(at: outputURL)
         guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
             throw AudioError.exportFailed
         }
+        session.videoComposition = videoComposition
         if #available(iOS 18.0, *) {
             try await session.export(to: outputURL, as: fileType)
         } else {
