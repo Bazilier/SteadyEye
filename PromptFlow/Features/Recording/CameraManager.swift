@@ -19,6 +19,10 @@ final class CameraManager: NSObject, ObservableObject {
     @Published var errorMessage: String?
     @Published var cameraPosition: AVCaptureDevice.Position = .front
     @Published var lastRecordedURL: URL?
+    /// The first frame of the take at `lastRecordedURL`, on the capture
+    /// clock (`captureClockNow()`): time zero of that file. Set just before
+    /// the URL. Nil when the writer never saw a frame.
+    var lastRecordedFirstFramePTS: CMTime?
     @Published var saveDirectlyOnStop = false
     @Published var isSessionReady = false
     @Published var isAudioReady = false
@@ -1498,6 +1502,12 @@ final class CameraManager: NSObject, ObservableObject {
     }
     #endif
 
+    /// Now, on the clock the capture session stamps its frames with, so an
+    /// event can be placed in the file being written.
+    func captureClockNow() -> CMTime {
+        CMClockGetTime(session.synchronizationClock ?? CMClockGetHostTimeClock())
+    }
+
     func stopRecording() {
         guard isRecording else { return }
 
@@ -1568,6 +1578,7 @@ final class CameraManager: NSObject, ObservableObject {
                 defer { self.endBackgroundTask() }
                 switch result {
                 case .success(let url):
+                    self.lastRecordedFirstFramePTS = recorder.sessionStartedAtPTS
                     if self.saveDirectlyOnStop {
                         self.handleSaveDirectlyOnStop(url: url)
                     } else {

@@ -31,7 +31,9 @@ final class AssetWriterRecorder {
     private var audioInput: AVAssetWriterInput?
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
 
-    private var sessionStartedAtPTS: CMTime?
+    /// The first frame's presentation time, on the capture clock: time zero
+    /// of the file. Set once, on the first appended frame.
+    private(set) var sessionStartedAtPTS: CMTime?
 
     private let camLog = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye",

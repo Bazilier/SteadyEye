@@ -1870,6 +1870,336 @@
         }
       }
     },
+    "editor.markers.button" : {
+      "comment" : "Button in the script editor (above the keyboard and next to the character count) that opens the popover explaining the // /// //// markers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pauses"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Паузы"
+          }
+        }
+      }
+    },
+    "editor.markers.hint" : {
+      "comment" : "Footer of the markers popover: tapping a row inserts that marker at the cursor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a row to insert it at the cursor"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca una fila para insertarla en el cursor"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque numa linha para inserir no cursor"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажми строку, чтобы вставить её на место курсора"
+          }
+        }
+      }
+    },
+    "editor.markers.long.body" : {
+      "comment" : "Markers popover: what /// does — about one second of silence.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A second of silence for emphasis"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un segundo de silencio para dar énfasis"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um segundo de silêncio para dar ênfase"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Секунда тишины для акцента"
+          }
+        }
+      }
+    },
+    "editor.markers.long.title" : {
+      "comment" : "Markers popover: name of the /// marker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long pause"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa larga"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa longa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длинная пауза"
+          }
+        }
+      }
+    },
+    "editor.markers.new" : {
+      "comment" : "Badge on the newest marker (////) in the markers popover. Shown in capitals.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новое"
+          }
+        }
+      }
+    },
+    "editor.markers.section.body" : {
+      "comment" : "Markers popover: what //// does — the prompter stops at the end of the section and offers Repeat or Next, while recording continues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The prompter stops at the end: repeat the part or go on. Recording keeps going."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El teleprompter se detiene al final: repite la parte o sigue. La grabación continúa."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O teleprompter para no final: repita o trecho ou siga em frente. A gravação continua."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Суфлёр встанет в конце: повтори кусок или иди дальше. Запись не прерывается."
+          }
+        }
+      }
+    },
+    "editor.markers.section.title" : {
+      "comment" : "Markers popover: name of the //// marker, which splits the script into sections the prompter stops after.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sección"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Секция"
+          }
+        }
+      }
+    },
+    "editor.markers.short.body" : {
+      "comment" : "Markers popover: what // does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A quick breath between phrases"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un respiro entre frases"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um respiro entre frases"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Короткий вдох между фразами"
+          }
+        }
+      }
+    },
+    "editor.markers.short.title" : {
+      "comment" : "Markers popover: name of the // marker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short pause"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa corta"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausa curta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Короткая пауза"
+          }
+        }
+      }
+    },
+    "editor.markers.subtitle" : {
+      "comment" : "Subtitle of the markers popover.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slashes in your text steer the prompter"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las barras en tu texto guían el teleprompter"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As barras no texto guiam o teleprompter"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слеши в тексте управляют суфлёром"
+          }
+        }
+      }
+    },
+    "editor.markers.title" : {
+      "comment" : "Title of the popover in the script editor that explains the // /// //// markers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pauses and sections"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausas y secciones"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausas e seções"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Паузы и секции"
+          }
+        }
+      }
+    },
     "editor.optimize_tip.body" : {
       "comment" : "Body of the tip shown the first time the editor holds the user's own text.",
       "extractionState" : "manual",
@@ -6834,6 +7164,66 @@
         }
       }
     },
+    "preview.section_cut.cut" : {
+      "comment" : "Chip over the preview video, and VoiceOver label of the scissors toggle: the take plays cut down to the last take of each //// section, without the pauses between.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pauses"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin pausas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem pausas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без пауз"
+          }
+        }
+      }
+    },
+    "preview.section_cut.whole" : {
+      "comment" : "Chip over the preview video when the scissors toggle is off: the whole take plays, repeats and pauses included.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toma completa"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravação completa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Целиком"
+          }
+        }
+      }
+    },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
       "extractionState" : "manual",
@@ -7431,6 +7821,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохраняем запись…"
+          }
+        }
+      }
+    },
+    "recording.section.held %lld %lld" : {
+      "comment" : "Shown in place of the prompter text when a //// section has been read to its end and the prompter waits for Next or Repeat. Arguments: section number, number of sections.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section %1$lld of %2$lld done"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sección %1$lld de %2$lld lista"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção %1$lld de %2$lld concluída"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Секция %1$lld из %2$lld готова"
+          }
+        }
+      }
+    },
+    "recording.section.next" : {
+      "comment" : "Caption under the play button when the prompter waits at a //// section break: go on to the next section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дальше"
+          }
+        }
+      }
+    },
+    "recording.section.repeat" : {
+      "comment" : "Caption under the reset button when the prompter waits at a //// section break: read the section just finished again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repeat"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
+          }
+        }
+      }
+    },
+    "recording.section.replay %lld %lld" : {
+      "comment" : "Chip on the recording screen while a //// section is being read again after Repeat. Arguments: section number, take number (2 for the first repeat).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay · section %1$lld · take %2$lld"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetición · sección %1$lld · toma %2$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetição · seção %1$lld · tomada %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повтор · секция %1$lld · дубль %2$lld"
           }
         }
       }

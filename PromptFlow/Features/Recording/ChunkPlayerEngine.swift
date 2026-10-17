@@ -24,6 +24,42 @@ final class ChunkPlayerEngine: ObservableObject {
     @Published var progress: Double = 0
     @Published var isReady = false
 
+    /// First chunk index of each `////` section, ascending. `[0]` for a
+    /// script without breaks, which never holds.
+    @Published private(set) var sectionStarts: [Int] = [0]
+    /// The section just read to its end, waiting for the user to replay it
+    /// or go on. Set by the advance loop instead of moving past a break, and
+    /// at the end of the last section too, which can only be replayed; the
+    /// engine is paused while it is set. Nil otherwise.
+    @Published private(set) var heldSection: Int?
+    /// Take of the section on screen: 1, then one more per replay. Back to
+    /// 1 whenever another section comes on screen.
+    @Published private(set) var sectionTake = 1
+
+    var sectionCount: Int { sectionStarts.count }
+
+    var currentSection: Int { section(containing: currentChunkIndex) }
+
+    /// Held at the end of the script: there is no section to go on to.
+    var isHoldingLastSection: Bool { heldSection == sectionCount - 1 }
+
+    /// The last word of a section, the script's last included once it has
+    /// breaks at all.
+    private func endsSection(_ index: Int) -> Bool {
+        sectionStarts.contains(index + 1) || (sectionCount > 1 && index == chunks.count - 1)
+    }
+
+    func section(containing index: Int) -> Int {
+        sectionStarts.lastIndex { $0 <= index } ?? 0
+    }
+
+    /// Chunk range of `section`, for the progress bar.
+    func chunkRange(ofSection section: Int) -> Range<Int> {
+        guard sectionStarts.indices.contains(section) else { return 0..<0 }
+        let end = section + 1 < sectionStarts.count ? sectionStarts[section + 1] : chunks.count
+        return sectionStarts[section]..<end
+    }
+
     /// External freeze, owned by FollowMyVoiceServiceV2. Independent of
     /// `isPlaying` so a user-initiated pause and a voice-driven freeze
     /// don't clobber each other. Flipping back to false re-fires the
@@ -90,6 +126,9 @@ final class ChunkPlayerEngine: ObservableObject {
 
         chunks = ["..."]
         chunkMetadata = [ChunkMetadata()]
+        sectionStarts = [0]
+        heldSection = nil
+        sectionTake = 1
         currentChunkIndex = 0
         progress = 0
         isPlaying = false
@@ -100,29 +139,41 @@ final class ChunkPlayerEngine: ObservableObject {
         let orpMode = orpEnabled
         let baseSpeed = orpBaseSpeedMs
         loadTask = Task { [weak self] in
-            // Detect strategy + chunk on background. Latin scripts run
-            // through MarkerPreprocessor so `{N}` and `///` resolve to
-            // chunkMetadata; non-Latin scripts skip preprocessing and
-            // emit no-effect metadata (markers stay in text as-is).
-            let result: (chunks: [String], metadata: [ChunkMetadata]) = await Task.detached {
+            // Detect strategy + chunk on background, one `////` section at
+            // a time. Latin scripts run through MarkerPreprocessor so `{N}`
+            // and `///` resolve to chunkMetadata; non-Latin scripts skip
+            // preprocessing and emit no-effect metadata (markers stay in
+            // text as-is). Section breaks apply to every script.
+            let result: (chunks: [String], metadata: [ChunkMetadata], sectionStarts: [Int]) = await Task.detached {
                 let strat = LanguageDetector.detect(scriptText)
-                if strat is LatinLanguageStrategy {
-                    let chunker: (String) -> [String]
-                    if orpMode && strat.supportsORP {
-                        chunker = { strat.chunksPerWord(text: $0, baseSpeedMs: baseSpeed) }
+                var chunks: [String] = []
+                var metadata: [ChunkMetadata] = []
+                var starts: [Int] = []
+                for section in MarkerPreprocessor.splitSections(scriptText) {
+                    let part: (chunks: [String], metadata: [ChunkMetadata])
+                    if strat is LatinLanguageStrategy {
+                        let chunker: (String) -> [String]
+                        if orpMode && strat.supportsORP {
+                            chunker = { strat.chunksPerWord(text: $0, baseSpeedMs: baseSpeed) }
+                        } else {
+                            chunker = { strat.chunks(from: $0) }
+                        }
+                        part = MarkerPreprocessor.process(rawText: section, chunker: chunker)
                     } else {
-                        chunker = { strat.chunks(from: $0) }
+                        let sectionChunks: [String]
+                        if orpMode && strat.supportsORP {
+                            sectionChunks = strat.chunksPerWord(text: section, baseSpeedMs: baseSpeed)
+                        } else {
+                            sectionChunks = strat.chunks(from: section)
+                        }
+                        part = (sectionChunks, Array(repeating: ChunkMetadata(), count: sectionChunks.count))
                     }
-                    return MarkerPreprocessor.process(rawText: scriptText, chunker: chunker)
-                } else {
-                    let chunks: [String]
-                    if orpMode && strat.supportsORP {
-                        chunks = strat.chunksPerWord(text: scriptText, baseSpeedMs: baseSpeed)
-                    } else {
-                        chunks = strat.chunks(from: scriptText)
-                    }
-                    return (chunks, Array(repeating: ChunkMetadata(), count: chunks.count))
+                    guard !part.chunks.isEmpty else { continue }
+                    starts.append(chunks.count)
+                    chunks += part.chunks
+                    metadata += part.metadata
                 }
+                return (chunks, metadata, starts.isEmpty ? [0] : starts)
             }.value
             // A newer loadScript cancelled this run; its chunks are stale.
             // The detached chunking above doesn't see the cancellation, so
@@ -132,6 +183,7 @@ final class ChunkPlayerEngine: ObservableObject {
             self.strategy = LanguageDetector.detect(scriptText)
             self.chunks = result.chunks
             self.chunkMetadata = result.metadata
+            self.sectionStarts = result.sectionStarts
             self.currentChunkIndex = 0
             self.isReady = true
         }
@@ -159,6 +211,13 @@ final class ChunkPlayerEngine: ObservableObject {
 
     func play() {
         guard isReady, !chunks.isEmpty, !isPlaying else { return }
+        // Plain play during a hold goes on, as "Next" does; at the end of
+        // the script it starts over.
+        if isHoldingLastSection {
+            seekTo(index: 0)
+        } else if heldSection != nil {
+            resolveHold(replay: false)
+        }
         if currentChunkIndex >= chunks.count {
             currentChunkIndex = 0
             progress = 0
@@ -177,19 +236,48 @@ final class ChunkPlayerEngine: ObservableObject {
         advanceTask?.cancel()
         advanceTask = nil
         isPlaying = false
+        heldSection = nil
+        sectionTake = 1
         currentChunkIndex = 0
         progress = 0
     }
 
+    /// Moving the cursor ends a hold. The take count survives a seek within
+    /// the section (the gaze rewind) and restarts on another section.
     func seekTo(index: Int) {
         let wasPlaying = isPlaying
         advanceTask?.cancel()
         advanceTask = nil
+        let oldSection = currentSection
+        heldSection = nil
         currentChunkIndex = min(max(0, index), max(0, chunks.count - 1))
         progress = chunks.isEmpty ? 0 : Double(currentChunkIndex) / Double(chunks.count)
+        if currentSection != oldSection { sectionTake = 1 }
         if wasPlaying {
             scheduleAdvance()
         }
+    }
+
+    /// Ends a hold: back to the first word of the held section (`replay`,
+    /// one more take), or on to the first word of the next. Leaves the
+    /// engine paused — the caller plays once its countdown is over. Going on
+    /// from the last section does nothing.
+    func resolveHold(replay: Bool) {
+        guard let held = heldSection, replay || held + 1 < sectionCount else { return }
+        let target = replay ? held : held + 1
+        let take = replay ? sectionTake + 1 : 1
+        seekTo(index: sectionStarts[target])
+        sectionTake = take
+    }
+
+    /// Back to the first word of the section on screen, held or mid-read,
+    /// as one more take. Leaves the engine paused, like `resolveHold`.
+    func restartCurrentSection() {
+        let section = heldSection ?? currentSection
+        let take = sectionTake + 1
+        pause()
+        seekTo(index: sectionStarts[section])
+        sectionTake = take
     }
 
     /// The chunk that was on screen at `date`, from the last ~64 changes.
@@ -221,6 +309,7 @@ final class ChunkPlayerEngine: ObservableObject {
     ///     ÷ markerMul (from `{N}` inline marker)
     ///     ÷ externalSpeedMultiplier (FMV2)
     ///     + extraPauseSec (from `///` inline marker, NOT scaled)
+    ///     + sectionEndLingerSec (last word of a section, NOT scaled)
     /// markerMul and externalSpeedMultiplier multiply together to form
     /// the divisor — slowdowns stack, speedups stack, mixing slows-and-
     /// speeds-at-once partially cancel. The combined divisor is floored
@@ -237,8 +326,13 @@ final class ChunkPlayerEngine: ObservableObject {
             base = ChunkTimingCalculator.calculateDuration(for: chunk, sliderValue: sliderValue, strategy: strategy)
         }
         let combinedMul = max(externalSpeedMultiplier * meta.speedMultiplier, 0.1)
-        return base / combinedMul + meta.extraPauseSec
+        let linger = endsSection(index) ? Self.sectionEndLingerSec : 0
+        return base / combinedMul + meta.extraPauseSec + linger
     }
+
+    /// How long a section's last word stays on screen beyond its own time
+    /// before the section hold. Honest seconds, like `///`.
+    static let sectionEndLingerSec: TimeInterval = 1.0
 
     // MARK: - Internal scheduling
 
@@ -254,7 +348,12 @@ final class ChunkPlayerEngine: ObservableObject {
             guard !Task.isCancelled, let self, self.isPlaying else { return }
 
             let next = self.currentChunkIndex + 1
-            if next < self.chunks.count {
+            if self.endsSection(self.currentChunkIndex) {
+                // End of a section: stop on its last word and wait.
+                self.heldSection = self.section(containing: self.currentChunkIndex)
+                if next >= self.chunks.count { self.progress = 1 }
+                self.isPlaying = false
+            } else if next < self.chunks.count {
                 self.currentChunkIndex = next
                 self.progress = Double(next) / Double(self.chunks.count)
                 self.scheduleAdvance()

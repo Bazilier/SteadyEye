@@ -379,8 +379,12 @@ struct ClassicThreeLineView: View {
 
     private static let cjkStripPunctuation: Set<Character> = ["。", "！", "？"]
 
+    /// Rows show only the current `////` section: its last word is not
+    /// followed by the next section's first, nor its first preceded by the
+    /// previous section's last.
     private func chunkText(at i: Int) -> String {
         guard i >= 0, i < player.chunks.count else { return "" }
+        guard player.chunkRange(ofSection: player.section(containing: displayIndex)).contains(i) else { return "" }
         let chunk = player.chunks[i]
         if ChunkTimingCalculator.isPause(chunk) { return "" }
         if CJKTokenizer.containsCJK(chunk) {

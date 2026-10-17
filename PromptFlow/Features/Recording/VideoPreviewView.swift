@@ -66,6 +66,10 @@ struct VideoPreviewView: View {
     /// Which soundtrack the top chip names while it is up; nil when hidden.
     @State private var studioChip: Bool?
     @State private var studioChipHideToken = UUID()
+    /// Which version the top chip names while it is up — cut (true) or
+    /// whole — after the cut button; nil when hidden.
+    @State private var cutChip: Bool?
+    @State private var cutChipHideToken = UUID()
     @State private var showStudioSaveSheet = false
     @State private var showStudioPaywall = false
     @State private var showStudioWillSaveToast = false
@@ -195,6 +199,9 @@ struct VideoPreviewView: View {
                         if firstTakeResult != nil {
                             continueButton
                         } else {
+                            if showsStudioButton, recording.sectionCuts != nil {
+                                SectionCutButton(isOn: recording.sectionCutsEnabled, action: handleCutTap)
+                            }
                             if showsStudioButton {
                                 StudioSoundButton(
                                     recording: recording,
@@ -528,6 +535,14 @@ struct VideoPreviewView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { playback.togglePlayPause() }
+            // Hold for double speed, Instagram style; let go for normal.
+            .onLongPressGesture(minimumDuration: 0.3) {
+                playback.beginFastForward()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                AppAnalytics.log("preview_fast_forward")
+            } onPressingChanged: { pressing in
+                if !pressing { playback.endFastForward() }
+            }
         }
     }
 
@@ -566,8 +581,14 @@ struct VideoPreviewView: View {
             ))
         }
         .overlay {
-            if let isStudio = studioChip {
+            if playback.isFastForwarding {
+                FastForwardChip()
+                    .transition(.opacity)
+            } else if let isStudio = studioChip {
                 StudioChip(isStudio: isStudio)
+                    .transition(.opacity)
+            } else if let isCut = cutChip {
+                SectionCutChip(isCut: isCut)
                     .transition(.opacity)
             }
         }
@@ -623,13 +644,54 @@ struct VideoPreviewView: View {
             Task {
                 await attachStudioAudio(replacingCurrentItem: false)
                 if playback.player == nil, isVisible {
-                    playback.setup(url: recording.fileURL, initialDuration: recording.duration)
+                    await setupPlainPlayer()
                 }
+                loadVideoSize()
+            }
+        } else if recording.usesSectionCuts {
+            Task {
+                await setupPlainPlayer()
                 loadVideoSize()
             }
         } else {
             playback.setup(url: recording.fileURL, initialDuration: recording.duration)
             loadVideoSize()
+        }
+    }
+
+    /// The take with its own soundtrack: cut when the cut is on, and the
+    /// whole file if the cut cannot be built.
+    private func setupPlainPlayer() async {
+        if recording.usesSectionCuts, let keep = recording.sectionCuts,
+           let item = try? await SectionCutComposition.playerItem(videoURL: recording.fileURL, keep: keep) {
+            guard isVisible, playback.player == nil else { return }
+            playback.setup(item: item, initialDuration: recording.displayDuration)
+        } else {
+            guard isVisible, playback.player == nil else { return }
+            playback.setup(url: recording.fileURL, initialDuration: recording.duration)
+        }
+    }
+
+    /// Flips between the cut take and the whole one, from the start: the
+    /// two have different timelines.
+    private func handleCutTap() {
+        recording.sectionCutsEnabled.toggle()
+        try? modelContext.save()
+        let isCut = recording.sectionCutsEnabled
+        AppAnalytics.log("section_cut_toggled", params: ["enabled": isCut])
+        UISelectionFeedbackGenerator().selectionChanged()
+        playback.teardown()
+        studioItem = nil
+        setupPlayer()
+        withAnimation(.easeOut(duration: 0.2)) {
+            studioChip = nil
+            cutChip = isCut
+        }
+        let token = UUID()
+        cutChipHideToken = token
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            guard token == cutChipHideToken else { return }
+            withAnimation(.easeIn(duration: 0.3)) { cutChip = nil }
         }
     }
 
@@ -643,7 +705,8 @@ struct VideoPreviewView: View {
             prepared = try await StudioSoundAudio.makePlayerItem(
                 videoURL: recording.fileURL,
                 studioAudioURL: studioURL,
-                useStudio: recording.studioEnabled
+                useStudio: recording.studioEnabled,
+                keep: recording.usesSectionCuts ? recording.sectionCuts : nil
             )
         } catch {
             AppAnalytics.log("studio_sound_playback_failed", params: [
@@ -657,7 +720,7 @@ struct VideoPreviewView: View {
             playback.replaceItem(with: prepared.item)
             flashStudioChip(isStudio: recording.studioEnabled)
         } else {
-            playback.setup(item: prepared.item, initialDuration: recording.duration)
+            playback.setup(item: prepared.item, initialDuration: recording.displayDuration)
         }
     }
 
@@ -791,7 +854,8 @@ struct VideoPreviewView: View {
         isSavingToCameraRoll = true
         Task {
             var file = StudioSoundManager.SaveFile(url: recording.fileURL, isTemporary: false)
-            if !forceOriginal, recording.usesStudioAudio {
+            // The original sound, when asked for, is still cut.
+            if recording.usesSectionCuts || (!forceOriginal && recording.usesStudioAudio) {
                 // A failed export falls back to the original rather than
                 // failing the save.
                 do {

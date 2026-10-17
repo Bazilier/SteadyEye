@@ -64,6 +64,12 @@ final class PlaybackController: ObservableObject {
     /// True once the take has played through to its last frame — the
     /// moment the user has actually watched it.
     @Published private(set) var didPlayToEnd: Bool = false
+    /// True while the user holds the video and it plays at
+    /// `fastForwardRate`.
+    @Published private(set) var isFastForwarding: Bool = false
+    private var wasPlayingBeforeFastForward: Bool = false
+
+    static let fastForwardRate: Float = 2
 
     private var timeObserverToken: Any?
     private var endObserver: NSObjectProtocol?
@@ -211,6 +217,8 @@ final class PlaybackController: ObservableObject {
         statusObservation?.invalidate()
         statusObservation = nil
 
+        isFastForwarding = false
+
         player?.pause()
         player = nil
     }
@@ -230,6 +238,32 @@ final class PlaybackController: ObservableObject {
                 player.seek(to: .zero)
             }
             player.play()
+        }
+    }
+
+    // MARK: - Hold to speed up
+
+    /// Plays at `fastForwardRate` while the video is held — from a pause
+    /// too, and from the start once it has played to the end.
+    func beginFastForward() {
+        guard let player, !isFastForwarding else { return }
+        wasPlayingBeforeFastForward = player.timeControlStatus == .playing
+        if currentTime >= duration - 0.05 {
+            player.seek(to: .zero)
+        }
+        isFastForwarding = true
+        player.rate = Self.fastForwardRate
+    }
+
+    /// Back to normal speed on release, or back to the pause it started
+    /// from. One that ran to the end stays there.
+    func endFastForward() {
+        guard let player, isFastForwarding else { return }
+        isFastForwarding = false
+        if wasPlayingBeforeFastForward, currentTime < duration - 0.05 {
+            player.rate = 1
+        } else {
+            player.pause()
         }
     }
 

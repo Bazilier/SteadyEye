@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import AVFoundation
 import UserNotifications
+import os
 
 /// Capsule chip for the recording status line.
 private struct StatusChip: ViewModifier {
@@ -265,6 +266,9 @@ struct RecordingView: View {
     @State private var countdownValue: Int = 0
     @State private var isCountingDown = false
     @State private var countdownTimer: Timer?
+    /// The take's `////` section takes, for cutting the file down to the
+    /// last take of each.
+    @State private var takeLog = SectionTakeLog()
     /// Settings → Countdown: 0 (Off), 3, 5 or 10 seconds.
     private var countdownSeconds: Int {
         max(0, settingsArray.first?.countdownDuration ?? 3)
@@ -382,6 +386,12 @@ struct RecordingView: View {
             } else {
                 stopFMV()
                 lastTakeGaze = gazeAttention.endTake()
+                takeLog.end(at: cameraManager.captureClockNow())
+            }
+        }
+        .onChange(of: player.heldSection) { _, held in
+            if held != nil, cameraManager.isRecording {
+                takeLog.end(at: cameraManager.captureClockNow())
             }
         }
         .onChange(of: gazeAttention.state) { _, state in
@@ -391,7 +401,9 @@ struct RecordingView: View {
                 // take back the words that ran during the confirmation delay:
                 // resume on the word that was showing when the eyes left.
                 player.gazeFrozen = true
-                if let onset = gazeAttention.awayOnset,
+                // At a section hold nothing is being read; a seek would end it.
+                if player.heldSection == nil,
+                   let onset = gazeAttention.awayOnset,
                    let index = player.chunkIndex(shownAt: onset),
                    index < player.currentChunkIndex {
                     player.seekTo(index: index)
@@ -1640,6 +1652,23 @@ struct RecordingView: View {
                 PlaceholderLoopView(fontSize: fontSize, isClassicMode: isClassicMode, lineCount: lineCount)
             }
         }
+        // Hidden rather than swapped out at a section hold, so the display
+        // keeps its state for when reading resumes.
+        .opacity(player.heldSection == nil ? 1 : 0)
+        .overlay {
+            if let held = player.heldSection {
+                Label {
+                    Text("recording.section.held \(held + 1) \(player.sectionCount)", comment: "Shown in place of the prompter text when a //// section has been read to its end and the prompter waits for Next or Repeat. Arguments: section number, number of sections.")
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                }
+                .font(.system(size: fontSize * 0.6, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            }
+        }
     }
 
     // MARK: - Follow My Voice V2 lifecycle
@@ -1695,13 +1724,29 @@ struct RecordingView: View {
 
     private var scrubBar: some View {
         GeometryReader { geo in
+            let count = CGFloat(max(1, player.chunks.count))
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.25))
                     .frame(height: 4)
+                // The section being replayed, as a band behind the track.
+                if player.sectionTake > 1 {
+                    let range = player.chunkRange(ofSection: player.currentSection)
+                    Capsule()
+                        .fill(Theme.accent.opacity(0.4))
+                        .frame(width: geo.size.width * CGFloat(range.count) / count, height: 10)
+                        .offset(x: geo.size.width * CGFloat(range.lowerBound) / count)
+                }
                 Capsule()
                     .fill(Theme.accent)
                     .frame(width: max(0, geo.size.width * smoothProgress), height: 4)
+                // Section breaks.
+                ForEach(player.sectionStarts.dropFirst(), id: \.self) { start in
+                    Capsule()
+                        .fill(.white)
+                        .frame(width: 2, height: 10)
+                        .offset(x: geo.size.width * CGFloat(start) / count - 1)
+                }
             }
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -1766,6 +1811,11 @@ struct RecordingView: View {
 
             if showCameraSettings { cameraSettingsPanel }
 
+            if player.sectionTake > 1 {
+                sectionReplayChip
+                    .transition(.opacity)
+            }
+
             speedSliderRow
 
             // 24 is exactly what `scrubBar` carried internally before the inset
@@ -1779,6 +1829,7 @@ struct RecordingView: View {
         // has no home indicator to clear.
         .padding(.bottom, isLandscape ? 24 : 48)
         .padding(.top, 12)
+        .animation(.easeInOut(duration: 0.2), value: player.sectionTake > 1)
     }
 
     // MARK: - Control pieces, shared by both orientations
@@ -1829,6 +1880,19 @@ struct RecordingView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// Marks a replayed `////` section and its take, from the Repeat tap
+    /// until the next section comes on screen.
+    private var sectionReplayChip: some View {
+        Label {
+            Text("recording.section.replay \(player.currentSection + 1) \(player.sectionTake)", comment: "Chip on the recording screen while a //// section is being read again after Repeat. Arguments: section number, take number (2 for the first repeat).")
+        } icon: {
+            Image(systemName: "arrow.counterclockwise")
+        }
+        .lineLimit(1)
+        .modifier(StatusChip())
+        .overlay(Capsule().strokeBorder(Theme.accent, lineWidth: 1.5))
     }
 
     /// The exposure row itself — label, slider, EV readout — with no chrome.
@@ -1953,21 +2017,41 @@ struct RecordingView: View {
     /// whole block, so no glyph turns on its own.
     private var transportRow: some View {
         HStack(spacing: 48) {
-            playPauseButton
-            recordButton
             resetButton
+            recordButton
+            playPauseButton
         }
     }
 
+    /// At a section hold: "Next", ringed as the default way on. At the end
+    /// of the last section there is nothing to go on to, so it is off.
     private var playPauseButton: some View {
-        Button { togglePlay() } label: {
+        let offersNext = player.heldSection != nil && !player.isHoldingLastSection
+        return Button {
+            if offersNext {
+                resolveSectionHold(replay: false)
+            } else {
+                togglePlay()
+            }
+        } label: {
             Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 28))
                 .foregroundStyle(.white)
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
                 .modifier(GlassCircleModifier())
+                .overlay {
+                    if offersNext {
+                        Circle().strokeBorder(Theme.accent, lineWidth: 2)
+                    }
+                }
         }
-        .disabled(!player.isReady)
+        .disabled(!player.isReady || player.isHoldingLastSection)
+        .opacity(player.isHoldingLastSection ? 0.4 : 1)
+        .overlay(alignment: .bottom) {
+            if offersNext {
+                transportCaption(Text("recording.section.next", comment: "Caption under the play button when the prompter waits at a //// section break: go on to the next section."))
+            }
+        }
     }
 
     /// Unchanged from the portrait row: a static 72pt ring with the inner shape
@@ -1999,15 +2083,43 @@ struct RecordingView: View {
         }
     }
 
+    /// Back to the script's start — or, in a script with sections, to the
+    /// start of the section on screen.
     private var resetButton: some View {
-        Button { resetDisplay() } label: {
+        Button {
+            if player.sectionCount > 1, hasStartedPlayback {
+                restartSection()
+            } else {
+                resetDisplay()
+            }
+        } label: {
             Image(systemName: "arrow.counterclockwise")
                 .font(.system(size: 22))
                 .foregroundStyle(.white)
                 .frame(width: Self.transportButtonSize, height: Self.transportButtonSize)
                 .modifier(GlassCircleModifier())
         }
+        .overlay(alignment: .bottom) {
+            if player.heldSection != nil {
+                transportCaption(Text("recording.section.repeat", comment: "Caption under the reset button when the prompter waits at a //// section break: read the section just finished again."))
+            }
+        }
     }
+
+    /// Below a transport button, outside its layout box and hit area, so the
+    /// row neither moves nor grows a tap target when it appears.
+    private func transportCaption(_ text: Text) -> some View {
+        text
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.white.opacity(0.85))
+            .fixedSize()
+            .offset(y: Self.transportCaptionDrop)
+            .allowsHitTesting(false)
+    }
+
+    /// From the button's bottom edge to the caption's: about 8 pt clear of
+    /// the circle for a `.caption2` line.
+    private static let transportCaptionDrop: CGFloat = 22
 
     // MARK: - Countdown overlay
 
@@ -2039,7 +2151,22 @@ struct RecordingView: View {
             player.pause()
         } else {
             player.play()
+            // A resume goes on with the take under way.
+            if !takeLog.hasOpenTake { noteTakeStart() }
         }
+    }
+
+    /// Reading starts: a new take of the section on screen.
+    private func startReading() {
+        player.play()
+        noteTakeStart()
+    }
+
+    /// Logs a take of the section on screen, if it is going into a file
+    /// that has sections to cut.
+    private func noteTakeStart() {
+        guard cameraManager.isRecording, player.sectionCount > 1 else { return }
+        takeLog.begin(section: player.currentSection, at: cameraManager.captureClockNow())
     }
 
     private func resetDisplay() {
@@ -2130,11 +2257,15 @@ struct RecordingView: View {
         smoothProgress = 0
         hasStartedPlayback = true
         // Player stays paused — chunks visible but frozen
+        runCountdown { beginRecording() }
+    }
 
-        // Countdown Off: start straight away, no overlay.
+    /// The Settings countdown on the overlay, then `action`. Countdown Off:
+    /// `action` straight away, no overlay.
+    private func runCountdown(then action: @escaping () -> Void) {
         let seconds = countdownSeconds
         guard seconds > 0 else {
-            beginRecording()
+            action()
             return
         }
 
@@ -2149,21 +2280,58 @@ struct RecordingView: View {
                     t.invalidate()
                     countdownTimer = nil
                     isCountingDown = false
-                    beginRecording()
+                    action()
                 }
             }
         }
     }
 
+    /// Next or Repeat at a section hold. The section's first word is on
+    /// screen, still, through the countdown; reading starts after it. A take
+    /// in progress keeps recording throughout.
+    private func resolveSectionHold(replay: Bool) {
+        guard let held = player.heldSection else { return }
+        player.resolveHold(replay: replay)
+        smoothProgress = player.progress
+        AppAnalytics.log(replay ? "section_replay" : "section_continue", params: [
+            "section": held + 1,
+            "sections": player.sectionCount,
+            "take": player.sectionTake,
+            "is_recording": cameraManager.isRecording
+        ])
+        runCountdown { startReading() }
+    }
+
+    /// ↺ in a script with sections: the section on screen again from its
+    /// first word, as a new take, after the countdown. At a hold this is
+    /// Repeat; mid-read it drops the take under way.
+    private func restartSection() {
+        if player.heldSection != nil {
+            resolveSectionHold(replay: true)
+            return
+        }
+        let section = player.currentSection
+        player.restartCurrentSection()
+        smoothProgress = player.progress
+        AppAnalytics.log("section_restart", params: [
+            "section": section + 1,
+            "sections": player.sectionCount,
+            "take": player.sectionTake,
+            "is_recording": cameraManager.isRecording
+        ])
+        runCountdown { startReading() }
+    }
+
     private func beginRecording() {
         takeStoppedByFold = false
+        takeLog = SectionTakeLog()
         cameraManager.startRecording()
         AppAnalytics.log("recording_started", params: [
             "display_mode": displayMode,
             "script_length_words": script.content.split(separator: " ").count
         ])
         if autoStartPrompting {
-            player.play()
+            startReading()
         }
     }
 
@@ -2177,6 +2345,20 @@ struct RecordingView: View {
     private func handleRecordingFinished(sourceURL: URL) {
         let duration = cameraManager.lastRecordingDuration
         let scriptTitle = script.title
+        let sectionCuts = cameraManager.lastRecordedFirstFramePTS.flatMap {
+            takeLog.keptRanges(firstFrame: $0, fileEnd: duration)
+        }
+        if player.sectionCount > 1 {
+            let first = cameraManager.lastRecordedFirstFramePTS
+            let takes = takeLog.takes.map { take in
+                let start = first.map { CMTimeSubtract(take.start, $0).seconds } ?? .nan
+                let end = first.flatMap { f in take.end.map { CMTimeSubtract($0, f).seconds } } ?? .nan
+                return String(format: "s%d:%.2f-%.2f", take.section + 1, start, end)
+            }.joined(separator: ",")
+            let kept = sectionCuts?.map { String(format: "%.2f-%.2f", $0.lowerBound, $0.upperBound) }.joined(separator: ",") ?? "none"
+            Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye", category: "SectionCut")
+                .notice("event=takes duration=\(String(format: "%.2f", duration), privacy: .public) has_first_frame=\(first != nil) takes=\(takes, privacy: .public) kept=\(kept, privacy: .public)")
+        }
         isProcessingRecording = true
 
         RecordingPersistence.persist(
@@ -2188,6 +2370,10 @@ struct RecordingView: View {
             isProcessingRecording = false
             switch result {
             case .success(let recording):
+                if let sectionCuts {
+                    recording.sectionCuts = sectionCuts
+                    try? modelContext.save()
+                }
                 let wasFirst = !hasCompletedFirstRecording
                 AppAnalytics.log("recording_saved", params: [
                     "duration_sec": Int(duration.rounded()),
@@ -2237,7 +2423,25 @@ struct RecordingView: View {
                     cameraManager: cameraManager,
                     monitor: duoMonitor
                 )
-                previewRecording = recording
+                if let sectionCuts {
+                    // The cut, tightened to the voice, before the preview
+                    // builds from it. Still processing meanwhile, so the
+                    // unfold close does not read the gap as a failed save.
+                    isProcessingRecording = true
+                    Task { @MainActor in
+                        do {
+                            recording.sectionCuts = try await SilenceTrimmer.trim(sectionCuts, toVoiceIn: recording.fileURL)
+                            try? modelContext.save()
+                        } catch {
+                            Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye", category: "SectionCut")
+                                .error("event=trim_failed error=\(String(describing: error), privacy: .public)")
+                        }
+                        previewRecording = recording
+                        isProcessingRecording = false
+                    }
+                } else {
+                    previewRecording = recording
+                }
             case .failure(let error):
                 // Auto-save failed entirely (file move error, generator error,
                 // etc.). Don't present the preview — clean up the temp source
