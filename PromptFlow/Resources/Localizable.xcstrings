@@ -7975,6 +7975,156 @@
         }
       }
     },
+    "recording.stop_confirm.keep" : {
+      "comment" : "Cancel button in the stop-recording alert: go on recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep recording"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seguir grabando"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar gravando"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить запись"
+          }
+        }
+      }
+    },
+    "recording.stop_confirm.message" : {
+      "comment" : "Body of the stop-recording alert: the record button stops the take; to start the prompter, tap the play button (▶︎).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This button stops the take. To start the prompter, tap ▶︎."
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este botón detiene la toma. Para iniciar el teleprompter, toca ▶︎."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este botão para a gravação. Para iniciar o teleprompter, toque em ▶︎."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта кнопка останавливает запись. Чтобы запустить суфлёр, нажми ▶︎."
+          }
+        }
+      }
+    },
+    "recording.stop_confirm.stop" : {
+      "comment" : "Button in the stop-recording alert: stop the take.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop recording"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить"
+          }
+        }
+      }
+    },
+    "recording.stop_confirm.stop_dont_ask" : {
+      "comment" : "Button in the stop-recording alert: stop the take and never ask again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop, don’t ask again"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener y no volver a preguntar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar e não perguntar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить и больше не спрашивать"
+          }
+        }
+      }
+    },
+    "recording.stop_confirm.title" : {
+      "comment" : "Title of the alert shown when the record button is tapped during a take while the prompter is stopped mid-script (at a section break or paused): it would stop the recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop recording?"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Detener la grabación?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar a gravação?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить запись?"
+          }
+        }
+      }
+    },
     "recording.toast.saved" : {
       "comment" : "Toast shown after a recording is auto-saved when the app goes to the background.",
       "extractionState" : "manual",

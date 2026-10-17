@@ -85,6 +85,10 @@ struct RecordingView: View {
     @AppStorage("hasCompletedFirstRecording") private var hasCompletedFirstRecording = false
     @State private var showPaywall: Bool = false
     @State private var showMicPermissionAlert: Bool = false
+    /// "Stop recording?" — the record button tapped while the prompter is
+    /// stopped mid-script, where it is easy to take for play.
+    @State private var showStopConfirm = false
+    @AppStorage("skipStopRecordingConfirm") private var skipStopConfirm = false
     @State private var cameraAuthStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var micAuthStatus: AVAudioApplication.recordPermission = AVAudioApplication.shared.recordPermission
     /// First-run explainer for the long-press-and-drag gesture that
@@ -564,6 +568,31 @@ struct RecordingView: View {
             }
         } message: {
             Text(cameraManager.errorMessage ?? "")
+        }
+        .alert(
+            Text("recording.stop_confirm.title", comment: "Title of the alert shown when the record button is tapped during a take while the prompter is stopped mid-script (at a section break or paused): it would stop the recording."),
+            isPresented: $showStopConfirm
+        ) {
+            Button(role: .destructive) {
+                AppAnalytics.log("stop_confirm_result", params: ["result": "stop"])
+                stopRecording()
+            } label: {
+                Text("recording.stop_confirm.stop", comment: "Button in the stop-recording alert: stop the take.")
+            }
+            Button {
+                AppAnalytics.log("stop_confirm_result", params: ["result": "stop_dont_ask"])
+                skipStopConfirm = true
+                stopRecording()
+            } label: {
+                Text("recording.stop_confirm.stop_dont_ask", comment: "Button in the stop-recording alert: stop the take and never ask again.")
+            }
+            Button(role: .cancel) {
+                AppAnalytics.log("stop_confirm_result", params: ["result": "keep_recording"])
+            } label: {
+                Text("recording.stop_confirm.keep", comment: "Cancel button in the stop-recording alert: go on recording.")
+            }
+        } message: {
+            Text("recording.stop_confirm.message", comment: "Body of the stop-recording alert: the record button stops the take; to start the prompter, tap the play button (▶︎).")
         }
         .alert(
             Text("recording.mic_alert.title", comment: "Title of the alert shown when the user taps record but mic permission is denied"),
@@ -2186,9 +2215,12 @@ struct RecordingView: View {
 
     private func toggleRecording() {
         if cameraManager.isRecording {
-            cameraManager.stopRecording()
-            player.pause()
-            // Stay on current chunk — do not reset
+            if needsStopConfirm {
+                showStopConfirm = true
+                AppAnalytics.log("stop_confirm_shown", params: ["at_section_hold": player.heldSection != nil])
+                return
+            }
+            stopRecording()
         } else {
             // The guided first run shows value before any paywall, hard
             // paywall mode included.
@@ -2202,6 +2234,22 @@ struct RecordingView: View {
             }
             startCountdown()
         }
+    }
+
+    private func stopRecording() {
+        cameraManager.stopRecording()
+        player.pause()
+        // Stay on current chunk — do not reset
+    }
+
+    /// The record button looks like a way on when the prompter is stopped
+    /// mid-script — at a section hold, or paused — so stopping the take
+    /// asks first there. Not while it reads (stopping is then meant), and
+    /// not once the script is done.
+    private var needsStopConfirm: Bool {
+        guard !skipStopConfirm, !player.isPlaying else { return false }
+        let finished = player.isHoldingLastSection || player.progress >= 1
+        return !finished
     }
 
     /// Ends a countdown or a take because the Duo is being folded or
