@@ -73,11 +73,18 @@ enum StudioSoundAudio {
         let originalMix: AVAudioMix
     }
 
+    /// `keep`: the section cuts to apply (`SectionCutComposition`).
     @MainActor
-    static func makePlayerItem(videoURL: URL, studioAudioURL: URL, useStudio: Bool) async throws -> PlayerItem {
+    static func makePlayerItem(
+        videoURL: URL,
+        studioAudioURL: URL,
+        useStudio: Bool,
+        keep: [ClosedRange<Double>]? = nil
+    ) async throws -> PlayerItem {
         let composition = AVMutableComposition()
         let audioStart = try await insertVideo(of: videoURL, into: composition, includeOriginalAudio: true)
         let studioTrack = try await insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
+        if let keep { SectionCutComposition.removeGaps(keeping: keep, from: composition) }
 
         let originalTrack = composition.tracks(withMediaType: .audio).first { $0 !== studioTrack }
         let studioMix = mix(audible: studioTrack, muted: originalTrack)
@@ -118,7 +125,7 @@ enum StudioSoundAudio {
     /// Inserts the video track (and, if asked, the original audio) at their
     /// own times. Returns where the original audio starts — where the
     /// processed audio must start too.
-    private static func insertVideo(
+    static func insertVideo(
         of videoURL: URL,
         into composition: AVMutableComposition,
         includeOriginalAudio: Bool
@@ -148,7 +155,7 @@ enum StudioSoundAudio {
 
     /// Inserts the processed audio at `start`, trimmed so it never runs past
     /// the end of the composition's video.
-    private static func insertStudioAudio(
+    static func insertStudioAudio(
         _ url: URL,
         into composition: AVMutableComposition,
         at start: CMTime
@@ -177,7 +184,7 @@ enum StudioSoundAudio {
         return audioMix
     }
 
-    private static func export(
+    static func export(
         _ asset: AVAsset,
         preset: String,
         to outputURL: URL,

@@ -37,6 +37,15 @@ final class Recording: Identifiable {
     /// Save to Camera Roll as soon as processing finishes.
     var studioSaveWhenReady: Bool = false
 
+    // Section cuts (`SectionTakeLog`). Optional or defaulted, like Studio
+    // Sound's fields, so existing stores migrate as they are.
+    /// The parts of the file to keep, in seconds: the last take of each
+    /// `////` section. JSON `[[start, end], …]`; nil for a take without
+    /// sections.
+    var sectionCutsData: Data?
+    /// The toggle: play and save the cut version (true) or the whole take.
+    var sectionCutsEnabled: Bool = true
+
     init(
         fileName: String,
         thumbnailFileName: String? = nil,
@@ -65,6 +74,30 @@ final class Recording: Identifiable {
     var studioAudioURL: URL? {
         guard let studioAudioFileName else { return nil }
         return Recording.recordingsDirectory.appendingPathComponent(studioAudioFileName)
+    }
+
+    var sectionCuts: [ClosedRange<Double>]? {
+        get {
+            guard let sectionCutsData,
+                  let pairs = try? JSONDecoder().decode([[Double]].self, from: sectionCutsData)
+            else { return nil }
+            let ranges = pairs.compactMap { $0.count == 2 && $0[0] <= $0[1] ? $0[0]...$0[1] : nil }
+            return ranges.isEmpty ? nil : ranges
+        }
+        set {
+            sectionCutsData = newValue.flatMap { try? JSONEncoder().encode($0.map { [$0.lowerBound, $0.upperBound] }) }
+        }
+    }
+
+    /// Cuts exist and the toggle is on.
+    var usesSectionCuts: Bool {
+        sectionCutsEnabled && sectionCuts != nil
+    }
+
+    /// What the take runs to once cut, or as recorded.
+    var displayDuration: TimeInterval {
+        guard usesSectionCuts, let sectionCuts else { return duration }
+        return min(duration, sectionCuts.reduce(0) { $0 + ($1.upperBound - $1.lowerBound) })
     }
 
     /// Processed audio exists and the toggle is on.

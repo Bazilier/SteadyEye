@@ -446,7 +446,7 @@ struct RecordingThumbnailCard: View {
                         guard let url = recording.thumbnailURL else { return }
                         loadedThumbnail = await ThumbnailCache.load(url)
                     }
-                Text(formatDuration(recording.duration))
+                Text(formatDuration(recording.displayDuration))
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)

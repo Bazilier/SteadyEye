@@ -147,8 +147,18 @@ final class StudioSoundManager: ObservableObject {
         let isTemporary: Bool
     }
 
+    /// The take as it is played: cut down to its sections' last takes when
+    /// the cut is on (`Recording.usesSectionCuts`), with the processed
+    /// soundtrack when Studio Sound is on.
     func fileForSaving(_ recording: Recording) async throws -> SaveFile {
-        guard recording.usesStudioAudio, let studioURL = recording.studioAudioURL else {
+        let studioURL = recording.usesStudioAudio ? recording.studioAudioURL : nil
+        if recording.usesSectionCuts, let keep = recording.sectionCuts {
+            let url = try await SectionCutComposition.export(
+                videoURL: recording.fileURL, studioAudioURL: studioURL, keep: keep
+            )
+            return SaveFile(url: url, isTemporary: true)
+        }
+        guard let studioURL else {
             return SaveFile(url: recording.fileURL, isTemporary: false)
         }
         let url = try await StudioSoundAudio.exportWithStudioAudio(

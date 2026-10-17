@@ -7164,6 +7164,66 @@
         }
       }
     },
+    "preview.section_cut.cut" : {
+      "comment" : "Chip over the preview video, and VoiceOver label of the scissors toggle: the take plays cut down to the last take of each //// section, without the pauses between.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pauses"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin pausas"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem pausas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без пауз"
+          }
+        }
+      }
+    },
+    "preview.section_cut.whole" : {
+      "comment" : "Chip over the preview video when the scissors toggle is off: the whole take plays, repeats and pauses included.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full take"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toma completa"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravação completa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Целиком"
+          }
+        }
+      }
+    },
     "push.inactive_3_days.body" : {
       "comment" : "Body of the inactivity push notification (fires 3 days after the last app session boundary).",
       "extractionState" : "manual",
@@ -7761,6 +7821,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохраняем запись…"
+          }
+        }
+      }
+    },
+    "recording.section.held %lld %lld" : {
+      "comment" : "Shown in place of the prompter text when a //// section has been read to its end and the prompter waits for Next or Repeat. Arguments: section number, number of sections.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section %1$lld of %2$lld done"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sección %1$lld de %2$lld lista"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção %1$lld de %2$lld concluída"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Секция %1$lld из %2$lld готова"
+          }
+        }
+      }
+    },
+    "recording.section.next" : {
+      "comment" : "Caption under the play button when the prompter waits at a //// section break: go on to the next section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дальше"
+          }
+        }
+      }
+    },
+    "recording.section.repeat" : {
+      "comment" : "Caption under the reset button when the prompter waits at a //// section break: read the section just finished again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repeat"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetir"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
+          }
+        }
+      }
+    },
+    "recording.section.replay %lld %lld" : {
+      "comment" : "Chip on the recording screen while a //// section is being read again after Repeat. Arguments: section number, take number (2 for the first repeat).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay · section %1$lld · take %2$lld"
+          }
+        },
+        "es-419" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetición · sección %1$lld · toma %2$lld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repetição · seção %1$lld · tomada %2$lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повтор · секция %1$lld · дубль %2$lld"
           }
         }
       }
