@@ -211,6 +211,11 @@ struct RecordingView: View {
     @State private var lastTakeGaze: GazeAttention.TakeSummary?
     /// The preview on screen is of the user's very first take.
     @State private var previewIsFirstTake = false
+    /// For `recording_view_closed`: when this screen opened, how many takes
+    /// it started, and whether its close was already logged.
+    @State private var openedAt = Date()
+    @State private var takesThisOpen = 0
+    @State private var didLogClose = false
     @AppStorage("videoResolution") private var videoResolution: String = "1080p"
     @AppStorage("videoFPS") private var videoFPS: Int = 30
     private var isClassicMode: Bool { lineCount > 1 }
@@ -303,6 +308,7 @@ struct RecordingView: View {
                 "script_source": script.isDemo ? "demo" : "user",
                 "script_length_words": script.content.split(separator: " ").count
             ])
+            openedAt = Date()
             UIApplication.shared.isIdleTimerDisabled = true
             player.loadScript(script.content)
             player.sliderValue = speedSlider
@@ -416,6 +422,7 @@ struct RecordingView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .background || newPhase == .inactive else { return }
+            logClose(reason: newPhase == .background ? "app_background" : "app_inactive")
             if cameraManager.isRecording {
                 cameraManager.saveDirectlyOnStop = true
                 cameraManager.stopRecording()
@@ -487,7 +494,7 @@ struct RecordingView: View {
         .withRecordingToasts(
             showAudioToast: $showAudioToast,
             showResolutionToast: $showResolutionToast,
-            onOpenSettings: { selectedTab = .settings; close() }
+            onOpenSettings: { selectedTab = .settings; close(reason: "settings") }
         )
         .fullScreenCover(item: $previewRecording) { recording in
             VideoPreviewView(recording: recording, onDismiss: {
@@ -500,7 +507,7 @@ struct RecordingView: View {
                 if previewIsFirstTake,
                    UserDefaults.standard.bool(forKey: "pendingOwnScriptAfterFirstTake") {
                     previewIsFirstTake = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { close() }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { close(reason: "first_take_done") }
                 } else if closeWhenTakeHandled || duoMonitor?.state?.posture == .unfolded {
                     // Unfolded while this take was saved or previewed.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { finishUnfoldClose() }
@@ -529,7 +536,7 @@ struct RecordingView: View {
             onRecordOwnScript: {
                 // ScriptListView picks this up once the camera is gone:
                 // paywall first, then the own-script offer.
-                close()
+                close(reason: "first_take_done")
             })
         }
         .fullScreenCover(isPresented: $showPaywall) {
@@ -582,7 +589,7 @@ struct RecordingView: View {
             Button(LeaveSetupCopy.skip, role: .destructive) {
                 OnboardingFlow.abandon(reason: "left_own_camera")
                 showFirstTakeCoach = false
-                close()
+                close(reason: "left_setup")
             }
         } message: {
             Text(LeaveSetupCopy.cameraMessage)
@@ -1531,11 +1538,25 @@ struct RecordingView: View {
     /// the session at the end of the animation (a visible freeze on device).
     /// During a take nothing changes: `onDisappear` finalises it as before.
     /// `onDisappear` still calls `stop()`, which is safe to repeat.
-    private func close() {
+    private func close(reason: String) {
+        logClose(reason: reason)
         if !cameraManager.isRecording {
             cameraManager.stop()
         }
         dismiss()
+    }
+
+    /// `recording_view_closed`, once per open: why the camera closed, after
+    /// how long, and whether any take was started.
+    private func logClose(reason: String) {
+        guard !didLogClose else { return }
+        didLogClose = true
+        AppAnalytics.log("recording_view_closed", params: [
+            "reason": reason,
+            "seconds_open": Int(Date().timeIntervalSince(openedAt)),
+            "takes": takesThisOpen,
+            "script_source": script.isDemo ? "demo" : "user"
+        ])
     }
 
     /// Closing the camera before the guided take exists walks out of the
@@ -1544,7 +1565,7 @@ struct RecordingView: View {
         if needsGuidedTake, !cameraManager.isRecording, !isCountingDown {
             showLeaveSetupAlert = true
         } else {
-            close()
+            close(reason: "back")
         }
     }
 
@@ -1577,7 +1598,7 @@ struct RecordingView: View {
             .ignoresSafeArea()
             VStack(spacing: 16) {
                 HStack {
-                    Button { close() } label: {
+                    Button { close(reason: "no_access") } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.white)
@@ -1616,7 +1637,7 @@ struct RecordingView: View {
                 .primaryButtonStyle()
                 .padding(.horizontal, 24)
                 Button(String(localized: "recording.permission.go_back", defaultValue: "Go back")) {
-                    close()
+                    close(reason: "no_access")
                 }
                 .foregroundStyle(.white.opacity(0.7))
                 Spacer()
@@ -2121,7 +2142,7 @@ struct RecordingView: View {
         guard duoMonitor?.state?.posture == .unfolded || duoMonitor?.isHingeClosed == false else { return }
         AppAnalytics.log("duo_camera_closed_unfolded", params: ["had_take": hadTake])
         onClosedByUnfold?()
-        close()
+        close(reason: "duo_unfold")
     }
 
     private func startCountdown() {
@@ -2158,6 +2179,7 @@ struct RecordingView: View {
     private func beginRecording() {
         takeStoppedByFold = false
         cameraManager.startRecording()
+        takesThisOpen += 1
         AppAnalytics.log("recording_started", params: [
             "display_mode": displayMode,
             "script_length_words": script.content.split(separator: " ").count
