@@ -434,6 +434,7 @@ struct VideoPreviewView: View {
             // iOS mutes haptics then. Allowed while the preview is up only —
             // during a take they would be picked up by the mic.
             try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
+            prepareAudioForPlayback()
             setupPlayer()
             Task {
                 await studioSound.refreshQuota()
@@ -640,6 +641,21 @@ struct VideoPreviewView: View {
     }
 
     // MARK: - Player lifecycle
+
+    /// The camera leaves the app's audio session set for recording
+    /// (`.playAndRecord`, `.videoRecording`) and inactive once it closes.
+    /// Brought up by the player instead, that session took a second or two
+    /// — mic path included — and the opening of the sound was lost. Opened
+    /// from the recordings list, with no camera running, the session is
+    /// switched to plain playback and made active before the player starts;
+    /// the camera sets it back to recording when it next starts. Over a
+    /// running camera it is already active and is left alone.
+    private func prepareAudioForPlayback() {
+        guard !CameraManager.shared.session.isRunning else { return }
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .moviePlayback)
+        try? session.setActive(true)
+    }
 
     private func setupPlayer() {
         guard FileManager.default.fileExists(atPath: recording.fileURL.path) else {

@@ -74,6 +74,8 @@ final class PlaybackController: ObservableObject {
     private var timeObserverToken: Any?
     private var endObserver: NSObjectProtocol?
     private var statusObservation: NSKeyValueObservation?
+    /// Waits for the first item to be ready before playback starts.
+    private var readyObservation: NSKeyValueObservation?
     /// In-flight asset-duration load started by `setup`. Cancelled on
     /// re-`setup` and in `teardown` so a dismissed preview doesn't leave
     /// a task holding the asset.
@@ -153,7 +155,33 @@ final class PlaybackController: ObservableObject {
             self.duration = loaded.seconds
         }
 
-        avPlayer.play()
+        startWhenReady(avPlayer, item: item)
+    }
+
+    /// Plays once the item is ready. Started at once, the picture ran on
+    /// while a composition's audio was still being read, and the opening
+    /// of the sound was lost.
+    private func startWhenReady(_ avPlayer: AVPlayer, item: AVPlayerItem) {
+        readyObservation?.invalidate()
+        let start: () -> Void = { [weak self, weak avPlayer] in
+            guard let self, let avPlayer, self.player === avPlayer else { return }
+            self.readyObservation?.invalidate()
+            self.readyObservation = nil
+            avPlayer.play()
+        }
+        switch item.status {
+        case .readyToPlay, .failed:
+            start()
+        default:
+            readyObservation = item.observe(\.status, options: [.new]) { item, _ in
+                DispatchQueue.main.async {
+                    switch item.status {
+                    case .readyToPlay, .failed: start()
+                    default: break
+                    }
+                }
+            }
+        }
     }
 
     /// Pause at the last frame on end-of-item. Does NOT seek to
@@ -216,6 +244,8 @@ final class PlaybackController: ObservableObject {
 
         statusObservation?.invalidate()
         statusObservation = nil
+        readyObservation?.invalidate()
+        readyObservation = nil
 
         isFastForwarding = false
 
