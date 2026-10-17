@@ -155,7 +155,9 @@ struct ChatView: View {
     /// timestamp line: it is static copy, not a dated message.
     private var pinnedBubble: some View {
         ChatBubbleRow(trailing: false) {
-            ChatBubbleSurface(content: pinnedText, isInbound: false)
+            FounderBubbleLine {
+                ChatBubbleSurface(content: pinnedText, isInbound: false)
+            }
         }
     }
 

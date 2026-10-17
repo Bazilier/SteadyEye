@@ -12,10 +12,18 @@ struct ChatBubbleView: View {
     var body: some View {
         ChatBubbleRow(trailing: isInbound) {
             VStack(alignment: isInbound ? .trailing : .leading, spacing: 4) {
-                ChatBubbleSurface(content: Text(message.text), isInbound: isInbound)
-                    .opacity(isFailed ? 0.7 : 1.0)
+                if isInbound {
+                    ChatBubbleSurface(content: Text(message.text), isInbound: true)
+                        .opacity(isFailed ? 0.7 : 1.0)
+                } else {
+                    FounderBubbleLine {
+                        ChatBubbleSurface(content: Text(message.text), isInbound: false)
+                    }
+                }
 
                 statusOrTimestampLine
+                    // Under the founder's bubble, not under his avatar.
+                    .padding(.leading, isInbound ? 0 : FounderAvatar.chatIndent)
             }
         }
     }
@@ -100,6 +108,41 @@ struct ChatBubbleSurface: View {
             )
             .textSelection(.enabled)
     }
+}
+
+/// The founder's photo, round. Decorative: the row or bubble beside it already
+/// says who is speaking.
+struct FounderAvatar: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image("FounderAvatar")
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+}
+
+/// A founder bubble with his avatar beside its bottom edge, as on every one of
+/// his replies (and the pinned message).
+struct FounderBubbleLine<Bubble: View>: View {
+    @ViewBuilder let bubble: Bubble
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: FounderAvatar.chatSpacing) {
+            FounderAvatar(size: FounderAvatar.chatSize)
+            bubble
+        }
+    }
+}
+
+extension FounderAvatar {
+    static let chatSize: CGFloat = 28
+    static let chatSpacing: CGFloat = 8
+    /// How far a founder bubble sits from the row's leading edge.
+    static let chatIndent: CGFloat = chatSize + chatSpacing
 }
 
 /// One chat row: its content is offered at most `maxFraction` of the row's
