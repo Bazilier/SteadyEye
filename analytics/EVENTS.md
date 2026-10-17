@@ -44,6 +44,7 @@ The table at the bottom is checked against the code by `scripts/analytics_events
 **F1. An event Firebase never accepts.** `onboarding_back_from_settings_camera_opened` is 43 chars, so the SDK drops it.
 - Added on 2026-10-16 in `04f6726` (onboarding v2), so it has never been recorded.
 - Fix: rename it, for example to `onboarding_settings_return_opened`. Call site: `ScriptListView.swift`, `openFlowScriptIfBackFromSettings`.
+- **Fixed** on `fix/analytics-audit`: renamed to `onboarding_settings_return_opened`.
 
 **F2. The push soft-ask "shown" event is sent twice.**
 - `soft_ask_shown` (ScriptListView, when the sheet is triggered) and `push_soft_ask_shown` (SoftAskNotificationView `onAppear`) fire for the same display.
@@ -142,7 +143,6 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `recording_exported_to_camera_roll` | Export | ok | Video saved to Photos; `via` = preview / list / background / studio_when_ready | duration_sec, had_watermark, studio_sound, via | RecordingsView, StudioSoundManager, VideoPreviewView |
 | `onboarding_access_allow_tapped` | Onboarding | ok | Allow tapped on the access step | — | OnboardingView |
 | `onboarding_access_shown` | Onboarding | ok | Camera/mic access step shown | — | OnboardingView |
-| `onboarding_back_from_settings_camera_opened` | Onboarding | fix | Back from Settings with access granted, take auto-opens. **43 chars — Firebase drops it**, see audit F1 | — | ScriptListView |
 | `onboarding_completed` | Onboarding | ok | Onboarding screens finished; `path` = how | path | OnboardingView |
 | `onboarding_continue_tapped` | Onboarding | ok | Continue on the welcome screen | — | OnboardingView |
 | `onboarding_flow_finished` | Onboarding | ok | Guided flow (onboarding → first take) closed; `reason` | reason | OnboardingFlow |
@@ -157,6 +157,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `onboarding_script_saved` | Onboarding | ok | First script saved; `source` = ai / paste / sample | script_length_words, source | OnboardingScriptView |
 | `onboarding_script_shown` | Onboarding | ok | First-script step shown (onboarding v2) | — | OnboardingScriptView |
 | `onboarding_script_skipped` | Onboarding | ok | First-script step skipped | — | OnboardingScriptView |
+| `onboarding_settings_return_opened` | Onboarding | ok | Back from Settings with camera and mic granted; the flow's take auto-opens. Was `onboarding_back_from_settings_camera_opened` (43 chars, never recorded) | — | ScriptListView |
 | `onboarding_skip_for_now_tapped` | Onboarding | ok | Access skipped; params carry what was granted | camera_granted, mic_granted, photos_granted | OnboardingView |
 | `onboarding_started` | Onboarding | ok | Onboarding shown | — | OnboardingView |
 | `offer_code_redemption_failed` | Paywall | ok | Offer code sheet failed to open | error_reason | SubscriptionManager |

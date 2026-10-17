@@ -702,7 +702,7 @@ struct ScriptListView: View {
               scriptToRecord == nil, editorMode == nil, paywallPresentation == nil
         else { return }
         defaults.removeObject(forKey: OnboardingFlow.awaitingSettingsKey)
-        AppAnalytics.log("onboarding_back_from_settings_camera_opened")
+        AppAnalytics.log("onboarding_settings_return_opened")
         UserDefaults.standard.set(true, forKey: "nextRecordingIsOnboardingAuto")
         scriptToRecord = script
     }
