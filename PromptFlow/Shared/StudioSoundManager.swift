@@ -1,5 +1,7 @@
 import Combine
 import Foundation
+import AVFoundation
+import os
 import SwiftData
 import Photos
 import UIKit
@@ -75,10 +77,13 @@ final class StudioSoundManager: ObservableObject {
         recording.studioErrorCode = nil
         recording.studioStartedAt = Date()
         recording.studioStatus = .preparing
+        // Decided here, once: retries and a relaunch send the same audio.
+        recording.studioJobCutData = recording.studioSendsCutOnly ? recording.sectionCutsData : nil
         save()
         AppAnalytics.log("studio_sound_started", params: [
             "duration_sec": Int(recording.duration.rounded()),
-            "is_retry": recording.studioAudioFileName != nil
+            "is_retry": recording.studioAudioFileName != nil,
+            "cut_only": recording.studioJobCutData != nil
         ])
         run(recording.id)
     }
@@ -154,7 +159,10 @@ final class StudioSoundManager: ObservableObject {
         let studioURL = recording.usesStudioAudio ? recording.studioAudioURL : nil
         if recording.usesSectionCuts, let keep = recording.sectionCuts {
             let url = try await SectionCutComposition.export(
-                videoURL: recording.fileURL, studioAudioURL: studioURL, keep: keep
+                videoURL: recording.fileURL,
+                studioAudioURL: studioURL,
+                keep: keep,
+                studioIsCut: studioURL != nil && recording.studioCutData != nil
             )
             return SaveFile(url: url, isTemporary: true)
         }
@@ -221,11 +229,17 @@ final class StudioSoundManager: ObservableObject {
         defer { try? FileManager.default.removeItem(at: audioURL) }
 
         do {
-            try await StudioSoundAudio.extractAudio(from: recording.fileURL, to: audioURL)
+            try await StudioSoundAudio.extractAudio(
+                from: recording.fileURL, keep: Recording.decodeCuts(recording.studioJobCutData), to: audioURL
+            )
         } catch {
             fail(recording, code: "extract_failed")
             return
         }
+
+        let sentSec = (try? await AVURLAsset(url: audioURL).load(.duration).seconds) ?? -1
+        Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.kirillvasilyev.SteadyEye", category: "SectionCut")
+            .notice("event=studio_upload cut_only=\(recording.studioJobCutData != nil) take_sec=\(String(format: "%.1f", recording.duration), privacy: .public) sent_sec=\(String(format: "%.1f", sentSec), privacy: .public) units=\(Recording.studioUnits(forSeconds: sentSec))")
 
         recording.studioStatus = .uploading
         save()
@@ -308,7 +322,10 @@ final class StudioSoundManager: ObservableObject {
         let outputURL = Recording.recordingsDirectory.appendingPathComponent(fileName)
         do {
             try await StudioSoundAudio.finishProcessedAudio(
-                downloadedURL: downloadedURL, videoURL: recording.fileURL, to: outputURL
+                downloadedURL: downloadedURL,
+                videoURL: recording.fileURL,
+                keep: Recording.decodeCuts(recording.studioJobCutData),
+                to: outputURL
             )
         } catch StudioSoundAudio.AudioError.lengthMismatch(let original, let processed) {
             AppAnalytics.log("studio_sound_length_mismatch", params: [
@@ -327,6 +344,7 @@ final class StudioSoundManager: ObservableObject {
         }
 
         recording.studioAudioFileName = fileName
+        recording.studioCutData = recording.studioJobCutData
         recording.studioEnabled = true
         recording.studioErrorCode = nil
         recording.studioStatus = .ready

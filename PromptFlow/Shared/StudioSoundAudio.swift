@@ -25,17 +25,9 @@ enum StudioSoundAudio {
     // MARK: - Extract
 
     /// Copies the recording's audio track, without re-encoding, into an .m4a.
-    static func extractAudio(from videoURL: URL, to outputURL: URL) async throws {
-        let asset = AVURLAsset(url: videoURL)
-        guard let source = try await asset.loadTracks(withMediaType: .audio).first else {
-            throw AudioError.noAudioTrack
-        }
-        let range = try await source.load(.timeRange)
-        let composition = AVMutableComposition()
-        guard let track = composition.addMutableTrack(
-            withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
-        ) else { throw AudioError.exportFailed }
-        try track.insertTimeRange(range, of: source, at: .zero)
+    /// With `keep`, only those parts, back to back — the cut's timeline.
+    static func extractAudio(from videoURL: URL, keep: [ClosedRange<Double>]? = nil, to outputURL: URL) async throws {
+        let composition = try await audioComposition(of: videoURL, keep: keep)
         do {
             try await export(composition, preset: AVAssetExportPresetPassthrough, to: outputURL, as: .m4a)
         } catch {
@@ -45,12 +37,42 @@ enum StudioSoundAudio {
         }
     }
 
+    /// The recording's audio alone, cut to `keep` when given. Whole, it
+    /// starts at zero; cut, the gaps go exactly as they do from the video's
+    /// composition, so the two timelines match.
+    private static func audioComposition(of videoURL: URL, keep: [ClosedRange<Double>]?) async throws -> AVMutableComposition {
+        let asset = AVURLAsset(url: videoURL)
+        guard let source = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw AudioError.noAudioTrack
+        }
+        let range = try await source.load(.timeRange)
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(
+            withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else { throw AudioError.exportFailed }
+        if let keep {
+            try track.insertTimeRange(range, of: source, at: range.start)
+            SectionCutComposition.removeGaps(keeping: keep, from: composition)
+        } else {
+            try track.insertTimeRange(range, of: source, at: .zero)
+        }
+        return composition
+    }
+
     // MARK: - Finish
 
     /// Turns the downloaded lossless result into the AAC file kept next to
-    /// the recording, after checking it is exactly as long as the original.
-    static func finishProcessedAudio(downloadedURL: URL, videoURL: URL, to outputURL: URL) async throws {
-        let original = try await audioDuration(ofVideoAt: videoURL)
+    /// the recording, after checking it is exactly as long as what was sent:
+    /// the original audio, or its cut (`keep`).
+    static func finishProcessedAudio(
+        downloadedURL: URL,
+        videoURL: URL,
+        keep: [ClosedRange<Double>]? = nil,
+        to outputURL: URL
+    ) async throws {
+        let original = keep == nil
+            ? try await audioDuration(ofVideoAt: videoURL)
+            : try await audioComposition(of: videoURL, keep: keep).duration.seconds
         let processed = try await AVURLAsset(url: downloadedURL).load(.duration).seconds
         guard abs(original - processed) <= lengthTolerance else {
             throw AudioError.lengthMismatch(original: original, processed: processed)
@@ -74,17 +96,26 @@ enum StudioSoundAudio {
     }
 
     /// `keep`: the section cuts to apply (`SectionCutComposition`).
+    /// `studioIsCut`: the processed audio covers that cut only, already on
+    /// its timeline, so it goes in after the gaps are out.
     @MainActor
     static func makePlayerItem(
         videoURL: URL,
         studioAudioURL: URL,
         useStudio: Bool,
-        keep: [ClosedRange<Double>]? = nil
+        keep: [ClosedRange<Double>]? = nil,
+        studioIsCut: Bool = false
     ) async throws -> PlayerItem {
         let composition = AVMutableComposition()
         let audioStart = try await insertVideo(of: videoURL, into: composition, includeOriginalAudio: true)
-        let studioTrack = try await insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
-        if let keep { SectionCutComposition.removeGaps(keeping: keep, from: composition) }
+        let studioTrack: AVMutableCompositionTrack
+        if let keep, studioIsCut {
+            SectionCutComposition.removeGaps(keeping: keep, from: composition)
+            studioTrack = try await insertStudioAudio(studioAudioURL, into: composition, at: .zero)
+        } else {
+            studioTrack = try await insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
+            if let keep { SectionCutComposition.removeGaps(keeping: keep, from: composition) }
+        }
 
         let originalTrack = composition.tracks(withMediaType: .audio).first { $0 !== studioTrack }
         let studioMix = mix(audible: studioTrack, muted: originalTrack)

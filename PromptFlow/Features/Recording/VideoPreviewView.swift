@@ -704,14 +704,16 @@ struct VideoPreviewView: View {
     /// it in when Studio Sound finished while the preview was open. On any
     /// failure the plain file keeps playing.
     private func attachStudioAudio(replacingCurrentItem: Bool) async {
-        guard let studioURL = recording.studioAudioURL else { return }
+        // Audio processed for the cut only has nothing to say to the whole take.
+        guard let studioURL = recording.studioAudioURL, recording.studioFitsPlayback else { return }
         let prepared: StudioSoundAudio.PlayerItem
         do {
             prepared = try await StudioSoundAudio.makePlayerItem(
                 videoURL: recording.fileURL,
                 studioAudioURL: studioURL,
                 useStudio: recording.studioEnabled,
-                keep: recording.usesSectionCuts ? recording.sectionCuts : nil
+                keep: recording.usesSectionCuts ? recording.sectionCuts : nil,
+                studioIsCut: recording.studioCutData != nil
             )
         } catch {
             AppAnalytics.log("studio_sound_playback_failed", params: [
@@ -1039,6 +1041,12 @@ struct VideoPreviewView: View {
                 return
             }
             startStudio()
+        case .ready where !recording.studioFitsPlayback && !recording.usesSectionCuts:
+            // Processed for the cut only, and the whole take is on: back to
+            // the cut, with Studio Sound.
+            StudioSoundManager.shared.setEnabled(true, for: recording)
+            handleCutTap()
+            comparedStudioSound = true
         case .ready:
             let enabled = !recording.studioEnabled
             StudioSoundManager.shared.setEnabled(enabled, for: recording)
@@ -1056,10 +1064,11 @@ struct VideoPreviewView: View {
         }
     }
 
-    /// What this recording costs: one enhancement per started 3 minutes,
-    /// as the server counts it.
+    /// What this recording costs: one enhancement per started 3 minutes of
+    /// the audio sent, as the server counts it — the cut alone when that is
+    /// cheaper (`Recording.studioSendsCutOnly`).
     private var studioUnits: Int {
-        max(1, Int((recording.duration / 180).rounded(.up)))
+        recording.studioUnitsToSend
     }
 
     private func startStudio() {

@@ -100,4 +100,47 @@ final class SectionCutTests: XCTestCase {
         recording.sectionCutsEnabled = false
         XCTAssertEqual(recording.displayDuration, 12)
     }
+
+    // MARK: - Studio Sound and the cut
+
+    private func recording(duration: Double, cuts: [ClosedRange<Double>]?) -> Recording {
+        let recording = Recording(fileName: "x.mov", scriptTitle: "x", duration: duration, hasWatermark: false)
+        recording.sectionCuts = cuts
+        return recording
+    }
+
+    func testShortTakeSendsWhole() {
+        // 2:40 whole, 1:30 cut: one unit either way.
+        let rec = recording(duration: 160, cuts: [0...90])
+        XCTAssertFalse(rec.studioSendsCutOnly)
+        XCTAssertEqual(rec.studioUnitsToSend, 1)
+    }
+
+    func testCutSendsAloneWhenItSavesAUnit() {
+        // 4:00 whole (2 units), 2:30 cut (1 unit).
+        let rec = recording(duration: 240, cuts: [0...100, 140...190])
+        XCTAssertTrue(rec.studioSendsCutOnly)
+        XCTAssertEqual(rec.studioUnitsToSend, 1)
+        rec.sectionCutsEnabled = false
+        XCTAssertFalse(rec.studioSendsCutOnly, "The whole take is what plays")
+        XCTAssertEqual(rec.studioUnitsToSend, 2)
+    }
+
+    func testCutOnlyStudioFitsTheCutOnly() {
+        let rec = recording(duration: 240, cuts: [0...100, 140...190])
+        XCTAssertTrue(rec.studioFitsPlayback, "Whole-take audio fits both")
+        rec.studioCutData = rec.sectionCutsData
+        XCTAssertTrue(rec.studioFitsPlayback)
+        rec.sectionCutsEnabled = false
+        XCTAssertFalse(rec.studioFitsPlayback)
+        rec.sectionCutsEnabled = true
+        rec.sectionCuts = [0...90]
+        XCTAssertFalse(rec.studioFitsPlayback, "Processed for another cut")
+    }
+
+    func testStudioUnitsPerStartedThreeMinutes() {
+        XCTAssertEqual(Recording.studioUnits(forSeconds: 1), 1)
+        XCTAssertEqual(Recording.studioUnits(forSeconds: 180), 1)
+        XCTAssertEqual(Recording.studioUnits(forSeconds: 181), 2)
+    }
 }

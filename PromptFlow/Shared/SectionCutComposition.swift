@@ -47,15 +47,27 @@ enum SectionCutComposition {
     /// processed soundtrack when `studioAudioURL` is given. Re-encoded:
     /// a passthrough copy keeps the cuts only as an edit list, which some
     /// editors ignore, bringing the gaps back. The caller deletes the file.
-    static func export(videoURL: URL, studioAudioURL: URL?, keep: [ClosedRange<Double>]) async throws -> URL {
+    /// `studioIsCut`: the processed audio covers the cut only, on its
+    /// timeline (`Recording.studioCutData`).
+    static func export(
+        videoURL: URL,
+        studioAudioURL: URL?,
+        keep: [ClosedRange<Double>],
+        studioIsCut: Bool = false
+    ) async throws -> URL {
         let composition = AVMutableComposition()
         let audioStart = try await StudioSoundAudio.insertVideo(
             of: videoURL, into: composition, includeOriginalAudio: studioAudioURL == nil
         )
-        if let studioAudioURL {
-            _ = try await StudioSoundAudio.insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
+        if let studioAudioURL, studioIsCut {
+            removeGaps(keeping: keep, from: composition)
+            _ = try await StudioSoundAudio.insertStudioAudio(studioAudioURL, into: composition, at: .zero)
+        } else {
+            if let studioAudioURL {
+                _ = try await StudioSoundAudio.insertStudioAudio(studioAudioURL, into: composition, at: audioStart)
+            }
+            removeGaps(keeping: keep, from: composition)
         }
-        removeGaps(keeping: keep, from: composition)
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("cut-export-\(UUID().uuidString).mov")
