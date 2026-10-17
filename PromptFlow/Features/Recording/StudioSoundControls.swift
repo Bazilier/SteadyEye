@@ -872,59 +872,61 @@ struct StudioCardOverlay: View {
                 }
             }
         default:
-            HStack(spacing: 6) {
-                studioBadge
-                if recording.sectionCuts != nil { cutBadge }
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            leadingBadge
+                .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
     }
 
+    /// Studio whenever the take has processed audio, whether or not it is
+    /// switched on (or the error, when it failed), and the scissors beside
+    /// it whenever the take has a cut — accent while the cut plays, white
+    /// while the whole take does. Two badges, set tight together and kept
+    /// small so they stay clear of the duration on the right.
     @ViewBuilder
-    private var studioBadge: some View {
-        switch recording.studioStatus {
-        case .ready where recording.usesStudioAudio:
-            badge(icon: "sparkles", tint: Theme.accent, text: "Studio", textColor: .white)
-        case .failed:
-            badge(
-                icon: "exclamationmark.circle",
-                tint: .red,
-                text: String(
-                    localized: "studio.card.failed",
-                    defaultValue: "Error",
-                    comment: "Badge on a recording card's thumbnail when Studio Sound failed."
-                ),
-                textColor: Color(red: 1, green: 0.41, blue: 0.38)
-            )
-        default:
-            EmptyView()
+    private var leadingBadge: some View {
+        let hasStudio = recording.studioStatus == .ready && recording.studioAudioURL != nil
+        let failed = recording.studioStatus == .failed
+        HStack(spacing: 4) {
+            if hasStudio {
+                capsule(horizontalPadding: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Theme.accent)
+                        Text(verbatim: "Studio")
+                            .foregroundStyle(.white)
+                    }
+                }
+            } else if failed {
+                capsule(horizontalPadding: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundStyle(.red)
+                        Text(String(
+                            localized: "studio.card.failed",
+                            defaultValue: "Error",
+                            comment: "Badge on a recording card's thumbnail when Studio Sound failed."
+                        ))
+                        .foregroundStyle(Color(red: 1, green: 0.41, blue: 0.38))
+                    }
+                }
+            }
+            if recording.sectionCuts != nil {
+                capsule(horizontalPadding: 6) {
+                    Image(systemName: "scissors")
+                        .foregroundStyle(recording.sectionCutsEnabled ? Theme.accent : .white)
+                }
+                .accessibilityElement()
+                .accessibilityLabel(SectionCutChip.label(isCut: recording.sectionCutsEnabled))
+            }
         }
     }
 
-    /// Icon only, beside Studio's badge and the duration: accent while the
-    /// cut plays, white while the whole take does.
-    private var cutBadge: some View {
-        Image(systemName: "scissors")
+    private func capsule<Content: View>(horizontalPadding: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        content()
             .font(.caption.weight(.semibold))
-            .foregroundStyle(recording.sectionCutsEnabled ? Theme.accent : .white)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 4)
             .background(Color.black.opacity(0.6), in: Capsule())
-            .accessibilityElement()
-            .accessibilityLabel(SectionCutChip.label(isCut: recording.sectionCutsEnabled))
-    }
-
-    private func badge(icon: String, tint: Color, text: String, textColor: Color) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-            Text(verbatim: text)
-                .foregroundStyle(textColor)
-        }
-        .font(.caption.weight(.semibold))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.6), in: Capsule())
     }
 }
