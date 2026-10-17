@@ -1588,7 +1588,8 @@ final class CameraManager: NSObject, ObservableObject {
                     AppAnalytics.log("recording_failed", params: [
                         "duration_sec": Int(self.lastRecordingDuration.rounded()),
                         "display_mode": UserDefaults.standard.string(forKey: "teleprompterMode") ?? "wbw",
-                        "error_reason": "\(nsError.domain)/\(nsError.code)"
+                        "error_reason": "\(nsError.domain)/\(nsError.code)",
+                        "stage": "writer"
                     ])
                     self.errorMessage = String(
                         localized: "camera.error.recordingError",

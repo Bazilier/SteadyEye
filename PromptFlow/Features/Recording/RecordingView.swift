@@ -2252,7 +2252,8 @@ struct RecordingView: View {
                 AppAnalytics.log("recording_failed", params: [
                     "duration_sec": Int(duration.rounded()),
                     "display_mode": displayMode,
-                    "error_reason": "\(nsError.domain)/\(nsError.code)"
+                    "error_reason": "\(nsError.domain)/\(nsError.code)",
+                    "stage": "persist"
                 ])
                 DuoReportService.reportTake(
                     fileURL: nil,

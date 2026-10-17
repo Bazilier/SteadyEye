@@ -80,6 +80,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 **F7. `recording_failed` covers two different failures.**
 - The writer failing (CameraManager) and the library save failing (RecordingView) use the same name and the same params.
 - Fix: add `stage: "writer" | "persist"`.
+- **Fixed** on `fix/analytics-audit`: `stage: "writer" | "persist"` added.
 
 **F8. Naming conventions are mixed.**
 - `reason` and `error_reason` are both used.
@@ -204,7 +205,7 @@ Fix: use `"\(nsError.domain)/\(nsError.code)"`, the way `recording_failed` alrea
 | `first_take_coach_shown` | Recording | ok | First-take coach mark shown | script_source | RecordingView |
 | `follow_my_voice_v2_started` | Recording | ok | Follow My Voice started | — | RecordingView |
 | `follow_my_voice_v2_unavailable` | Recording | ok | Follow My Voice failed to start; `reason` = domain/code | reason | RecordingView |
-| `recording_failed` | Recording | review | Take lost. Two stages (writer, persist) share the name — see audit F7 | display_mode, duration_sec, error_reason | CameraManager, RecordingView |
+| `recording_failed` | Recording | ok | Take lost; `stage` = writer (file not finished) / persist (library save failed) | display_mode, duration_sec, error_reason, stage | CameraManager, RecordingView |
 | `recording_saved` | Recording | ok | Take saved to the library; `via`, `was_first` | duration_sec, via, was_first | CameraManager, RecordingView |
 | `recording_started` | Recording | ok | Take started | display_mode, script_length_words | RecordingView |
 | `recording_stopped` | Recording | ok | Take stopped (fires on failures too) | display_mode, duration_sec | CameraManager |
