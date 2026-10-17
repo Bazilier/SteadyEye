@@ -1,101 +1,101 @@
 import SwiftUI
 
 /// Explains the three slash markers and inserts the one tapped. Shown from
-/// the editor's "//" buttons.
+/// the editor's "//" buttons. A grouped list, as in Settings: each row is
+/// the marker as it is typed, what it does, and a plus.
 struct MarkersPopover: View {
     let onInsert: (ScriptMarker) -> Void
     let onClose: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("editor.markers.title", comment: "Title of the popover in the script editor that explains the // /// //// markers.")
-                        .font(.title3.bold())
-                    Text("editor.markers.subtitle", comment: "Subtitle of the markers popover.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Color(.tertiarySystemFill), in: Circle())
-                }
-                .accessibilityLabel(Text("common.close", comment: "Close button of the markers popover in the script editor"))
-            }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 4)
+    /// The popover's own surface, as the app's sheets (`CoachSheet`).
+    static let background = Color(white: 0.11)
+    /// The grouped rows on it.
+    private static let groupFill = Color(white: 0.17)
 
-            ForEach(ScriptMarker.allCases) { marker in
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            rows
+            Text("editor.markers.hint", comment: "Footer of the markers popover: the slashes stay in the script text only (the audience never sees them), and tapping a row inserts that marker at the cursor.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 6)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .frame(width: 352)
+        .presentationBackground(Self.background)
+        .preferredColorScheme(.dark)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Text(verbatim: "//")
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 44, height: 44)
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
+            Text("editor.markers.title", comment: "Title of the popover in the script editor that explains the // /// //// markers.")
+                .font(.title3.bold())
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(Color(white: 0.17), in: Circle())
+            }
+            .accessibilityLabel(Text("common.close", comment: "Close button of the markers popover in the script editor"))
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var rows: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(ScriptMarker.allCases.enumerated()), id: \.element) { index, marker in
+                if index > 0 {
+                    // Inset to the text, as a grouped list divides its rows.
+                    Rectangle()
+                        .fill(Color(white: 0.24))
+                        .frame(height: 0.5)
+                        .padding(.leading, 80)
+                }
                 row(marker)
             }
-
-            Text("editor.markers.hint", comment: "Footer of the markers popover: tapping a row inserts that marker at the cursor.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 2)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .frame(width: 360)
+        .background(Self.groupFill, in: RoundedRectangle(cornerRadius: Theme.Radius.medium - 2, style: .continuous))
     }
 
     private func row(_ marker: ScriptMarker) -> some View {
-        let isSection = marker == .section
-        return Button { onInsert(marker) } label: {
+        Button { onInsert(marker) } label: {
             HStack(spacing: 12) {
+                // The marker as it is typed, on the prompter's black.
                 Text(verbatim: marker.rawValue)
-                    .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundStyle(isSection ? Theme.onAccent : Theme.accent)
-                    .frame(width: 64, height: 44)
-                    .background(
-                        isSection ? Theme.accent : Theme.accentTint,
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.small)
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        title(marker)
-                            .font(.callout.weight(.semibold))
-                        if isSection {
-                            Text("editor.markers.new", comment: "Badge on the newest marker (////) in the markers popover.")
-                                .font(.caption2.weight(.bold))
-                                .textCase(.uppercase)
-                                .foregroundStyle(Theme.onAccent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .kerning(-1)
+                    .foregroundStyle(Theme.accent)
+                    .frame(minWidth: 54, minHeight: 32)
+                    .padding(.horizontal, 2)
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    title(marker)
+                        .font(.body.weight(.medium))
                     summary(marker)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    preview(marker)
-                        .padding(.top, 4)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(isSection ? Theme.accent : .secondary)
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 22))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(Theme.onAccent, Theme.accent)
             }
-            .padding(12)
-            .background(
-                isSection ? Theme.accent.opacity(0.14) : Color(.tertiarySystemFill),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-            .overlay {
-                if isSection {
-                    RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.accent, lineWidth: 1.5)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
@@ -113,51 +113,7 @@ struct MarkersPopover: View {
         switch marker {
         case .shortPause: Text("editor.markers.short.body", comment: "Markers popover: what // does.")
         case .longPause: Text("editor.markers.long.body", comment: "Markers popover: what /// does — about one second of silence.")
-        case .section: Text("editor.markers.section.body", comment: "Markers popover: what //// does — the prompter stops at the end of the section and offers Repeat or Next, while recording continues.")
-        }
-    }
-
-    /// A word, the gap the marker makes, and the next word; for a section,
-    /// the Repeat and Next buttons the prompter stops on.
-    @ViewBuilder
-    private func preview(_ marker: ScriptMarker) -> some View {
-        HStack(spacing: 6) {
-            Capsule()
-                .fill(.secondary)
-                .frame(width: 40, height: 6)
-            switch marker {
-            case .shortPause, .longPause:
-                Line()
-                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [0.1, 4]))
-                    .frame(width: marker == .shortPause ? 12 : 40, height: 2)
-                Capsule()
-                    .fill(.secondary)
-                    .frame(width: 30, height: 6)
-            case .section:
-                previewButton("arrow.counterclockwise", ringed: false)
-                previewButton("play.fill", ringed: true)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func previewButton(_ systemName: String, ringed: Bool) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
-            .background(Color(.systemGray3), in: Circle())
-            .overlay {
-                if ringed { Circle().strokeBorder(Theme.accent, lineWidth: 1.5) }
-            }
-    }
-
-    private struct Line: Shape {
-        func path(in rect: CGRect) -> Path {
-            Path { p in
-                p.move(to: CGPoint(x: rect.minX, y: rect.midY))
-                p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-            }
+        case .section: Text("editor.markers.section.body", comment: "Markers popover: what //// does — the prompter stops at the end of the section and offers Repeat or Next (use the same words as those buttons), and the pauses are cut from the video afterwards.")
         }
     }
 }
