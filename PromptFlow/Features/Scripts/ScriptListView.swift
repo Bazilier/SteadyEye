@@ -489,8 +489,11 @@ struct ScriptListView: View {
                                 "script_source": script.isDemo ? "demo" : "user",
                                 "script_length_words": script.content.split(separator: " ").count
                             ])
-                            cardOpener.open(script.id, reduceMotion: reduceMotion) {
-                                scriptToRecord = script
+                            Task { @MainActor in
+                                await MediaAccess.requestUndetermined()
+                                cardOpener.open(script.id, reduceMotion: reduceMotion) {
+                                    scriptToRecord = script
+                                }
                             }
                         } label: {
                             HStack {
@@ -656,7 +659,10 @@ struct ScriptListView: View {
             showDraftScript = true
         case .ownTake(let id):
             if let script = scripts.first(where: { $0.id == id }) {
-                scriptToRecord = script
+                Task { @MainActor in
+                    await MediaAccess.requestUndetermined()
+                    scriptToRecord = script
+                }
             } else {
                 UserDefaults.standard.set(true, forKey: "pendingOwnScriptAfterFirstTake")
                 showDraftScript = true
@@ -726,6 +732,7 @@ struct ScriptListView: View {
             case .record(let script):
                 // Remembered so a relaunch can resume on this script's take.
                 UserDefaults.standard.set(script.id.uuidString, forKey: OnboardingFlow.flowScriptIDKey)
+                await MediaAccess.requestUndetermined()
                 scriptToRecord = script
             case .insert: break
             case .writeMyself: editorMode = .newSelfWritten
